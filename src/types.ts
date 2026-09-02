@@ -7,7 +7,10 @@ export type MessageStatus =
   | 'DELIVERED'
   | 'BOUNCED'
   | 'FAILED'
-  | 'COMPLAINED';
+  | 'COMPLAINED'
+  | 'REJECTED'
+  | 'RENDERING_FAILED'
+  | 'DELIVERY_DELAYED';
 
 export type EventType =
   | 'QUEUED'
@@ -19,7 +22,11 @@ export type EventType =
   | 'COMPLAINED'
   | 'OPENED'
   | 'CLICKED'
-  | 'UNSUBSCRIBED';
+  | 'UNSUBSCRIBED'
+  | 'REJECTED'
+  | 'RENDERING_FAILURE'
+  | 'DELIVERY_DELAY'
+  | 'SUBSCRIPTION';
 
 export type CampaignStatus =
   | 'DRAFT'
@@ -174,6 +181,7 @@ export interface MessageAttachment {
 export interface Message {
   id: string;
   messageId: string; // RFC 5322 Message-ID format e.g. <abc-123@domain.com>
+  sesMessageId?: string; // Amazon SES mail.messageId e.g. 0102018f...
   campaignId?: string;
   campaignName?: string;
   senderId: string;
@@ -221,6 +229,10 @@ export interface DashboardStats {
   bounced: number;
   failed: number;
   complaints: number;
+  rejected: number;
+  deliveryDelayed: number;
+  renderingFailed: number;
+  queued: number;
   opens: number;
   clicks: number;
   deliveryRate: number; // percentage
@@ -237,6 +249,7 @@ export interface DashboardStats {
     delivered: number;
     bounced: number;
     failed: number;
+    rejected?: number;
   }>;
   hourlyActivity: Array<{
     hour: string;

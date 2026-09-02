@@ -106,6 +106,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             <option value="BOUNCED">Bounced</option>
             <option value="FAILED">Failed</option>
             <option value="COMPLAINED">Complained</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="RENDERING_FAILED">Rendering Failed</option>
+            <option value="DELIVERY_DELAYED">Delivery Delayed</option>
           </select>
 
           {/* Sender Filter */}

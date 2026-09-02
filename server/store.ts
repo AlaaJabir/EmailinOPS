@@ -11,6 +11,7 @@ import {
   MessageEvent,
   TechnicalLog,
   PrometheusMetrics,
+  DashboardStats,
 } from '../src/types.js';
 
 // In-Memory Database Store mimicking PostgreSQL + Prisma relations
@@ -29,6 +30,7 @@ class DatabaseStore {
   logs: TechnicalLog[] = [];
   settings: Record<string, any> = {};
   apiKeys: Array<{ id: string; name: string; keyPrefix: string; createdAt: string; lastUsedAt?: string }> = [];
+  processedEventIds: Set<string> = new Set<string>();
 
   constructor() {
     this.seedInitialData();
@@ -377,6 +379,9 @@ class DatabaseStore {
     // 11. API Keys
     this.apiKeys = [];
 
+    // Idempotency tracking set for webhook & event deduplication
+    this.processedEventIds = new Set<string>();
+
     // 12. Settings
     this.settings = {
       kumomta: {
@@ -418,51 +423,143 @@ class DatabaseStore {
     };
   }
 
+  // Idempotency tracking helpers
+  hasProcessedEvent(key: string): boolean {
+    return this.processedEventIds.has(key);
+  }
+
+  recordProcessedEvent(key: string): void {
+    this.processedEventIds.add(key);
+  }
+
+  // Robust Message Correlation Strategy:
+  // Correlation between:
+  // Internal ID -> RFC Message-ID -> SES mail.messageId -> SES Event
+  findMessageForEvent(params: {
+    internalId?: string;
+    rfcMessageId?: string;
+    sesMessageId?: string;
+    recipient?: string;
+  }): Message | undefined {
+    const { internalId, rfcMessageId, sesMessageId, recipient } = params;
+
+    // 1. Direct match on Dashboard internal message ID (e.g. msg_174000_abc)
+    if (internalId) {
+      const found = this.messages.find((m) => m.id === internalId);
+      if (found) return found;
+    }
+
+    // 2. Direct match on RFC 5322 Message-ID (stripping angle brackets and trimming)
+    if (rfcMessageId) {
+      const cleanRfc = rfcMessageId.trim().replace(/^<|>$/g, '').toLowerCase();
+      const found = this.messages.find((m) => {
+        const cleanM = (m.messageId || '').trim().replace(/^<|>$/g, '').toLowerCase();
+        return cleanM === cleanRfc;
+      });
+      if (found) return found;
+    }
+
+    // 3. Match on Amazon SES mail.messageId (if previously linked or matching providerMessageId)
+    if (sesMessageId) {
+      const cleanSes = sesMessageId.trim();
+      const found = this.messages.find(
+        (m) =>
+          m.sesMessageId === cleanSes ||
+          m.providerMessageId === cleanSes ||
+          m.id === cleanSes ||
+          m.messageId === cleanSes
+      );
+      if (found) return found;
+    }
+
+    // 4. Fallback match by recipient if exactly one candidate message exists
+    if (recipient) {
+      const cleanRecip = recipient.trim().toLowerCase();
+      const matching = this.messages.filter((m) => m.toEmail.trim().toLowerCase() === cleanRecip);
+      if (matching.length === 1) {
+        return matching[0];
+      }
+    }
+
+    return undefined;
+  }
+
   // Dashboard Aggregations (Derived strictly from real runtime data)
-  getDashboardStats() {
+  getDashboardStats(): DashboardStats {
     const realMessages = this.messages;
 
-    // Messages accepted into KumoMTA spool
-    const acceptedMessages = realMessages.filter(
-      (m) => m.status === 'QUEUED' || m.status === 'SENT' || m.status === 'DELIVERED'
-    );
-    const totalSent = acceptedMessages.length;
+    let queued = 0;
+    let sent = 0;
+    let delivered = 0;
+    let bounced = 0;
+    let failed = 0;
+    let complaints = 0;
+    let rejected = 0;
+    let deliveryDelayed = 0;
+    let renderingFailed = 0;
 
-    // Messages accepted and currently in queued/spool status
-    const queued = realMessages.filter((m) => m.status === 'QUEUED').length;
+    for (const m of realMessages) {
+      switch (m.status) {
+        case 'QUEUED':
+          queued++;
+          break;
+        case 'SENDING':
+        case 'SENT':
+          sent++;
+          break;
+        case 'DELIVERED':
+          delivered++;
+          break;
+        case 'BOUNCED':
+          bounced++;
+          break;
+        case 'FAILED':
+          failed++;
+          break;
+        case 'COMPLAINED':
+          complaints++;
+          break;
+        case 'REJECTED':
+          rejected++;
+          break;
+        case 'DELIVERY_DELAYED':
+          deliveryDelayed++;
+          break;
+        case 'RENDERING_FAILED':
+          renderingFailed++;
+          break;
+      }
+    }
 
-    // Messages that failed during transmission/rejection
-    const failed = realMessages.filter((m) => m.status === 'FAILED').length;
+    // Total sent includes all messages accepted and dispatched through the pipeline
+    const totalSent = realMessages.length;
 
-    // Telemetry for downstream delivery/bounces/complaints/opens/clicks is pending Step 2
-    // Do NOT fabricate or estimate values
-    const delivered = 0;
-    const bounced = 0;
-    const complaints = 0;
-    const opens = 0;
-    const clicks = 0;
+    // Real open and click counts from recorded events
+    const opens = this.messageEvents.filter((e) => e.eventType === 'OPENED').length;
+    const clicks = this.messageEvents.filter((e) => e.eventType === 'CLICKED').length;
 
-    const deliveryRate = 0;
-    const bounceRate = 0;
-    const openRate = 0;
-    const clickRate = 0;
+    // Computed rates (0 if no messages)
+    const deliveryRate = totalSent > 0 ? Number(((delivered / totalSent) * 100).toFixed(1)) : 0;
+    const bounceRate = totalSent > 0 ? Number(((bounced / totalSent) * 100).toFixed(2)) : 0;
+    const openRate = delivered > 0 ? Number(((opens / delivered) * 100).toFixed(1)) : 0;
+    const clickRate = delivered > 0 ? Number(((clicks / delivered) * 100).toFixed(1)) : 0;
 
     // Calculate real sending rate from submissions in the last 60 seconds
     const now = Date.now();
     const recentSubmissions = realMessages.filter((m) => {
       const msgTime = new Date(m.createdAt || m.queuedAt).getTime();
-      return now - msgTime <= 60000 && (m.status === 'QUEUED' || m.status === 'SENT' || m.status === 'DELIVERED');
+      return now - msgTime <= 60000 && m.status !== 'FAILED';
     }).length;
     const sendingRatePerSec = recentSubmissions > 0 ? Number((recentSubmissions / 60).toFixed(2)) : 0;
 
     // Real timeseries for the last 7 days derived from actual runtime messages
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const timeseriesMap = new Map<string, { sent: number; delivered: number; bounced: number; failed: number }>();
+    const timeseriesMap = new Map<string, { sent: number; delivered: number; bounced: number; failed: number; rejected: number }>();
 
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now - i * 86400000);
       const dayName = days[d.getDay()];
-      timeseriesMap.set(dayName, { sent: 0, delivered: 0, bounced: 0, failed: 0 });
+      timeseriesMap.set(dayName, { sent: 0, delivered: 0, bounced: 0, failed: 0, rejected: 0 });
     }
 
     for (const m of realMessages) {
@@ -470,11 +567,11 @@ class DatabaseStore {
       const dayName = days[d.getDay()];
       if (timeseriesMap.has(dayName)) {
         const item = timeseriesMap.get(dayName)!;
-        if (m.status === 'QUEUED' || m.status === 'SENT' || m.status === 'DELIVERED') {
-          item.sent += 1;
-        } else if (m.status === 'FAILED') {
-          item.failed += 1;
-        }
+        item.sent += 1;
+        if (m.status === 'DELIVERED') item.delivered += 1;
+        else if (m.status === 'BOUNCED') item.bounced += 1;
+        else if (m.status === 'FAILED') item.failed += 1;
+        else if (m.status === 'REJECTED') item.rejected += 1;
       }
     }
 
@@ -514,8 +611,8 @@ class DatabaseStore {
         name: s.name,
         email: s.fromEmail,
         volume: s.sentCount,
-        deliveryRate: 0,
-        bounceRate: 0,
+        deliveryRate: s.sentCount > 0 ? Number(((s.deliveredCount / s.sentCount) * 100).toFixed(2)) : 0,
+        bounceRate: s.sentCount > 0 ? Number(((s.bouncedCount / s.sentCount) * 100).toFixed(2)) : 0,
       }));
 
     const topCampaigns = this.campaigns
@@ -524,10 +621,16 @@ class DatabaseStore {
         id: c.id,
         name: c.name,
         sent: c.sentCount,
-        delivered: 0,
-        openRate: 0,
-        clickRate: 0,
+        delivered: c.deliveredCount,
+        openRate: c.deliveredCount > 0 ? Number(((c.openCount / c.deliveredCount) * 100).toFixed(1)) : 0,
+        clickRate: c.openCount > 0 ? Number(((c.clickCount / c.openCount) * 100).toFixed(1)) : 0,
       }));
+
+    // Detect SES health based on webhook events or settings
+    const hasSesEvents = this.messageEvents.some(
+      (e) => e.eventType === 'DELIVERED' || e.eventType === 'BOUNCED' || e.eventType === 'SENT'
+    );
+    const sesHealth = hasSesEvents ? 'healthy' : this.settings.ses.status === 'healthy' ? 'healthy' : 'degraded';
 
     return {
       totalSent,
@@ -535,6 +638,10 @@ class DatabaseStore {
       bounced,
       failed,
       complaints,
+      rejected,
+      deliveryDelayed,
+      renderingFailed,
+      queued,
       opens,
       clicks,
       deliveryRate,
@@ -544,7 +651,7 @@ class DatabaseStore {
       queueSize: queued,
       sendingRatePerSec,
       kumoHealth: 'healthy',
-      sesHealth: 'offline',
+      sesHealth,
       timeseries,
       hourlyActivity,
       topSenders,

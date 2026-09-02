@@ -163,12 +163,32 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
               {message.status === 'BOUNCED' && (
                 <div className="p-4 rounded-sm bg-rose-500/10 border border-rose-500/20 text-xs space-y-1">
                   <div className="font-semibold text-rose-400 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4" /> Hard Bounce Diagnostic
+                    <AlertTriangle className="w-4 h-4" /> {message.bounceType || 'Hard'} Bounce Diagnostic
                   </div>
                   <div className="text-zinc-300 font-mono">{message.bounceReason || 'Mailbox lookup failed'}</div>
                   <div className="text-[#888888] text-[11px]">
-                    Recipient has been added to the active suppression table to prevent further delivery attempts.
+                    Recipient has been added to the active suppression table to protect sender reputation.
                   </div>
+                </div>
+              )}
+
+              {/* SES Rejection Banner */}
+              {message.status === 'REJECTED' && (
+                <div className="p-4 rounded-sm bg-rose-500/10 border border-rose-500/20 text-xs space-y-1">
+                  <div className="font-semibold text-rose-400 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4" /> Amazon SES Policy Rejection
+                  </div>
+                  <div className="text-zinc-300 font-mono">{message.bounceReason || 'Message rejected by SES upstream'}</div>
+                </div>
+              )}
+
+              {/* Delivery Delay Banner */}
+              {message.status === 'DELIVERY_DELAYED' && (
+                <div className="p-4 rounded-sm bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                  <div className="font-semibold text-amber-300 flex items-center gap-1.5">
+                    <Clock className="w-4 h-4" /> Downstream MTA Delivery Delay
+                  </div>
+                  <div className="text-zinc-300 font-mono">{message.bounceReason || 'Temporary deferral at destination mail server'}</div>
                 </div>
               )}
 
@@ -188,6 +208,9 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
             <div className="space-y-3 font-mono text-xs">
               <div className="p-4 rounded-sm bg-[#050505] border border-white-10 space-y-2">
                 <div className="text-[#888888]">Message-ID: <span className="text-emerald-400">{message.messageId}</span></div>
+                {message.sesMessageId && (
+                  <div className="text-[#888888]">SES Message-ID: <span className="text-sky-400">{message.sesMessageId}</span></div>
+                )}
                 <div className="text-[#888888]">Date: <span className="text-zinc-200">{new Date(message.createdAt).toUTCString()}</span></div>
                 <div className="text-[#888888]">From: <span className="text-zinc-200">{message.fromEmail}</span></div>
                 <div className="text-[#888888]">To: <span className="text-zinc-200">{message.toEmail}</span></div>
@@ -215,8 +238,11 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
 
         {/* Footer */}
         <div className="p-4 border-t border-white-10 bg-[#050505] flex items-center justify-between">
-          <div className="text-xs text-[#888888]">
-            Internal ID: <span className="font-mono text-zinc-300">{message.id}</span>
+          <div className="text-xs text-[#888888] flex items-center gap-3">
+            <span>Internal ID: <span className="font-mono text-zinc-300">{message.id}</span></span>
+            {message.sesMessageId && (
+              <span>&bull; SES: <span className="font-mono text-sky-400">{message.sesMessageId}</span></span>
+            )}
           </div>
           <button
             onClick={onClose}

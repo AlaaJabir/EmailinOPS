@@ -351,11 +351,17 @@ export class KumoMtaService {
     const senderId = sender ? sender.id : db.senders[0]?.id || 'snd_01';
     const senderDisplayName = payload.fromName || sender?.name || this.config.fromName;
 
-    // Custom headers
+    // Custom headers with correlation identifiers
     const customHeaders: Record<string, string> = {
       'X-KumoMTA-Queue': 'tier1-high-throughput',
       'X-KumoMTA-Spool-ID': `spool-${Date.now().toString(36)}`,
       'X-Entity-ID': 'emailops-kumo-cluster',
+      'X-Internal-Message-ID': internalId,
+      'X-EmailOps-ID': internalId,
+      ...(payload.campaignId ? { 'X-Campaign-ID': payload.campaignId } : {}),
+      ...(process.env.SES_CONFIGURATION_SET || db.settings.ses.configurationSet
+        ? { 'X-SES-CONFIGURATION-SET': process.env.SES_CONFIGURATION_SET || db.settings.ses.configurationSet }
+        : {}),
       ...(payload.customHeaders || {}),
     };
 
@@ -417,9 +423,17 @@ export class KumoMtaService {
       // Status in KumoMTA upon initial successful SMTP injection is QUEUED (spooled for upstream relay)
       const messageStatus: MessageStatus = 'QUEUED';
 
+      // Parse SES messageId if present in upstream SMTP response
+      let parsedSesMessageId: string | undefined = undefined;
+      const sesMatch = smtpResponse.match(/250.*?Ok\s+([0-9a-zA-Z\-_]{16,})/i);
+      if (sesMatch && sesMatch[1]) {
+        parsedSesMessageId = sesMatch[1];
+      }
+
       const newMsg: Message = {
         id: internalId,
         messageId: rfcMessageId,
+        sesMessageId: parsedSesMessageId,
         campaignId: payload.campaignId,
         campaignName: payload.campaignId
           ? db.campaigns.find((c) => c.id === payload.campaignId)?.name

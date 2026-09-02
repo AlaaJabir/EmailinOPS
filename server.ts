@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import 'dotenv/config';
+import dotenv from 'dotenv';
 
 import { authRouter } from './server/routes/auth.js';
 import { messagesRouter } from './server/routes/messages.js';
@@ -20,6 +20,8 @@ import { db } from './server/store.js';
 import { kumoMtaService } from './server/services/KumoMtaService.js';
 import { sesProvider } from './server/services/SesProvider.js';
 
+dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -27,8 +29,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Middlewares
-  app.use(express.json({ limit: '25mb' }));
+  // Middlewares - accept application/json AND text/plain (used by AWS SNS webhooks)
+  app.use(express.json({ limit: '25mb', type: ['application/json', 'text/plain'] }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
   // Request logger
@@ -99,7 +101,7 @@ async function startServer() {
     });
   }
 
-    app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`[EmailOps] Server started on http://0.0.0.0:${PORT}`);
   });
 }

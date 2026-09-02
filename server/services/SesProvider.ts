@@ -1,4 +1,5 @@
 import { db } from '../store.js';
+import { eventProcessor, SesEventPayload } from './EventProcessor.js';
 
 export interface EmailProvider {
   name: string;
@@ -21,131 +22,60 @@ export class SesProvider implements EmailProvider {
 
   async checkHealth(): Promise<{ status: 'healthy' | 'degraded' | 'offline'; region: string; quota: any }> {
     const hasCredentials = Boolean(process.env.SES_SMTP_USERNAME && process.env.SES_SMTP_PASSWORD);
+    const hasEvents = db.messageEvents.some(
+      (e) => e.eventType === 'DELIVERED' || e.eventType === 'BOUNCED' || e.eventType === 'SENT'
+    );
     return {
-      status: hasCredentials ? 'healthy' : 'offline',
+      status: hasEvents || hasCredentials ? 'healthy' : 'offline',
       region: this.region,
       quota: {
         max24HourSend: 0,
-        sentLast24Hours: 0,
+        sentLast24Hours: db.messages.length,
         maxSendRate: 0,
-        bounceRatePercent: 0,
+        bounceRatePercent: db.getDashboardStats().bounceRate,
         complaintRatePercent: 0,
-        accountStatus: hasCredentials ? 'Configured' : 'Offline / Unconfigured',
+        accountStatus: hasCredentials ? 'Configured' : hasEvents ? 'Active Webhook Telemetry' : 'Offline / Unconfigured',
       },
     };
   }
 
   // Ingest Amazon SNS Bounce Notification
   async processBounceWebhook(payload: {
-    bounceType: 'Permanent' | 'Transient';
-    bouncedRecipients: Array<{ emailAddress: string; status: string; diagnosticCode?: string }>;
-    mail: { messageId: string; source: string; destination: string[] };
+    bounceType?: 'Permanent' | 'Transient' | string;
+    bouncedRecipients?: Array<{ emailAddress: string; status?: string; diagnosticCode?: string }>;
+    mail?: { messageId: string; source?: string; destination?: string[] };
+    [key: string]: any;
   }): Promise<void> {
-    const nowIso = new Date().toISOString();
-    const { bounceType, bouncedRecipients, mail } = payload;
-
-    for (const recipient of bouncedRecipients) {
-      // Find message by RFC Message-ID or provider message ID
-      const message = db.messages.find(
-        (m) => m.providerMessageId === mail.messageId || m.toEmail.toLowerCase() === recipient.emailAddress.toLowerCase()
-      );
-
-      if (message) {
-        message.status = 'BOUNCED';
-        message.bouncedAt = nowIso;
-        message.bounceType = bounceType === 'Permanent' ? 'Hard' : 'Soft';
-        message.bounceReason = recipient.diagnosticCode || `SES ${bounceType} Bounce`;
-
-        // Add event
-        const evt = {
-          id: `evt_ses_bnc_${Date.now()}`,
-          messageId: message.messageId,
-          eventType: 'BOUNCED' as const,
-          eventData: { bounceType, diagnosticCode: recipient.diagnosticCode, source: 'ses_sns_webhook' },
-          timestamp: nowIso,
-        };
-        message.events = message.events || [];
-        message.events.push(evt);
-        db.messageEvents.push(evt);
-      }
-
-      // Add to suppression list if permanent
-      if (bounceType === 'Permanent') {
-        const existing = db.suppressions.find((s) => s.email.toLowerCase() === recipient.emailAddress.toLowerCase());
-        if (!existing) {
-          db.suppressions.unshift({
-            id: `sup_${Date.now()}`,
-            email: recipient.emailAddress,
-            type: 'HARD_BOUNCE',
-            reason: recipient.diagnosticCode || 'Permanent Bounce reported by Amazon SES SNS webhook',
-            source: 'ses_webhook',
-            createdAt: nowIso,
-          });
-        }
-      }
-    }
-
-    db.logs.unshift({
-      id: `log_ses_${Date.now()}`,
-      timestamp: nowIso,
-      service: 'Amazon SES',
-      event: 'SES_BOUNCE_WEBHOOK_PROCESSED',
-      severity: 'WARN',
-      response: `Processed ${bouncedRecipients.length} bounce records from SNS payload`,
-      details: payload,
+    eventProcessor.processSesNotification({
+      eventType: 'Bounce',
+      bounce: {
+        bounceType: payload.bounceType,
+        bouncedRecipients: payload.bouncedRecipients,
+      },
+      mail: payload.mail,
     });
   }
 
   // Ingest Amazon SNS Complaint Notification
   async processComplaintWebhook(payload: {
-    complainedRecipients: Array<{ emailAddress: string }>;
+    complainedRecipients?: Array<{ emailAddress: string }>;
     complaintFeedbackType?: string;
-    mail: { messageId: string; source: string };
+    mail?: { messageId: string; source?: string };
+    [key: string]: any;
   }): Promise<void> {
-    const nowIso = new Date().toISOString();
-    const { complainedRecipients, complaintFeedbackType } = payload;
-
-    for (const recipient of complainedRecipients) {
-      const message = db.messages.find(
-        (m) => m.toEmail.toLowerCase() === recipient.emailAddress.toLowerCase()
-      );
-
-      if (message) {
-        message.status = 'COMPLAINED';
-        const evt = {
-          id: `evt_ses_cmp_${Date.now()}`,
-          messageId: message.messageId,
-          eventType: 'COMPLAINED' as const,
-          eventData: { feedbackType: complaintFeedbackType || 'abuse', source: 'ses_feedback_loop' },
-          timestamp: nowIso,
-        };
-        message.events = message.events || [];
-        message.events.push(evt);
-        db.messageEvents.push(evt);
-      }
-
-      const existing = db.suppressions.find((s) => s.email.toLowerCase() === recipient.emailAddress.toLowerCase());
-      if (!existing) {
-        db.suppressions.unshift({
-          id: `sup_${Date.now()}`,
-          email: recipient.emailAddress,
-          type: 'COMPLAINT',
-          reason: `Spam complaint received via Amazon SES Feedback Loop (${complaintFeedbackType || 'abuse'})`,
-          source: 'ses_webhook',
-          createdAt: nowIso,
-        });
-      }
-    }
-
-    db.logs.unshift({
-      id: `log_ses_cmp_${Date.now()}`,
-      timestamp: nowIso,
-      service: 'Amazon SES',
-      event: 'SES_COMPLAINT_WEBHOOK_PROCESSED',
-      severity: 'ERROR',
-      response: `Complaint logged for ${complainedRecipients.map((r) => r.emailAddress).join(', ')}`,
-      details: payload,
+    eventProcessor.processSesNotification({
+      eventType: 'Complaint',
+      complaint: {
+        complainedRecipients: payload.complainedRecipients,
+        complaintFeedbackType: payload.complaintFeedbackType,
+      },
+      mail: payload.mail,
     });
+  }
+
+  // Process arbitrary SES event notification
+  async processNotification(payload: SesEventPayload, meta?: { snsMessageId?: string; topicArn?: string }) {
+    return eventProcessor.processSesNotification(payload, meta);
   }
 }
 
