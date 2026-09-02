@@ -83,7 +83,7 @@ export const SendersView: React.FC<SendersViewProps> = ({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif italic text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             Senders & Sending Domains
           </h1>
           <p className="text-xs text-[#888888] mt-1">
@@ -277,7 +277,7 @@ export const SendersView: React.FC<SendersViewProps> = ({
       {showAddSenderModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
-            <h2 className="text-sm font-serif italic text-white">Add Sender Identity</h2>
+            <h2 className="text-sm font-semibold text-white">Add Sender Identity</h2>
             <form onSubmit={submitNewSender} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-[#888888] mb-1">Display Name</label>
@@ -363,7 +363,7 @@ export const SendersView: React.FC<SendersViewProps> = ({
       {showAddDomainModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
-            <h2 className="text-sm font-serif italic text-white">Add Sending Domain</h2>
+            <h2 className="text-sm font-semibold text-white">Add Sending Domain</h2>
             <form onSubmit={submitNewDomain} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-[#888888] mb-1">Domain FQDN</label>

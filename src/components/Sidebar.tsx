@@ -64,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             EO
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-serif italic text-white tracking-tight">
+            <span className="text-lg font-bold text-white tracking-tight">
               EmailOps
             </span>
             <span className="text-[9px] font-mono tracking-widest text-[#888888] uppercase">

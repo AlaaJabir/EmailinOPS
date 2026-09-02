@@ -68,7 +68,7 @@ export const SuppressionView: React.FC<SuppressionViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif italic text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             Suppression & Compliance
           </h1>
           <p className="text-xs text-[#888888] mt-1">
@@ -187,7 +187,7 @@ export const SuppressionView: React.FC<SuppressionViewProps> = ({
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 font-sans">
           <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <h2 className="text-sm font-serif italic text-white">Add Manual Suppression</h2>
+            <h2 className="text-sm font-semibold text-white">Add Manual Suppression</h2>
             <form onSubmit={handleAdd} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-[#888888] mb-1">Email Address</label>

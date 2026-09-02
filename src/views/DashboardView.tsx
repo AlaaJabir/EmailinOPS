@@ -127,7 +127,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Page Title & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif italic text-white tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
             Operations Dashboard
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           </h1>
@@ -232,7 +232,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               </div>
               <div className="mt-3">
-                <div className={`text-xl font-serif italic ${kpi.color}`}>{kpi.value}</div>
+                <div className={`text-2xl font-bold tracking-tight ${kpi.color}`}>{kpi.value}</div>
                 <div className="text-[10px] text-[#888888] mt-0.5 truncate">{kpi.sub}</div>
               </div>
             </div>
@@ -246,7 +246,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="lg:col-span-2 p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-serif italic text-white">Sending Volume & Delivery Trends</h2>
+              <h2 className="text-sm font-semibold text-white">Sending Volume & Delivery Trends</h2>
               <p className="text-xs text-[#888888]">Daily dispatched emails vs delivered vs bounced</p>
             </div>
             <div className="flex items-center gap-4 text-xs font-mono">
@@ -289,7 +289,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Hourly Sending Distribution */}
         <div className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-4">
           <div>
-            <h2 className="text-sm font-serif italic text-white">Hourly Distribution</h2>
+            <h2 className="text-sm font-semibold text-white">Hourly Distribution</h2>
             <p className="text-xs text-[#888888]">Peak traffic hours across European timezones</p>
           </div>
 
@@ -315,7 +315,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Top Senders */}
         <div className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-serif italic text-white">Top Sender Identities</h2>
+            <h2 className="text-sm font-semibold text-white">Top Sender Identities</h2>
             <span className="text-[10px] uppercase tracking-wider text-[#888888]">Volume & SLA</span>
           </div>
 
@@ -338,7 +338,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Top Campaigns */}
         <div className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-serif italic text-white">Top Campaigns</h2>
+            <h2 className="text-sm font-semibold text-white">Top Campaigns</h2>
             <span className="text-[10px] uppercase tracking-wider text-[#888888]">Engagement</span>
           </div>
 
@@ -369,7 +369,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-serif italic text-white">Recent Sending Activity</h2>
+            <h2 className="text-sm font-semibold text-white">Recent Sending Activity</h2>
             <p className="text-xs text-[#888888]">Live stream of messages processed through KumoMTA spool</p>
           </div>
           <span className="text-[10px] uppercase tracking-wider text-[#888888] font-mono">Last {recentMessages.length} records</span>

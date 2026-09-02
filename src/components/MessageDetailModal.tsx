@@ -43,7 +43,7 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-serif italic text-white text-base">Message Telemetry</span>
+                <span className="font-semibold text-white text-base">Message Telemetry</span>
                 <StatusBadge status={message.status} />
               </div>
               <div className="flex items-center gap-2 text-xs text-[#888888] mt-0.5">

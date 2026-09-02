@@ -91,7 +91,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="p-8 space-y-6 max-w-7xl mx-auto font-sans">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-serif italic text-white tracking-tight flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
           Infrastructure Configuration
         </h1>
         <p className="text-xs text-[#888888] mt-1">

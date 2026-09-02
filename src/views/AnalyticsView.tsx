@@ -52,7 +52,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats, senders, ca
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif italic text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             Deliverability & ISP Analytics
           </h1>
           <p className="text-xs text-[#888888] mt-1">
@@ -95,7 +95,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats, senders, ca
             <span>Overall Inbox Placement</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-3xl font-serif italic text-white">98.9%</div>
+          <div className="text-3xl font-bold tracking-tight text-white">98.9%</div>
           <div className="text-[10px] text-emerald-400 font-mono tracking-tight">+0.4% from warmup policy</div>
         </div>
 
@@ -104,7 +104,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats, senders, ca
             <span>Aggregated Bounce Rate</span>
             <AlertTriangle className="w-4 h-4 text-amber-300" />
           </div>
-          <div className="text-3xl font-serif italic text-amber-300">{stats.bounceRate}%</div>
+          <div className="text-3xl font-bold tracking-tight text-amber-300">{stats.bounceRate}%</div>
           <div className="text-[10px] text-[#888888] font-mono tracking-tight">0.68% Hard / 0.21% Soft</div>
         </div>
 
@@ -113,7 +113,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats, senders, ca
             <span>Avg Open Engagement</span>
             <Eye className="w-4 h-4 text-sky-400" />
           </div>
-          <div className="text-3xl font-serif italic text-white">{stats.openRate}%</div>
+          <div className="text-3xl font-bold tracking-tight text-white">{stats.openRate}%</div>
           <div className="text-[10px] text-[#888888] font-mono tracking-tight">Based on 1x1 tracking pixel</div>
         </div>
 
@@ -122,7 +122,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats, senders, ca
             <span>Click-Through Rate (CTR)</span>
             <MousePointerClick className="w-4 h-4 text-teal-400" />
           </div>
-          <div className="text-3xl font-serif italic text-white">{stats.clickRate}%</div>
+          <div className="text-3xl font-bold tracking-tight text-white">{stats.clickRate}%</div>
           <div className="text-[10px] text-[#888888] font-mono tracking-tight">Rewritten custom domain links</div>
         </div>
       </div>

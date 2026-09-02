@@ -61,7 +61,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ logs, onRefresh, isLoading }
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif italic text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             Technical Audit & Service Logs
             <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-white animate-pulse' : 'bg-[#888888]'}`} />
           </h1>

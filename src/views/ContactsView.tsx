@@ -118,7 +118,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif italic text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             Audience Contacts & Lists
           </h1>
           <p className="text-xs text-[#888888] mt-1">
@@ -261,7 +261,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
-            <h2 className="text-sm font-serif italic text-white">Add Individual Contact</h2>
+            <h2 className="text-sm font-semibold text-white">Add Individual Contact</h2>
             <form onSubmit={submitContact} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-[#888888] mb-1">Email Address</label>
@@ -330,7 +330,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       {showListModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
-            <h2 className="text-sm font-serif italic text-white">Create Contact List</h2>
+            <h2 className="text-sm font-semibold text-white">Create Contact List</h2>
             <form onSubmit={submitList} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-[#888888] mb-1">List Name</label>
@@ -382,7 +382,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             <div className="flex items-center gap-3">
               <FileSpreadsheet className="w-6 h-6 text-white" />
               <div>
-                <h2 className="text-sm font-serif italic text-white">Import Contacts from CSV</h2>
+                <h2 className="text-sm font-semibold text-white">Import Contacts from CSV</h2>
                 <p className="text-xs text-[#888888]">
                   Paste comma-separated rows or sample data (email, first_name, last_name, company).
                 </p>

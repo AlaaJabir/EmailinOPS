@@ -149,7 +149,7 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif italic text-white tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
             Send Email
             <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-xs bg-white/10 text-zinc-300 border border-white-10">
               KumoMTA Direct Spool
@@ -441,7 +441,7 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
         {/* Right Preview (5 cols) */}
         <div className="lg:col-span-5 space-y-4 sticky top-20">
           <div className="p-4 rounded-sm bg-[#0F0F0F] border border-white-10 flex items-center justify-between">
-            <div className="text-xs font-serif italic text-white">Live Client Preview</div>
+            <div className="text-xs font-semibold text-white">Live Client Preview</div>
             <div className="flex items-center gap-1 bg-[#050505] p-1 rounded-sm border border-white-10">
               <button
                 type="button"
@@ -478,7 +478,7 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
                 <div className="text-[11px] font-mono text-[#888888] truncate">
                   To: <span className="text-zinc-200">{to}</span>
                 </div>
-                <div className="text-xs font-serif italic text-white truncate pt-1">{subject}</div>
+                <div className="text-xs font-medium text-white truncate pt-1">{subject}</div>
               </div>
 
               {/* Rendered HTML Canvas */}
@@ -498,7 +498,7 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
             <div>
-              <h2 className="text-sm font-serif italic text-white">Send Test Verification</h2>
+              <h2 className="text-sm font-semibold text-white">Send Test Verification</h2>
               <p className="text-xs text-[#888888] mt-1">
                 Dispatches a single copy of this email to verify DKIM signatures and rendered styling.
               </p>
