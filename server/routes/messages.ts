@@ -3,14 +3,21 @@ import { db } from '../store.js';
 import { kumoMtaService } from '../services/KumoMtaService.js';
 import { suppressionService } from '../services/SuppressionService.js';
 import { complianceService } from '../services/ComplianceService.js';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { supabaseService } from '../services/SupabaseService.js';
 
 export const messagesRouter = Router();
 
-// GET /api/messages - Filterable and searchable message list
-messagesRouter.get('/', (req: Request, res: Response) => {
+// GET /api/messages - Filterable and searchable message list (scoped to user)
+messagesRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
   const { search, status, senderId, campaignId, provider, limit = '50', offset = '0' } = req.query;
 
-  let list = [...db.messages];
+  let list: any[] = [];
+  if (req.user && supabaseService.isConfigured) {
+    list = await supabaseService.getMessages(req.user.id, 200);
+  } else {
+    list = [...db.messages];
+  }
 
   if (search && typeof search === 'string') {
     const q = search.toLowerCase();
@@ -53,7 +60,7 @@ messagesRouter.get('/', (req: Request, res: Response) => {
 });
 
 // GET /api/messages/:id - Detailed message inspection
-messagesRouter.get('/:id', (req: Request, res: Response) => {
+messagesRouter.get('/:id', optionalAuth, (req: Request, res: Response) => {
   const { id } = req.params;
   const message = db.messages.find(
     (m) => m.id === id || m.messageId === id || m.messageId === `<${id}>`
@@ -75,7 +82,7 @@ messagesRouter.get('/:id', (req: Request, res: Response) => {
 });
 
 // POST /api/messages/send - Submit single or batch email via KumoMTA
-messagesRouter.post('/send', async (req: Request, res: Response) => {
+messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) => {
   const {
     fromName,
     fromEmail,
@@ -132,6 +139,7 @@ messagesRouter.post('/send', async (req: Request, res: Response) => {
       customHeaders,
       campaignId,
       attachments,
+      userId: req.user?.id,
     });
 
     res.json({
@@ -145,7 +153,7 @@ messagesRouter.post('/send', async (req: Request, res: Response) => {
 });
 
 // POST /api/messages/test - Send test verification email
-messagesRouter.post('/test', async (req: Request, res: Response) => {
+messagesRouter.post('/test', requireAuth, async (req: Request, res: Response) => {
   const { testEmail, fromEmail, subject, htmlBody } = req.body;
 
   if (!testEmail || !fromEmail) {
@@ -159,6 +167,7 @@ messagesRouter.post('/test', async (req: Request, res: Response) => {
       subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`,
       htmlBody: htmlBody || '<p>This is a test message from EmailOps Dashboard via KumoMTA.</p>',
       isTest: true,
+      userId: req.user?.id,
     });
 
     res.json({

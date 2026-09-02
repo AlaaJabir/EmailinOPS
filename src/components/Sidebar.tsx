@@ -13,6 +13,7 @@ import {
   Radio,
   Cpu,
   Layers,
+  LogOut,
 } from 'lucide-react';
 
 export type NavTab =
@@ -33,6 +34,8 @@ interface SidebarProps {
   kumoStatus?: 'healthy' | 'degraded' | 'offline';
   sesStatus?: 'healthy' | 'degraded' | 'offline';
   queueCount?: number;
+  user?: { name?: string; email?: string; role?: string; plan?: string } | null;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -175,15 +178,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* User Card */}
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white-5">
-          <div className="w-7 h-7 rounded-sm bg-white/10 border border-white/20 flex items-center justify-center text-[10px] font-mono text-white">
-            AV
+        {/* User Card & Logout */}
+        <div className="mt-3 pt-3 border-t border-white-5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-sm bg-white/10 border border-white/20 flex items-center justify-center text-[10px] font-mono text-white shrink-0">
+              {user?.name
+                ? user.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()
+                : user?.email ? user.email.substring(0, 2).toUpperCase() : 'OP'}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-medium text-white truncate">
+                {user?.name || user?.email || 'Email Operator'}
+              </div>
+              <div className="text-[9px] text-[#888888] uppercase tracking-wider flex items-center gap-1.5">
+                <span>{user?.role || 'ADMIN'}</span>
+                <span className="text-white/20">•</span>
+                <span className="text-emerald-400 font-mono text-[9px]">{user?.plan || 'PRO'}</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="text-[11px] font-medium text-white">Alex Vance</div>
-            <div className="text-[9px] text-[#888888] uppercase tracking-wider">KumoMTA Node 01</div>
-          </div>
+
+          {onLogout && (
+            <button
+              id="btn-sidebar-logout"
+              onClick={onLogout}
+              className="p-1.5 rounded text-[#888888] hover:text-red-400 hover:bg-white/5 transition-colors shrink-0"
+              title="Sign Out of EmailOps"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </aside>

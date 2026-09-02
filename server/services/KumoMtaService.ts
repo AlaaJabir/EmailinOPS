@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { db } from '../store.js';
 import { Message, MessageEvent, MessageStatus } from '../../src/types.js';
+import { supabaseService } from './SupabaseService.js';
 
 export interface SendEmailPayload {
   fromName?: string;
@@ -17,6 +18,7 @@ export interface SendEmailPayload {
   campaignId?: string;
   attachments?: Array<{ filename: string; fileSize: number; mimeType: string; content?: string | Buffer }>;
   isTest?: boolean;
+  userId?: string;
 }
 
 export interface KumoSubmissionResult {
@@ -485,6 +487,10 @@ export class KumoMtaService {
       newMsg.events = [initialEvent];
       db.messages.unshift(newMsg);
       db.messageEvents.push(initialEvent);
+
+      // Persist to Supabase database
+      supabaseService.saveMessage(newMsg, payload.userId || 'usr_admin_01').catch(() => {});
+      supabaseService.saveMessageEvent(initialEvent, payload.userId || 'usr_admin_01').catch(() => {});
 
       // Increment sender count
       if (sender) {

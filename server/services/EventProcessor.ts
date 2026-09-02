@@ -1,5 +1,6 @@
 import { db } from '../store.js';
 import { EventType, MessageEvent, MessageStatus } from '../../src/types.js';
+import { supabaseService } from './SupabaseService.js';
 
 export interface RawEventInput {
   messageId: string; // RFC 5322 or internal ID
@@ -413,6 +414,19 @@ export class EventProcessor {
         },
       });
 
+      // Persist to Supabase database
+      supabaseService.updateMessageStatus({
+        messageId: message.messageId,
+        status: message.status,
+        sesMessageId: message.sesMessageId,
+        deliveredAt: message.deliveredAt,
+        bouncedAt: message.bouncedAt,
+        bounceType: message.bounceType,
+        bounceReason: message.bounceReason,
+        smtpResponse: message.smtpResponse,
+      }).catch(() => {});
+      supabaseService.saveMessageEvent(eventRecord, (message as any).userId).catch(() => {});
+
       return {
         success: true,
         correlated: true,
@@ -543,6 +557,16 @@ export class EventProcessor {
         }
         break;
     }
+
+    // Persist to Supabase database
+    supabaseService.updateMessageStatus({
+      messageId: message.messageId,
+      status: message.status,
+      deliveredAt: message.deliveredAt,
+      bouncedAt: message.bouncedAt,
+      bounceReason: message.bounceReason,
+    }).catch(() => {});
+    supabaseService.saveMessageEvent(eventRecord, (message as any).userId).catch(() => {});
 
     return { success: true, event: eventRecord };
   }

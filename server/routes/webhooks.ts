@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../store.js';
 import { eventProcessor, SesEventPayload } from '../services/EventProcessor.js';
+import { supabaseService } from '../services/SupabaseService.js';
 
 export const webhooksRouter = Router();
 
@@ -158,7 +159,7 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
     const topicArn = body.TopicArn;
 
     // Idempotency: skip already processed SNS message IDs
-    if (snsMessageId && db.hasProcessedEvent(snsMessageId)) {
+    if (snsMessageId && (db.hasProcessedEvent(snsMessageId) || (await supabaseService.isEventProcessed(snsMessageId)))) {
       return res.status(200).json({
         status: 'success',
         duplicate: true,
@@ -196,6 +197,7 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
 
     if (snsMessageId) {
       db.recordProcessedEvent(snsMessageId);
+      await supabaseService.recordProcessedEvent(snsMessageId, 'SES_SNS');
     }
 
     return res.status(200).json({
