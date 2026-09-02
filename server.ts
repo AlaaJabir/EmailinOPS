@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import dotenv from 'dotenv';
+import 'dotenv/config';
 
 import { authRouter } from './server/routes/auth.js';
 import { messagesRouter } from './server/routes/messages.js';
@@ -19,9 +19,6 @@ import { seedRouter } from './server/routes/seed.js';
 import { db } from './server/store.js';
 import { kumoMtaService } from './server/services/KumoMtaService.js';
 import { sesProvider } from './server/services/SesProvider.js';
-import { kumoMtaServer } from './server/services/KumoMtaServer.js';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,11 +99,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+    app.listen(PORT, '0.0.0.0', () => {
     console.log(`[EmailOps] Server started on http://0.0.0.0:${PORT}`);
-    kumoMtaServer.start().catch((err) => {
-      console.warn('[KumoMTA Server] Could not bind listener:', err.message);
-    });
   });
 }
 
