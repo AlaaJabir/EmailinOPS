@@ -9,13 +9,26 @@ analyticsRouter.get('/', (req: Request, res: Response) => {
 
   const stats = db.getDashboardStats();
 
-  // Calculate domain performance breakdown
-  const domainBreakdown = [
-    { domain: 'gmail.com', volume: 64200, delivered: 63800, bounced: 350, openRate: 44.2, clickRate: 18.5 },
-    { domain: 'yahoo.com / aol', volume: 28900, delivered: 28400, bounced: 410, openRate: 36.8, clickRate: 14.1 },
-    { domain: 'outlook.com / hotmail', volume: 31500, delivered: 31200, bounced: 240, openRate: 39.5, clickRate: 16.2 },
-    { domain: 'corporate / custom domains', volume: 20890, delivered: 20680, bounced: 180, openRate: 48.9, clickRate: 22.4 },
-  ];
+  // Calculate real domain performance breakdown from actual messages
+  const domainCounts = new Map<string, { volume: number; delivered: number; bounced: number; failed: number }>();
+  for (const msg of db.messages) {
+    const domainName = msg.toEmail.split('@')[1]?.toLowerCase() || 'other';
+    const current = domainCounts.get(domainName) || { volume: 0, delivered: 0, bounced: 0, failed: 0 };
+    current.volume += 1;
+    if (msg.status === 'DELIVERED') current.delivered += 1;
+    else if (msg.status === 'BOUNCED') current.bounced += 1;
+    else if (msg.status === 'FAILED') current.failed += 1;
+    domainCounts.set(domainName, current);
+  }
+
+  const domainBreakdown = Array.from(domainCounts.entries()).map(([domain, data]) => ({
+    domain,
+    volume: data.volume,
+    delivered: data.delivered,
+    bounced: data.bounced,
+    openRate: 0,
+    clickRate: 0,
+  }));
 
   // Sender Comparison Breakdown
   const senderComparison = db.senders.map((s) => {

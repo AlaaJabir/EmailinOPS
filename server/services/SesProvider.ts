@@ -20,16 +20,17 @@ export class SesProvider implements EmailProvider {
   }
 
   async checkHealth(): Promise<{ status: 'healthy' | 'degraded' | 'offline'; region: string; quota: any }> {
+    const hasCredentials = Boolean(process.env.SES_SMTP_USERNAME && process.env.SES_SMTP_PASSWORD);
     return {
-      status: 'healthy',
+      status: hasCredentials ? 'healthy' : 'offline',
       region: this.region,
       quota: {
-        max24HourSend: 500000,
-        sentLast24Hours: 145490,
-        maxSendRate: 200, // per second
-        bounceRatePercent: 0.14,
-        complaintRatePercent: 0.02,
-        accountStatus: 'Healthy (Production Access Enabled)',
+        max24HourSend: 0,
+        sentLast24Hours: 0,
+        maxSendRate: 0,
+        bounceRatePercent: 0,
+        complaintRatePercent: 0,
+        accountStatus: hasCredentials ? 'Configured' : 'Offline / Unconfigured',
       },
     };
   }

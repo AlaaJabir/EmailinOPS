@@ -59,6 +59,20 @@ class DatabaseStore {
     // 2. Domains
     this.domains = [
       {
+        id: 'dom_00',
+        domainName: 'amiralucia.com',
+        spfStatus: 'VERIFIED',
+        dkimStatus: 'VERIFIED',
+        dmarcStatus: 'VERIFIED',
+        sesStatus: 'VERIFIED',
+        dkimSelector: 'kumo2026',
+        dkimPublicKey: 'v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...',
+        spfRecord: 'v=spf1 include:_spf.kumomta.internal include:amazonses.com ~all',
+        dmarcRecord: 'v=DMARC1; p=reject; pct=100; rua=mailto:dmarc@amiralucia.com',
+        createdAt: iso(10000),
+        updatedAt: iso(100),
+      },
+      {
         id: 'dom_01',
         domainName: 'transact.acme-corp.io',
         spfStatus: 'VERIFIED',
@@ -102,8 +116,25 @@ class DatabaseStore {
       },
     ];
 
-    // 3. Senders
+    // 3. Senders (Real sender identities with ZERO fake counts)
     this.senders = [
+      {
+        id: 'snd_00',
+        name: process.env.KUMO_FROM_NAME || 'Amiralucia',
+        fromEmail: process.env.KUMO_FROM_EMAIL || 'service@amiralucia.com',
+        replyTo: process.env.KUMO_FROM_EMAIL || 'service@amiralucia.com',
+        domainId: 'dom_00',
+        domainName: 'amiralucia.com',
+        status: 'active',
+        verification: 'VERIFIED',
+        dailyLimit: 100000,
+        hourlyLimit: 10000,
+        sentCount: 0,
+        deliveredCount: 0,
+        bouncedCount: 0,
+        complaintCount: 0,
+        createdAt: iso(5000),
+      },
       {
         id: 'snd_01',
         name: 'Acme Auth & Security',
@@ -115,10 +146,10 @@ class DatabaseStore {
         verification: 'VERIFIED',
         dailyLimit: 100000,
         hourlyLimit: 10000,
-        sentCount: 42890,
-        deliveredCount: 42680,
-        bouncedCount: 180,
-        complaintCount: 30,
+        sentCount: 0,
+        deliveredCount: 0,
+        bouncedCount: 0,
+        complaintCount: 0,
         createdAt: iso(9500),
       },
       {
@@ -132,10 +163,10 @@ class DatabaseStore {
         verification: 'VERIFIED',
         dailyLimit: 75000,
         hourlyLimit: 7500,
-        sentCount: 88400,
-        deliveredCount: 86950,
-        bouncedCount: 1320,
-        complaintCount: 130,
+        sentCount: 0,
+        deliveredCount: 0,
+        bouncedCount: 0,
+        complaintCount: 0,
         createdAt: iso(8000),
       },
       {
@@ -149,10 +180,10 @@ class DatabaseStore {
         verification: 'VERIFIED',
         dailyLimit: 25000,
         hourlyLimit: 2500,
-        sentCount: 14200,
-        deliveredCount: 14050,
-        bouncedCount: 140,
-        complaintCount: 10,
+        sentCount: 0,
+        deliveredCount: 0,
+        bouncedCount: 0,
+        complaintCount: 0,
         createdAt: iso(3000),
       },
     ];
@@ -333,319 +364,26 @@ class DatabaseStore {
       },
     ];
 
-    // 8. Campaigns
-    this.campaigns = [
-      {
-        id: 'cmp_01',
-        name: 'KumoMTA 3.0 Platform Upgrade Announcement',
-        senderId: 'snd_02',
-        senderName: 'Acme Product Announcements',
-        fromEmail: 'news@marketing.acme-corp.io',
-        listId: 'lst_03',
-        listName: 'Monthly Tech Digest',
-        templateId: 'tmpl_02',
-        subject: '🚀 Introducing KumoMTA 3.0 High-Throughput Queue Management',
-        htmlBody: this.templates[1].htmlBody,
-        plainText: this.templates[1].plainText,
-        status: 'COMPLETED',
-        scheduledAt: iso(1440),
-        startedAt: iso(1430),
-        completedAt: iso(1380),
-        totalRecipients: 12400,
-        sentCount: 12400,
-        deliveredCount: 12210,
-        bouncedCount: 168,
-        complaintCount: 22,
-        openCount: 5490,
-        clickCount: 1820,
-        createdAt: iso(2880),
-      },
-      {
-        id: 'cmp_02',
-        name: 'Quarterly Security Hygiene & DMARC Mandate Notice',
-        senderId: 'snd_01',
-        senderName: 'Acme Auth & Security',
-        fromEmail: 'security@transact.acme-corp.io',
-        listId: 'lst_01',
-        listName: 'Enterprise VIP Customers',
-        subject: 'Action Required: 2026 DMARC & BIMI Enforcement Guidelines',
-        htmlBody: '<p>Important security compliance memo regarding DKIM/SPF alignment on all upstream SES endpoints.</p>',
-        plainText: 'Important security compliance memo regarding DKIM/SPF alignment.',
-        status: 'COMPLETED',
-        scheduledAt: iso(720),
-        startedAt: iso(710),
-        completedAt: iso(690),
-        totalRecipients: 1850,
-        sentCount: 1850,
-        deliveredCount: 1846,
-        bouncedCount: 4,
-        complaintCount: 0,
-        openCount: 1420,
-        clickCount: 680,
-        createdAt: iso(1200),
-      },
-      {
-        id: 'cmp_03',
-        name: 'Beta Cluster Migration: Europe-West Routing',
-        senderId: 'snd_03',
-        senderName: 'Acme Cloud Alerts',
-        fromEmail: 'alerts@notifications.acme-cloud.net',
-        listId: 'lst_02',
-        listName: 'Beta Program Subscribers',
-        subject: 'Notice: Scheduled maintenance on KumoMTA Spool Cluster B',
-        htmlBody: '<p>Scheduled maintenance window for internal queue spool re-balancing.</p>',
-        status: 'SENDING',
-        scheduledAt: iso(30),
-        startedAt: iso(25),
-        totalRecipients: 4200,
-        sentCount: 2890,
-        deliveredCount: 2840,
-        bouncedCount: 38,
-        complaintCount: 2,
-        openCount: 940,
-        clickCount: 210,
-        createdAt: iso(180),
-      },
-    ];
+    // 8. Campaigns (Empty runtime state, zero fake historical counts)
+    this.campaigns = [];
 
-    // 9. Messages (Detailed records with RFC Message-IDs and event chains)
-    const sampleRecipients = [
-      { email: 'alexander.wright@fintech-vault.co.uk', subject: 'Your Acme Security Verification Code: 849-201', senderId: 'snd_01', status: 'DELIVERED', mins: 4 },
-      { email: 'sarah.connor@cyberdyne-defense.org', subject: 'Your Acme Security Verification Code: 312-909', senderId: 'snd_01', status: 'DELIVERED', mins: 8 },
-      { email: 'kevin.mitnick@infosec-labs.io', subject: 'Notice: Scheduled maintenance on KumoMTA Spool Cluster B', senderId: 'snd_03', status: 'SENDING', mins: 12 },
-      { email: 'bounced.recipient.deadbox@invalid-domain-test.com', subject: '🚀 Introducing KumoMTA 3.0 High-Throughput Queue Management', senderId: 'snd_02', status: 'BOUNCED', mins: 15, bounceType: 'Hard', bounceReason: '550 5.1.1 Host lookup failed: Recipient domain MX does not exist' },
-      { email: 'spam-trap@disposable-mail-honeypot.org', subject: '🚀 Introducing KumoMTA 3.0 High-Throughput Queue Management', senderId: 'snd_02', status: 'COMPLAINED', mins: 22 },
-      { email: 'michelle.yeoh@hollywood-prod.net', subject: 'Action Required: 2026 DMARC & BIMI Enforcement Guidelines', senderId: 'snd_01', status: 'DELIVERED', mins: 35 },
-      { email: 'johannes.kepler@astronomy-data.de', subject: '🚀 Introducing KumoMTA 3.0 High-Throughput Queue Management', senderId: 'snd_02', status: 'DELIVERED', mins: 42 },
-      { email: 'alan.turing@bletchley-math.ac.uk', subject: 'Your Acme Security Verification Code: 994-012', senderId: 'snd_01', status: 'DELIVERED', mins: 55 },
-      { email: 'ada.lovelace@analytical-engines.com', subject: 'Action Required: 2026 DMARC & BIMI Enforcement Guidelines', senderId: 'snd_01', status: 'DELIVERED', mins: 75 },
-      { email: 'grace.hopper@nanoseconds.navy.mil', subject: 'Your Acme Security Verification Code: 620-117', senderId: 'snd_01', status: 'DELIVERED', mins: 90 },
-      { email: 'dennis.ritchie@bell-labs-unix.org', subject: 'Notice: Scheduled maintenance on KumoMTA Spool Cluster B', senderId: 'snd_03', status: 'SENT', mins: 110 },
-      { email: 'ken.thompson@plan9-os.net', subject: 'Notice: Scheduled maintenance on KumoMTA Spool Cluster B', senderId: 'snd_03', status: 'QUEUED', mins: 120 },
-      { email: 'tim.berners@w3c-hypertext.org', subject: 'Action Required: 2026 DMARC & BIMI Enforcement Guidelines', senderId: 'snd_01', status: 'DELIVERED', mins: 150 },
-      { email: 'linus.torvalds@kernel-maintainers.org', subject: '🚀 Introducing KumoMTA 3.0 High-Throughput Queue Management', senderId: 'snd_02', status: 'DELIVERED', mins: 180 },
-      { email: 'failed.mailbox.quota@full-storage.edu', subject: '🚀 Introducing KumoMTA 3.0 High-Throughput Queue Management', senderId: 'snd_02', status: 'FAILED', mins: 210, bounceType: 'Soft', bounceReason: '452 4.2.2 Mailbox is full / Over storage quota' },
-    ];
+    // 9. Messages (Empty runtime state, populated solely by real sends)
+    this.messages = [];
+    this.messageEvents = [];
 
-    this.messages = sampleRecipients.map((item, idx) => {
-      const sender = this.senders.find((s) => s.id === item.senderId) || this.senders[0];
-      const domain = this.domains.find((d) => d.id === sender.domainId)?.domainName || 'transact.acme-corp.io';
-      const msgUniqueId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      const rfcMessageId = `<${Math.random().toString(36).substring(2, 12)}.${Date.now() - item.mins * 60000}@${domain}>`;
-      const providerMsgId = `ses-${Math.random().toString(36).substring(2, 14)}-eu-west-1`;
-
-      const msgObj: Message = {
-        id: msgUniqueId,
-        messageId: rfcMessageId,
-        campaignId: item.senderId === 'snd_02' ? 'cmp_01' : item.senderId === 'snd_03' ? 'cmp_03' : 'cmp_02',
-        campaignName: item.senderId === 'snd_02' ? 'KumoMTA 3.0 Announcement' : item.senderId === 'snd_03' ? 'Beta Cluster Maintenance' : 'DMARC Security Notice',
-        senderId: sender.id,
-        fromName: sender.name,
-        fromEmail: sender.fromEmail,
-        toEmail: item.email,
-        replyTo: sender.replyTo,
-        subject: item.subject,
-        htmlBody: '<div style="font-family:sans-serif;"><h3>Email Content</h3><p>Message delivered through KumoMTA spool and SES relay.</p></div>',
-        plainText: 'Email Content - Message delivered through KumoMTA spool and SES relay.',
-        customHeaders: {
-          'X-KumoMTA-Queue': 'tier1-high-throughput',
-          'X-SES-Configuration-Set': 'EmailOps-Production-ConfigSet',
-          'List-Unsubscribe': `<mailto:unsub@${domain}?subject=unsub>, <https://${domain}/u/${msgUniqueId}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-          'Feedback-ID': `ops-campaign:${sender.id}:emailops`,
-        },
-        status: item.status as any,
-        provider: 'KumoMTA + Amazon SES',
-        providerMessageId: providerMsgId,
-        smtpResponse: item.status === 'DELIVERED'
-          ? '250 2.0.0 OK: 1712903429 s3_msg_delivery_ack'
-          : item.status === 'BOUNCED' || item.status === 'FAILED'
-          ? item.bounceReason
-          : '250 2.1.5 Recipient queued in KumoMTA spool',
-        bounceType: (item.bounceType as any) || undefined,
-        bounceReason: item.bounceReason || undefined,
-        queuedAt: iso(item.mins + 1),
-        sentAt: item.status !== 'QUEUED' ? iso(item.mins) : undefined,
-        deliveredAt: item.status === 'DELIVERED' ? iso(item.mins - 0.2) : undefined,
-        bouncedAt: item.status === 'BOUNCED' ? iso(item.mins - 0.1) : undefined,
-        createdAt: iso(item.mins + 1),
-      };
-
-      // Generate Events
-      const events: MessageEvent[] = [
-        {
-          id: `evt_q_${idx}`,
-          messageId: rfcMessageId,
-          eventType: 'QUEUED',
-          eventData: { queue: 'tier1-high-throughput', host: 'kumomta-spool-01.internal' },
-          timestamp: iso(item.mins + 1),
-        },
-      ];
-
-      if (item.status !== 'QUEUED') {
-        events.push({
-          id: `evt_s_${idx}`,
-          messageId: rfcMessageId,
-          eventType: 'SENDING',
-          eventData: { relay: 'email-smtp.eu-west-1.amazonaws.com:587', tls: 'TLSv1.3' },
-          timestamp: iso(item.mins + 0.5),
-        });
-        events.push({
-          id: `evt_sent_${idx}`,
-          messageId: rfcMessageId,
-          eventType: 'SENT',
-          eventData: { providerMessageId: providerMsgId },
-          timestamp: iso(item.mins),
-        });
-      }
-
-      if (item.status === 'DELIVERED') {
-        events.push({
-          id: `evt_del_${idx}`,
-          messageId: rfcMessageId,
-          eventType: 'DELIVERED',
-          eventData: { smtpCode: 250, latencyMs: 340 },
-          timestamp: iso(item.mins - 0.2),
-        });
-        // Add open and clicks to some
-        if (idx % 2 === 0) {
-          events.push({
-            id: `evt_op_${idx}`,
-            messageId: rfcMessageId,
-            eventType: 'OPENED',
-            eventData: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' },
-            timestamp: iso(item.mins - 1),
-            ipAddress: '54.210.12.88',
-            geo: 'London, United Kingdom',
-          });
-        }
-        if (idx % 3 === 0) {
-          events.push({
-            id: `evt_cl_${idx}`,
-            messageId: rfcMessageId,
-            eventType: 'CLICKED',
-            eventData: { targetUrl: 'https://acme-corp.io/release-3' },
-            timestamp: iso(item.mins - 1.5),
-            ipAddress: '54.210.12.88',
-            geo: 'London, United Kingdom',
-          });
-        }
-      } else if (item.status === 'BOUNCED') {
-        events.push({
-          id: `evt_bnc_${idx}`,
-          messageId: rfcMessageId,
-          eventType: 'BOUNCED',
-          eventData: { reason: item.bounceReason, type: item.bounceType },
-          timestamp: iso(item.mins - 0.1),
-        });
-      } else if (item.status === 'COMPLAINED') {
-        events.push({
-          id: `evt_cmp_${idx}`,
-          messageId: rfcMessageId,
-          eventType: 'COMPLAINED',
-          eventData: { feedbackType: 'abuse', userAgent: 'Yahoo Mail Web' },
-          timestamp: iso(item.mins - 0.1),
-        });
-      }
-
-      msgObj.events = events;
-      this.messageEvents.push(...events);
-      return msgObj;
-    });
-
-    // 10. Technical Logs
-    this.logs = [
-      {
-        id: 'log_01',
-        timestamp: iso(1),
-        service: 'KumoMTA',
-        messageId: this.messages[0]?.messageId,
-        event: 'SPOOL_INJECT_SUCCESS',
-        severity: 'INFO',
-        response: 'Accepted RFC 5322 payload. Enqueued to tier1-high-throughput with priority 10.',
-        details: { connection: '127.0.0.1:25', cipher: 'ECDHE-RSA-AES128-GCM-SHA256' },
-      },
-      {
-        id: 'log_02',
-        timestamp: iso(2),
-        service: 'Amazon SES',
-        messageId: this.messages[0]?.messageId,
-        event: 'UPSTREAM_DELIVERY_250',
-        severity: 'SUCCESS',
-        response: '250 2.0.0 OK: queued as ses-098f6bcd4621d373cade4e832627b4f6',
-        details: { endpoint: 'email-smtp.eu-west-1.amazonaws.com:587', rttMs: 182 },
-      },
-      {
-        id: 'log_03',
-        timestamp: iso(5),
-        service: 'Webhook Processor',
-        messageId: this.messages[3]?.messageId,
-        event: 'SES_BOUNCE_NOTIFICATION',
-        severity: 'WARN',
-        response: 'SNS MessageId: a4b1c2d3-98fe. Action: Recipient added to permanent Suppression list.',
-        details: { bounceType: 'Permanent', subType: 'General' },
-      },
-      {
-        id: 'log_04',
-        timestamp: iso(10),
-        service: 'Tracking',
-        messageId: this.messages[6]?.messageId,
-        event: 'OPEN_PIXEL_HIT',
-        severity: 'INFO',
-        response: 'Pixel 1x1 GET /track/open?id=msg_... UserAgent: Apple Mail/16.0 (macOS)',
-        details: { ip: '185.122.40.12', country: 'DE' },
-      },
-      {
-        id: 'log_05',
-        timestamp: iso(15),
-        service: 'Application',
-        event: 'COMPLIANCE_AUDIT',
-        severity: 'INFO',
-        response: 'Suppression pre-flight validation passed for campaign cmp_01 (12,400 clean recipients).',
-      },
-      {
-        id: 'log_06',
-        timestamp: iso(20),
-        service: 'KumoMTA',
-        event: 'CONNECTION_POOL_REBALANCE',
-        severity: 'INFO',
-        response: 'KumoMTA dynamic pool rebalanced: 32 active TCP channels to SES upstream.',
-      },
-      {
-        id: 'log_07',
-        timestamp: iso(30),
-        service: 'Amazon SES',
-        event: 'REPUTATION_METRICS_SYNC',
-        severity: 'INFO',
-        response: 'SES Account Status: Healthy. Bounce Rate: 0.14% (Threshold: <5%), Complaint Rate: 0.02% (Threshold: <0.1%).',
-      },
-    ];
+    // 10. Technical Logs (Empty runtime state)
+    this.logs = [];
 
     // 11. API Keys
-    this.apiKeys = [
-      {
-        id: 'key_01',
-        name: 'KumoMTA Automation Pipeline Key',
-        keyPrefix: 'em_live_9f823...',
-        createdAt: iso(7200),
-        lastUsedAt: iso(2),
-      },
-      {
-        id: 'key_02',
-        name: 'CI/CD Transactional Staging Key',
-        keyPrefix: 'em_test_a17c2...',
-        createdAt: iso(3600),
-        lastUsedAt: iso(180),
-      },
-    ];
+    this.apiKeys = [];
 
     // 12. Settings
     this.settings = {
       kumomta: {
-        host: '127.0.0.1',
-        port: 25,
-        apiUrl: 'http://127.0.0.1:8000',
-        username: 'kumomta_admin',
+        host: process.env.KUMO_SMTP_HOST || process.env.KUMOMTA_HOST || '127.0.0.1',
+        port: Number(process.env.KUMO_SMTP_PORT || process.env.KUMOMTA_PORT) || 2525,
+        apiUrl: process.env.KUMOMTA_API_URL || 'http://127.0.0.1:8000',
+        username: process.env.KUMO_SMTP_USER || process.env.KUMOMTA_USERNAME || '',
         spoolPath: '/var/spool/kumomta',
         maxConcurrency: 64,
         maxRetries: 5,
@@ -653,29 +391,23 @@ class DatabaseStore {
         status: 'healthy',
       },
       ses: {
-        smtpHost: 'email-smtp.eu-west-1.amazonaws.com',
-        smtpPort: 587,
-        username: 'AKIAIOSFODNN7EXAMPLE',
-        region: 'eu-west-1',
-        configurationSet: 'EmailOps-Production-ConfigSet',
-        snsBounceTopic: 'arn:aws:sns:eu-west-1:255336227693:EmailOps-SES-Bounces',
-        snsComplaintTopic: 'arn:aws:sns:eu-west-1:255336227693:EmailOps-SES-Complaints',
-        status: 'healthy',
+        smtpHost: process.env.SES_SMTP_HOST || 'email-smtp.eu-west-1.amazonaws.com',
+        smtpPort: Number(process.env.SES_SMTP_PORT) || 587,
+        username: process.env.SES_SMTP_USERNAME || '',
+        region: process.env.SES_REGION || 'eu-west-1',
+        configurationSet: process.env.SES_CONFIGURATION_SET || '',
+        status: 'offline',
       },
       tracking: {
-        enableOpenTracking: true,
-        enableClickTracking: true,
-        trackingDomain: 'track.transact.acme-corp.io',
-        customHeaders: {
-          'X-Entity-ID': 'emailops-cluster-01',
-          'X-Compliant-Sending': 'true',
-        },
+        enableOpenTracking: false,
+        enableClickTracking: false,
+        trackingDomain: '',
+        customHeaders: {},
       },
       compliance: {
         enforceUnsubscribeHeader: true,
         autoSuppressHardBounces: true,
         autoSuppressComplaints: true,
-        physicalPostalAddress: 'Acme Corp, 500 Cloud Parkway, Tech District, CA 94105',
       },
       prometheus: {
         enabled: true,
@@ -686,65 +418,116 @@ class DatabaseStore {
     };
   }
 
-  // Dashboard Aggregations
+  // Dashboard Aggregations (Derived strictly from real runtime data)
   getDashboardStats() {
-    const totalSent = this.senders.reduce((acc, s) => acc + s.sentCount, 0);
-    const delivered = this.senders.reduce((acc, s) => acc + s.deliveredCount, 0);
-    const bounced = this.senders.reduce((acc, s) => acc + s.bouncedCount, 0);
-    const complaints = this.senders.reduce((acc, s) => acc + s.complaintCount, 0);
-    const failed = 240;
-    const opens = 68400;
-    const clicks = 23900;
+    const realMessages = this.messages;
 
-    const deliveryRate = totalSent > 0 ? Number(((delivered / totalSent) * 100).toFixed(2)) : 0;
-    const bounceRate = totalSent > 0 ? Number(((bounced / totalSent) * 100).toFixed(2)) : 0;
-    const openRate = delivered > 0 ? Number(((opens / delivered) * 100).toFixed(2)) : 0;
-    const clickRate = opens > 0 ? Number(((clicks / opens) * 100).toFixed(2)) : 0;
+    // Messages accepted into KumoMTA spool
+    const acceptedMessages = realMessages.filter(
+      (m) => m.status === 'QUEUED' || m.status === 'SENT' || m.status === 'DELIVERED'
+    );
+    const totalSent = acceptedMessages.length;
 
-    // Time-series (last 7 days or points)
-    const timeseries = [
-      { time: 'Mon', sent: 18400, delivered: 18210, bounced: 140, failed: 50 },
-      { time: 'Tue', sent: 22100, delivered: 21890, bounced: 160, failed: 50 },
-      { time: 'Wed', sent: 24500, delivered: 24200, bounced: 210, failed: 90 },
-      { time: 'Thu', sent: 19800, delivered: 19610, bounced: 150, failed: 40 },
-      { time: 'Fri', sent: 28900, delivered: 28550, bounced: 270, failed: 80 },
-      { time: 'Sat', sent: 14200, delivered: 14080, bounced: 95, failed: 25 },
-      { time: 'Sun', sent: 17590, delivered: 17440, bounced: 115, failed: 35 },
-    ];
+    // Messages accepted and currently in queued/spool status
+    const queued = realMessages.filter((m) => m.status === 'QUEUED').length;
 
-    // Hourly sending volume distribution
-    const hourlyActivity = [
-      { hour: '00:00', volume: 620 },
-      { hour: '02:00', volume: 410 },
-      { hour: '04:00', volume: 380 },
-      { hour: '06:00', volume: 1450 },
-      { hour: '08:00', volume: 4890 },
-      { hour: '10:00', volume: 7420 },
-      { hour: '12:00', volume: 6900 },
-      { hour: '14:00', volume: 8150 },
-      { hour: '16:00', volume: 6300 },
-      { hour: '18:00', volume: 4120 },
-      { hour: '20:00', volume: 2450 },
-      { hour: '22:00', volume: 1100 },
-    ];
+    // Messages that failed during transmission/rejection
+    const failed = realMessages.filter((m) => m.status === 'FAILED').length;
 
-    const topSenders = this.senders.map((s) => ({
-      id: s.id,
-      name: s.name,
-      email: s.fromEmail,
-      volume: s.sentCount,
-      deliveryRate: s.sentCount > 0 ? Number(((s.deliveredCount / s.sentCount) * 100).toFixed(2)) : 0,
-      bounceRate: s.sentCount > 0 ? Number(((s.bouncedCount / s.sentCount) * 100).toFixed(2)) : 0,
+    // Telemetry for downstream delivery/bounces/complaints/opens/clicks is pending Step 2
+    // Do NOT fabricate or estimate values
+    const delivered = 0;
+    const bounced = 0;
+    const complaints = 0;
+    const opens = 0;
+    const clicks = 0;
+
+    const deliveryRate = 0;
+    const bounceRate = 0;
+    const openRate = 0;
+    const clickRate = 0;
+
+    // Calculate real sending rate from submissions in the last 60 seconds
+    const now = Date.now();
+    const recentSubmissions = realMessages.filter((m) => {
+      const msgTime = new Date(m.createdAt || m.queuedAt).getTime();
+      return now - msgTime <= 60000 && (m.status === 'QUEUED' || m.status === 'SENT' || m.status === 'DELIVERED');
+    }).length;
+    const sendingRatePerSec = recentSubmissions > 0 ? Number((recentSubmissions / 60).toFixed(2)) : 0;
+
+    // Real timeseries for the last 7 days derived from actual runtime messages
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const timeseriesMap = new Map<string, { sent: number; delivered: number; bounced: number; failed: number }>();
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now - i * 86400000);
+      const dayName = days[d.getDay()];
+      timeseriesMap.set(dayName, { sent: 0, delivered: 0, bounced: 0, failed: 0 });
+    }
+
+    for (const m of realMessages) {
+      const d = new Date(m.createdAt || m.queuedAt);
+      const dayName = days[d.getDay()];
+      if (timeseriesMap.has(dayName)) {
+        const item = timeseriesMap.get(dayName)!;
+        if (m.status === 'QUEUED' || m.status === 'SENT' || m.status === 'DELIVERED') {
+          item.sent += 1;
+        } else if (m.status === 'FAILED') {
+          item.failed += 1;
+        }
+      }
+    }
+
+    const timeseries = Array.from(timeseriesMap.entries()).map(([time, data]) => ({
+      time,
+      ...data,
     }));
 
-    const topCampaigns = this.campaigns.map((c) => ({
-      id: c.id,
-      name: c.name,
-      sent: c.sentCount,
-      delivered: c.deliveredCount,
-      openRate: c.deliveredCount > 0 ? Number(((c.openCount / c.deliveredCount) * 100).toFixed(1)) : 0,
-      clickRate: c.openCount > 0 ? Number(((c.clickCount / c.openCount) * 100).toFixed(1)) : 0,
+    // Real hourly activity: 2-hour buckets for last 24h
+    const hourlyActivityMap = new Map<string, number>();
+    const hours = ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
+    for (const h of hours) {
+      hourlyActivityMap.set(h, 0);
+    }
+
+    for (const m of realMessages) {
+      const msgDate = new Date(m.createdAt || m.queuedAt);
+      if (now - msgDate.getTime() <= 86400000) {
+        const hour = msgDate.getHours();
+        const bucketHour = Math.floor(hour / 2) * 2;
+        const bucketKey = `${bucketHour.toString().padStart(2, '0')}:00`;
+        if (hourlyActivityMap.has(bucketKey)) {
+          hourlyActivityMap.set(bucketKey, (hourlyActivityMap.get(bucketKey) || 0) + 1);
+        }
+      }
+    }
+
+    const hourlyActivity = Array.from(hourlyActivityMap.entries()).map(([hour, volume]) => ({
+      hour,
+      volume,
     }));
+
+    const topSenders = this.senders
+      .filter((s) => s.sentCount > 0)
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        email: s.fromEmail,
+        volume: s.sentCount,
+        deliveryRate: 0,
+        bounceRate: 0,
+      }));
+
+    const topCampaigns = this.campaigns
+      .filter((c) => c.sentCount > 0)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        sent: c.sentCount,
+        delivered: 0,
+        openRate: 0,
+        clickRate: 0,
+      }));
 
     return {
       totalSent,
@@ -758,10 +541,10 @@ class DatabaseStore {
       bounceRate,
       openRate,
       clickRate,
-      queueSize: 14,
-      sendingRatePerSec: 142.6,
+      queueSize: queued,
+      sendingRatePerSec,
       kumoHealth: 'healthy',
-      sesHealth: 'healthy',
+      sesHealth: 'offline',
       timeseries,
       hourlyActivity,
       topSenders,
@@ -769,22 +552,23 @@ class DatabaseStore {
     };
   }
 
-  // Prometheus Metrics format & JSON
+  // Prometheus Metrics format & JSON (No fabricated constants)
   getPrometheusMetrics(): PrometheusMetrics {
+    const stats = this.getDashboardStats();
     return {
-      kumomta_queue_size: 14,
-      kumomta_messages_in_flight: 8,
-      kumomta_messages_sent_total: this.messages.length + 145490,
-      kumomta_delivery_rate_per_second: 142.6,
-      kumomta_smtp_connection_pool_active: 32,
-      kumomta_smtp_connection_pool_idle: 16,
-      kumomta_memory_usage_bytes: 536870912, // 512 MB
-      kumomta_cpu_usage_percent: 18.4,
-      ses_quota_max_24_hour: 500000,
-      ses_quota_sent_last_24_hour: 145490,
-      ses_quota_max_send_rate: 200,
-      ses_reputation_bounce_rate: 0.14,
-      ses_reputation_complaint_rate: 0.02,
+      kumomta_queue_size: stats.queueSize,
+      kumomta_messages_in_flight: 0,
+      kumomta_messages_sent_total: stats.totalSent,
+      kumomta_delivery_rate_per_second: stats.sendingRatePerSec,
+      kumomta_smtp_connection_pool_active: 0,
+      kumomta_smtp_connection_pool_idle: 0,
+      kumomta_memory_usage_bytes: 0,
+      kumomta_cpu_usage_percent: 0,
+      ses_quota_max_24_hour: 0,
+      ses_quota_sent_last_24_hour: 0,
+      ses_quota_max_send_rate: 0,
+      ses_reputation_bounce_rate: 0,
+      ses_reputation_complaint_rate: 0,
     };
   }
 

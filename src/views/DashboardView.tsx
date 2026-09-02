@@ -64,7 +64,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       icon: Send,
       color: 'text-white',
       bg: 'bg-white/5',
-      badge: '+12.4% vs last week',
+      badge: stats.totalSent > 0 ? 'Live Spool' : 'Ready',
     },
     {
       title: 'Delivered',
@@ -73,7 +73,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       icon: CheckCircle2,
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10',
-      badge: '99.1% SLA Target',
+      badge: stats.delivered > 0 ? 'Verified' : 'Pending',
     },
     {
       title: 'Bounced',
@@ -82,25 +82,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       icon: AlertTriangle,
       color: 'text-amber-300',
       bg: 'bg-amber-500/10',
-      badge: 'Below 2.0% limit',
+      badge: '0 Hard / 0 Soft',
     },
     {
       title: 'Failed',
       value: stats.failed.toLocaleString(),
-      sub: 'Transient relay errors',
+      sub: 'Transmission errors',
       icon: XCircle,
       color: 'text-rose-400',
       bg: 'bg-rose-500/10',
-      badge: 'Auto-retrying in spool',
+      badge: stats.failed > 0 ? 'Review logs' : 'None',
     },
     {
       title: 'Complaints',
       value: stats.complaints.toLocaleString(),
-      sub: '0.02% complaint rate',
+      sub: `${stats.totalSent > 0 ? ((stats.complaints / stats.totalSent) * 100).toFixed(2) : '0.00'}% complaint rate`,
       icon: ShieldAlert,
       color: 'text-purple-300',
       bg: 'bg-purple-500/10',
-      badge: 'SES FBL Monitored',
+      badge: 'FBL Monitored',
     },
     {
       title: 'Opens',
@@ -109,7 +109,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       icon: Eye,
       color: 'text-sky-300',
       bg: 'bg-sky-500/10',
-      badge: 'Pixel Tracked',
+      badge: 'Tracking',
     },
     {
       title: 'Clicks',
@@ -118,7 +118,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       icon: MousePointerClick,
       color: 'text-teal-300',
       bg: 'bg-teal-500/10',
-      badge: 'Redirect Engine',
+      badge: 'Tracking',
     },
   ];
 
@@ -166,9 +166,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="text-[10px] uppercase tracking-wider text-[#888888]">KumoMTA Spool Engine</div>
               <div className="text-xs font-semibold text-white flex items-center gap-2 mt-0.5">
-                14 Active Spool Queues
+                {stats.queueSize > 0 ? `${stats.queueSize} Queued in Spool` : 'Spool Ready'}
                 <span className="text-[9px] px-1.5 py-0.2 rounded-xs bg-emerald-500/20 text-emerald-400 font-mono">
-                  ONLINE
+                  {stats.kumoHealth === 'healthy' ? 'ONLINE' : stats.kumoHealth.toUpperCase()}
                 </span>
               </div>
             </div>
@@ -186,15 +186,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="text-[10px] uppercase tracking-wider text-[#888888]">Amazon SES Relay</div>
               <div className="text-xs font-semibold text-white flex items-center gap-2 mt-0.5">
-                eu-west-1 Endpoint
-                <span className="text-[9px] px-1.5 py-0.2 rounded-xs bg-sky-500/20 text-sky-400 font-mono">
-                  HEALTHY
+                Upstream Relay
+                <span className={`text-[9px] px-1.5 py-0.2 rounded-xs font-mono ${
+                  stats.sesHealth === 'healthy'
+                    ? 'bg-sky-500/20 text-sky-400'
+                    : 'bg-zinc-800 text-zinc-400'
+                }`}>
+                  {stats.sesHealth === 'healthy' ? 'HEALTHY' : 'UNCONFIGURED'}
                 </span>
               </div>
             </div>
           </div>
           <div className="text-right font-mono text-xs text-[#888888]">
-            <span className="text-white font-bold">145k</span> / 500k quota
+            <span className="text-white font-bold">{stats.totalSent}</span> sent
           </div>
         </div>
 
@@ -211,7 +215,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
           <div className="text-right text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5" /> High Bandwidth
+            <TrendingUp className="w-3.5 h-3.5" /> {stats.sendingRatePerSec > 0 ? 'Active Stream' : 'Idle'}
           </div>
         </div>
       </div>

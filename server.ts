@@ -19,6 +19,7 @@ import { seedRouter } from './server/routes/seed.js';
 import { db } from './server/store.js';
 import { kumoMtaService } from './server/services/KumoMtaService.js';
 import { sesProvider } from './server/services/SesProvider.js';
+import { kumoMtaServer } from './server/services/KumoMtaServer.js';
 
 dotenv.config();
 
@@ -103,6 +104,9 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[EmailOps] Server started on http://0.0.0.0:${PORT}`);
+    kumoMtaServer.start().catch((err) => {
+      console.warn('[KumoMTA Server] Could not bind listener:', err.message);
+    });
   });
 }
 
