@@ -1,0 +1,6 @@
+{
+  "name": "EmailOps Dashboard",
+  "description": "Production email operations and sending dashboard for KumoMTA, Amazon SES, sender management, message tracking, campaigns, contacts, and Prometheus monitoring.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
