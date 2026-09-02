@@ -152,17 +152,21 @@ messagesRouter.post('/test', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'testEmail and fromEmail are required' });
   }
 
-  const result = await kumoMtaService.submitEmail({
-    fromEmail,
-    to: testEmail,
-    subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`,
-    htmlBody: htmlBody || '<p>This is a test message from EmailOps Dashboard via KumoMTA.</p>',
-    isTest: true,
-  });
+  try {
+    const result = await kumoMtaService.submitEmail({
+      fromEmail,
+      to: testEmail,
+      subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`,
+      htmlBody: htmlBody || '<p>This is a test message from EmailOps Dashboard via KumoMTA.</p>',
+      isTest: true,
+    });
 
-  res.json({
-    success: true,
-    result,
-    message: `Test email dispatched to ${testEmail} through KumoMTA spool.`,
-  });
+    res.json({
+      success: true,
+      result,
+      message: `Test email dispatched to ${testEmail} through KumoMTA spool.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to send test email via KumoMTA' });
+  }
 });

@@ -41,13 +41,15 @@ async function startServer() {
     next();
   });
 
-  // Health Check Endpoint
+  // Health Check Endpoint (All services)
   app.get('/api/health', async (req, res) => {
     const kumoHealth = await kumoMtaService.checkHealth();
     const sesHealth = await sesProvider.checkHealth();
 
-    res.json({
-      status: 'healthy',
+    const isHealthy = kumoHealth.status === 'healthy';
+
+    res.status(isHealthy ? 200 : 200).json({
+      status: isHealthy ? 'healthy' : 'degraded',
       timestamp: new Date().toISOString(),
       services: {
         api: 'healthy',
@@ -56,6 +58,12 @@ async function startServer() {
         amazon_ses: sesHealth,
       },
     });
+  });
+
+  // Dedicated KumoMTA Health Check Endpoint
+  app.get('/api/health/kumomta', async (req, res) => {
+    const kumoHealth = await kumoMtaService.checkHealth();
+    res.status(kumoHealth.status === 'healthy' ? 200 : 503).json(kumoHealth);
   });
 
   // Dashboard Stats API
