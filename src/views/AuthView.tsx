@@ -3,41 +3,24 @@ import { useAuth } from '../context/AuthContext.js';
 import {
   Lock,
   Mail,
-  User,
   ShieldCheck,
   AlertCircle,
   ArrowRight,
   Server,
-  Zap,
-  CheckCircle2,
-  HelpCircle,
 } from 'lucide-react';
 
 export const AuthView: React.FC = () => {
-  const { login, register, error, clearError, isConfigured } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const { login, error, clearError } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const switchMode = (newMode: 'login' | 'register') => {
-    setMode(newMode);
-    setFormError(null);
-    clearError();
-    setSuccessMessage(null);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     clearError();
-    setSuccessMessage(null);
 
     const cleanEmail = email.trim();
     if (!cleanEmail) {
@@ -60,36 +43,12 @@ export const AuthView: React.FC = () => {
       return;
     }
 
-    if (mode === 'register') {
-      if (!fullName.trim()) {
-        setFormError('Full name is required.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setFormError('Passwords do not match.');
-        return;
-      }
+    setIsSubmitting(true);
+    const res = await login(cleanEmail, password);
+    setIsSubmitting(false);
 
-      setIsSubmitting(true);
-      const res = await register(cleanEmail, password, fullName.trim());
-      setIsSubmitting(false);
-
-      if (res.success) {
-        if (res.message) {
-          setSuccessMessage(res.message);
-          setMode('login');
-        }
-      } else {
-        setFormError(res.error || 'Registration failed');
-      }
-    } else {
-      setIsSubmitting(true);
-      const res = await login(cleanEmail, password);
-      setIsSubmitting(false);
-
-      if (!res.success) {
-        setFormError(res.error || 'Invalid email or password');
-      }
+    if (!res.success) {
+      setFormError(res.error || 'Invalid email or password');
     }
   };
 
@@ -115,68 +74,15 @@ export const AuthView: React.FC = () => {
             </span>
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            {mode === 'login' ? 'Sign in to EmailOps' : 'Create Operator Account'}
+            Sign in to EmailOps
           </h1>
           <p className="text-xs text-[#888888] mt-1.5 max-w-sm mx-auto">
-            {mode === 'login'
-              ? 'Real-time telemetry and control plane for KumoMTA and Amazon SES infrastructure.'
-              : 'Provision your secure administrator credentials backed by real Supabase authentication.'}
+            Enter your operator credentials to access the delivery control plane.
           </p>
         </div>
 
-        {/* Configuration Notice if Supabase env vars not provided */}
-        {!isConfigured && (
-          <div className="mb-6 p-4 rounded-sm border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-amber-300">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>Supabase Connection Setup</span>
-            </div>
-            <p className="text-[11px] text-amber-200/90 leading-relaxed">
-              Supabase Auth requires <code className="bg-black/40 px-1 py-0.5 rounded text-amber-100 font-mono">VITE_SUPABASE_URL</code> and{' '}
-              <code className="bg-black/40 px-1 py-0.5 rounded text-amber-100 font-mono">VITE_SUPABASE_ANON_KEY</code>.
-              Configure them in your environment variables to connect your live Supabase project.
-            </p>
-          </div>
-        )}
-
         {/* Auth Card */}
         <div className="bg-[#0F0F0F] border border-white/10 rounded-sm p-6 shadow-2xl backdrop-blur-md">
-          {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 p-1 bg-[#050505] border border-white/10 rounded-sm mb-6">
-            <button
-              id="tab-signin"
-              type="button"
-              onClick={() => switchMode('login')}
-              className={`py-1.5 text-xs font-medium rounded-sm transition-all ${
-                mode === 'login'
-                  ? 'bg-white text-black shadow-sm font-semibold'
-                  : 'text-[#888888] hover:text-white'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              id="tab-register"
-              type="button"
-              onClick={() => switchMode('register')}
-              className={`py-1.5 text-xs font-medium rounded-sm transition-all ${
-                mode === 'register'
-                  ? 'bg-white text-black shadow-sm font-semibold'
-                  : 'text-[#888888] hover:text-white'
-              }`}
-            >
-              Register
-            </button>
-          </div>
-
-          {/* Success Message */}
-          {successMessage && (
-            <div className="mb-4 p-3 rounded-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
-              <div className="leading-tight">{successMessage}</div>
-            </div>
-          )}
-
           {/* Error Alert */}
           {(formError || error) && (
             <div className="mb-4 p-3 rounded-sm bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-start gap-2">
@@ -187,26 +93,6 @@ export const AuthView: React.FC = () => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'register' && (
-              <div>
-                <label className="block text-[11px] font-medium text-[#888888] uppercase tracking-wider mb-1.5">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-[#666666] absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    id="input-name"
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Alex Vance"
-                    className="w-full bg-[#050505] border border-white/10 rounded-sm pl-9 pr-3 py-2 text-xs text-white placeholder:text-[#555555] focus:outline-none focus:border-white/40 transition-colors"
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label className="block text-[11px] font-medium text-[#888888] uppercase tracking-wider mb-1.5">
                 Work Email
@@ -217,6 +103,7 @@ export const AuthView: React.FC = () => {
                   id="input-email"
                   type="email"
                   required
+                  autoFocus
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="operator@emailops.io"
@@ -230,11 +117,9 @@ export const AuthView: React.FC = () => {
                 <label className="block text-[11px] font-medium text-[#888888] uppercase tracking-wider">
                   Password
                 </label>
-                {mode === 'login' && (
-                  <span className="text-[10px] text-[#666666]">
-                    Supabase Encrypted
-                  </span>
-                )}
+                <span className="text-[10px] text-[#666666]">
+                  Encrypted
+                </span>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-[#666666] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -250,26 +135,6 @@ export const AuthView: React.FC = () => {
               </div>
             </div>
 
-            {mode === 'register' && (
-              <div>
-                <label className="block text-[11px] font-medium text-[#888888] uppercase tracking-wider mb-1.5">
-                  Confirm Password
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-[#666666] absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    id="input-confirm-password"
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-[#050505] border border-white/10 rounded-sm pl-9 pr-3 py-2 text-xs text-white placeholder:text-[#555555] focus:outline-none focus:border-white/40 transition-colors"
-                  />
-                </div>
-              </div>
-            )}
-
             <button
               id="btn-auth-submit"
               type="submit"
@@ -279,11 +144,11 @@ export const AuthView: React.FC = () => {
               {isSubmitting ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                  <span>{mode === 'login' ? 'Authenticating...' : 'Provisioning Account...'}</span>
+                  <span>Authenticating...</span>
                 </>
               ) : (
                 <>
-                  <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
+                  <span>Sign In</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
@@ -301,20 +166,6 @@ export const AuthView: React.FC = () => {
               <span>KumoMTA 51.170.132.86</span>
             </div>
           </div>
-        </div>
-
-        {/* Bottom Switch Link */}
-        <div className="text-center mt-6">
-          <p className="text-xs text-[#888888]">
-            {mode === 'login' ? "Don't have an operator account?" : 'Already have credentials?'}
-            <button
-              type="button"
-              onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
-              className="ml-2 text-white hover:underline font-medium focus:outline-none"
-            >
-              {mode === 'login' ? 'Create one now' : 'Sign in here'}
-            </button>
-          </p>
         </div>
       </div>
     </div>
