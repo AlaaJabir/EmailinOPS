@@ -1,13 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../store.js';
 import { suppressionService } from '../services/SuppressionService.js';
+import { optionalAuth } from '../middleware/auth.js';
+import { supabaseService } from '../services/SupabaseService.js';
 
 export const suppressionsRouter = Router();
 
-// GET /api/suppressions - Search and filter suppression list
-suppressionsRouter.get('/', (req: Request, res: Response) => {
+// GET /api/suppressions - Search and filter suppression list (scoped to user)
+suppressionsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
   const { search, type } = req.query;
-  let list = [...db.suppressions];
+  let list = [];
+  if (req.user && supabaseService.isConfigured) {
+    list = await supabaseService.getSuppressions(req.user.id);
+  } else {
+    list = [...db.suppressions];
+  }
 
   if (search && typeof search === 'string') {
     const q = search.toLowerCase();

@@ -248,7 +248,7 @@ export class SupabaseService {
     sesMessageId?: string;
     deliveredAt?: string;
     bouncedAt?: string;
-    bounceType?: string;
+    bounceType?: 'Hard' | 'Soft' | 'Transient';
     bounceReason?: string;
     smtpResponse?: string;
   }): Promise<void> {

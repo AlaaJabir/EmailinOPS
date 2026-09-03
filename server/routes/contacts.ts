@@ -1,13 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../store.js';
 import { Contact, ContactList } from '../../src/types.js';
+import { optionalAuth } from '../middleware/auth.js';
+import { supabaseService } from '../services/SupabaseService.js';
 
 export const contactsRouter = Router();
 
-// GET /api/contacts - List contacts with filter & search
-contactsRouter.get('/', (req: Request, res: Response) => {
+// GET /api/contacts - List contacts with filter & search (scoped to user)
+contactsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
   const { search, status, listId } = req.query;
-  let list = [...db.contacts];
+  let list: Contact[] = [];
+  if (req.user && supabaseService.isConfigured) {
+    list = await supabaseService.getContacts(req.user.id);
+  } else {
+    list = [...db.contacts];
+  }
 
   if (search && typeof search === 'string') {
     const q = search.toLowerCase();

@@ -1,11 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../store.js';
 import { Sender, Domain } from '../../src/types.js';
+import { optionalAuth } from '../middleware/auth.js';
+import { supabaseService } from '../services/SupabaseService.js';
 
 export const sendersRouter = Router();
 
-// GET /api/senders - List all senders
-sendersRouter.get('/', (req: Request, res: Response) => {
+// GET /api/senders - List all senders (scoped to user)
+sendersRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
+  if (req.user && supabaseService.isConfigured) {
+    const senders = await supabaseService.getSenders(req.user.id);
+    return res.json({ senders });
+  }
   res.json({ senders: db.senders });
 });
 

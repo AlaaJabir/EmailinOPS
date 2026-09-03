@@ -1,11 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../store.js';
 import { Campaign } from '../../src/types.js';
+import { optionalAuth, requireAuth } from '../middleware/auth.js';
+import { supabaseService } from '../services/SupabaseService.js';
 
 export const campaignsRouter = Router();
 
-// GET /api/campaigns - List all campaigns
-campaignsRouter.get('/', (req: Request, res: Response) => {
+// GET /api/campaigns - List all campaigns (scoped to user)
+campaignsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
+  if (req.user && supabaseService.isConfigured) {
+    const campaigns = await supabaseService.getCampaigns(req.user.id);
+    return res.json({ campaigns });
+  }
   res.json({ campaigns: db.campaigns });
 });
 

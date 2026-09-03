@@ -44,6 +44,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   kumoStatus = 'healthy',
   sesStatus = 'healthy',
   queueCount = 14,
+  user,
+  onLogout,
 }) => {
   const navItems = [
     { id: 'dashboard' as NavTab, label: 'Dashboard', icon: LayoutDashboard },

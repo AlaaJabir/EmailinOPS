@@ -3,6 +3,8 @@ import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { MessageDetailModal } from './components/MessageDetailModal';
+import { useAuth } from './context/AuthContext';
+import { AuthView } from './views/AuthView';
 
 // Views
 import { DashboardView } from './views/DashboardView';
@@ -30,6 +32,8 @@ import {
 } from './types';
 
 export function App() {
+  const { user, profile, logout, isLoading: isAuthLoading, isConfigured, getAuthHeaders } = useAuth();
+
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -48,6 +52,21 @@ export function App() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Authenticated fetch wrapper that automatically attaches Supabase JWT
+  const authFetch = useCallback(
+    (url: string, options: RequestInit = {}) => {
+      const authHeaders = getAuthHeaders();
+      return fetch(url, {
+        ...options,
+        headers: {
+          ...authHeaders,
+          ...(options.headers || {}),
+        },
+      });
+    },
+    [getAuthHeaders]
+  );
+
   const addToast = (type: 'success' | 'error' | 'info', title: string, message?: string) => {
     const id = `toast_${Date.now()}_${Math.random()}`;
     setToasts((prev) => [...prev, { id, type, title, message }]);
@@ -63,7 +82,7 @@ export function App() {
   // Data fetchers
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/stats');
+      const res = await authFetch('/api/dashboard/stats');
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -71,11 +90,11 @@ export function App() {
     } catch (err) {
       console.error('Error fetching stats:', err);
     }
-  }, []);
+  }, [authFetch]);
 
   const fetchMessages = useCallback(async () => {
     try {
-      const res = await fetch('/api/messages?limit=100');
+      const res = await authFetch('/api/messages?limit=100');
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages || []);
@@ -83,13 +102,13 @@ export function App() {
     } catch (err) {
       console.error('Error fetching messages:', err);
     }
-  }, []);
+  }, [authFetch]);
 
   const fetchSendersAndDomains = useCallback(async () => {
     try {
       const [resSenders, resDomains] = await Promise.all([
-        fetch('/api/senders'),
-        fetch('/api/senders/domains'),
+        authFetch('/api/senders'),
+        authFetch('/api/senders/domains'),
       ]);
       if (resSenders.ok) {
         const data = await resSenders.json();
@@ -102,11 +121,11 @@ export function App() {
     } catch (err) {
       console.error('Error fetching senders/domains:', err);
     }
-  }, []);
+  }, [authFetch]);
 
   const fetchCampaigns = useCallback(async () => {
     try {
-      const res = await fetch('/api/campaigns');
+      const res = await authFetch('/api/campaigns');
       if (res.ok) {
         const data = await res.json();
         setCampaigns(data.campaigns || []);
@@ -114,13 +133,13 @@ export function App() {
     } catch (err) {
       console.error('Error fetching campaigns:', err);
     }
-  }, []);
+  }, [authFetch]);
 
   const fetchContactsAndLists = useCallback(async () => {
     try {
       const [resContacts, resLists] = await Promise.all([
-        fetch('/api/contacts'),
-        fetch('/api/contacts/lists'),
+        authFetch('/api/contacts'),
+        authFetch('/api/contacts/lists'),
       ]);
       if (resContacts.ok) {
         const data = await resContacts.json();
@@ -133,11 +152,11 @@ export function App() {
     } catch (err) {
       console.error('Error fetching contacts:', err);
     }
-  }, []);
+  }, [authFetch]);
 
   const fetchSuppressions = useCallback(async () => {
     try {
-      const res = await fetch('/api/suppressions');
+      const res = await authFetch('/api/suppressions');
       if (res.ok) {
         const data = await res.json();
         setSuppressions(data.suppressions || []);
@@ -145,11 +164,11 @@ export function App() {
     } catch (err) {
       console.error('Error fetching suppressions:', err);
     }
-  }, []);
+  }, [authFetch]);
 
   const fetchLogs = useCallback(async () => {
     try {
-      const res = await fetch('/api/logs?limit=100');
+      const res = await authFetch('/api/logs?limit=100');
       if (res.ok) {
         const data = await res.json();
         setLogs(data.logs || []);
@@ -157,11 +176,11 @@ export function App() {
     } catch (err) {
       console.error('Error fetching logs:', err);
     }
-  }, []);
+  }, [authFetch]);
 
   const fetchSettings = useCallback(async () => {
     try {
-      const res = await fetch('/api/settings');
+      const res = await authFetch('/api/settings');
       if (res.ok) {
         const data = await res.json();
         setSettings(data.settings || {});
@@ -170,7 +189,7 @@ export function App() {
     } catch (err) {
       console.error('Error fetching settings:', err);
     }
-  }, []);
+  }, [authFetch]);
 
   const refreshAll = useCallback(async () => {
     setIsLoading(true);
@@ -209,7 +228,7 @@ export function App() {
   // Action: Send Email
   const handleSendEmail = async (payload: any) => {
     try {
-      const res = await fetch('/api/messages/send', {
+      const res = await authFetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -228,7 +247,7 @@ export function App() {
       addToast(
         'success',
         'Injected into KumoMTA Spool',
-        `RFC Message-ID: ${data.messageId}`
+        `RFC Message-ID: ${data.messageId || data.result?.messageId}`
       );
       refreshAll();
     } catch (err: any) {
@@ -239,7 +258,7 @@ export function App() {
   // Action: Send Test Email
   const handleSendTest = async (payload: any) => {
     try {
-      const res = await fetch('/api/messages/test', {
+      const res = await authFetch('/api/messages/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -262,7 +281,7 @@ export function App() {
   const handleSimulateTraffic = async () => {
     setIsSimulating(true);
     try {
-      const res = await fetch('/api/seed/simulate-traffic', {
+      const res = await authFetch('/api/seed/simulate-traffic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ count: 5 }),
@@ -283,7 +302,7 @@ export function App() {
   // Action: Add Sender
   const handleAddSender = async (senderData: any) => {
     try {
-      const res = await fetch('/api/senders', {
+      const res = await authFetch('/api/senders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(senderData),
@@ -300,7 +319,7 @@ export function App() {
   // Action: Add Domain
   const handleAddDomain = async (domainData: any) => {
     try {
-      const res = await fetch('/api/senders/domains', {
+      const res = await authFetch('/api/senders/domains', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(domainData),
@@ -317,7 +336,7 @@ export function App() {
   // Action: Create Campaign
   const handleCreateCampaign = async (campaignData: any) => {
     try {
-      const res = await fetch('/api/campaigns', {
+      const res = await authFetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(campaignData),
@@ -334,7 +353,7 @@ export function App() {
   // Action: Update Campaign Status
   const handleUpdateCampaignStatus = async (id: string, status: string) => {
     try {
-      const res = await fetch(`/api/campaigns/${id}/status`, {
+      const res = await authFetch(`/api/campaigns/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -351,7 +370,7 @@ export function App() {
   // Action: Add Contact
   const handleAddContact = async (contactData: any) => {
     try {
-      const res = await fetch('/api/contacts', {
+      const res = await authFetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(contactData),
@@ -368,7 +387,7 @@ export function App() {
   // Action: Create List
   const handleCreateList = async (listData: any) => {
     try {
-      const res = await fetch('/api/contacts/lists', {
+      const res = await authFetch('/api/contacts/lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(listData),
@@ -385,7 +404,7 @@ export function App() {
   // Action: Import CSV
   const handleImportCsv = async (csvContacts: any[]) => {
     try {
-      const res = await fetch('/api/contacts/import-csv', {
+      const res = await authFetch('/api/contacts/import-csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contacts: csvContacts }),
@@ -407,7 +426,7 @@ export function App() {
   // Action: Add Suppression
   const handleAddSuppression = async (suppressionData: any) => {
     try {
-      const res = await fetch('/api/suppressions', {
+      const res = await authFetch('/api/suppressions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(suppressionData),
@@ -424,7 +443,7 @@ export function App() {
   // Action: Remove Suppression
   const handleRemoveSuppression = async (id: string) => {
     try {
-      const res = await fetch(`/api/suppressions/${id}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/suppressions/${id}`, { method: 'DELETE' });
       if (res.ok) {
         addToast('info', 'Suppression Removed', 'Address unblocked for future delivery attempts');
         fetchSuppressions();
@@ -437,7 +456,7 @@ export function App() {
   // Action: Save Settings
   const handleSaveSettings = async (category: string, values: any) => {
     try {
-      const res = await fetch('/api/settings', {
+      const res = await authFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category, values }),
@@ -453,7 +472,7 @@ export function App() {
 
   // Action: Create API Key
   const handleCreateApiKey = async (name: string) => {
-    const res = await fetch('/api/settings/api-keys', {
+    const res = await authFetch('/api/settings/api-keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -466,7 +485,7 @@ export function App() {
   // Action: Revoke API Key
   const handleRevokeApiKey = async (id: string) => {
     try {
-      const res = await fetch(`/api/settings/api-keys/${id}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/settings/api-keys/${id}`, { method: 'DELETE' });
       if (res.ok) {
         addToast('info', 'API Key Revoked', 'Token invalidated immediately');
         fetchSettings();
@@ -476,6 +495,30 @@ export function App() {
     }
   };
 
+  // Authentication Loading Screen
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+          <div className="text-[11px] font-mono text-[#888888] tracking-widest uppercase">
+            Authenticating EmailOps Session...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Unauthenticated: Show Supabase Authentication View
+  if (!user) {
+    return (
+      <>
+        <AuthView />
+        <ToastContainer toasts={toasts} onDismiss={removeToast} />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex flex-row antialiased font-sans selection:bg-white/20 selection:text-white">
       {/* Sidebar Navigation */}
@@ -483,6 +526,13 @@ export function App() {
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         queueCount={stats?.queueSize || 14}
+        user={{
+          name: profile?.fullName || user.email?.split('@')[0],
+          email: user.email,
+          role: profile?.role,
+          plan: profile?.plan,
+        }}
+        onLogout={logout}
       />
 
       {/* Main Content Area */}
