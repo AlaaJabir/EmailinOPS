@@ -16,6 +16,8 @@ import { settingsRouter } from './server/routes/settings.js';
 import { metricsRouter } from './server/routes/metrics.js';
 import { webhooksRouter } from './server/routes/webhooks.js';
 import { seedRouter } from './server/routes/seed.js';
+import { unsubscribeRouter } from './server/routes/unsubscribe.js';
+import { trackingRouter } from './server/routes/tracking.js';
 import { db } from './server/store.js';
 import { kumoMtaService } from './server/services/KumoMtaService.js';
 import { sesProvider } from './server/services/SesProvider.js';
@@ -85,6 +87,9 @@ async function startServer() {
   app.use('/api/metrics', metricsRouter);
   app.use('/api/webhooks', webhooksRouter);
   app.use('/api/seed', seedRouter);
+  app.use('/api/tracking', trackingRouter);
+  app.use('/api/unsubscribe', unsubscribeRouter);
+  app.use('/unsubscribe', unsubscribeRouter);
 
   // Serve Frontend / Vite Middleware
   if (process.env.NODE_ENV !== 'production') {

@@ -23,6 +23,7 @@ interface CampaignsViewProps {
   lists: ContactList[];
   onCreateCampaign: (campaign: any) => Promise<void>;
   onUpdateCampaignStatus: (id: string, status: string) => Promise<void>;
+  onRunCampaign?: (id: string) => Promise<void>;
 }
 
 export const CampaignsView: React.FC<CampaignsViewProps> = ({
@@ -31,6 +32,7 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({
   lists,
   onCreateCampaign,
   onUpdateCampaignStatus,
+  onRunCampaign,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -130,6 +132,16 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({
                 </span>
 
                 <div className="flex items-center gap-2">
+                  {onRunCampaign && c.status !== 'SENDING' && (
+                    <button
+                      onClick={() => onRunCampaign(c.id)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-xs bg-white/10 hover:bg-white text-white hover:text-black font-semibold text-[11px] transition-colors"
+                      title="Run personalized broadcast to all non-suppressed contacts"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>Dispatch</span>
+                    </button>
+                  )}
                   {c.status === 'SENDING' && (
                     <button
                       onClick={() => onUpdateCampaignStatus(c.id, 'PAUSED')}

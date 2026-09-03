@@ -367,6 +367,29 @@ export function App() {
     }
   };
 
+  // Action: Run Personalized Campaign Broadcast
+  const handleRunCampaign = async (id: string) => {
+    try {
+      addToast('info', 'Broadcasting Campaign', 'Evaluating suppressions and generating personalized tokens...');
+      const res = await authFetch(`/api/campaigns/${id}/send`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast('error', 'Campaign Dispatch Failed', data.error || 'Failed to dispatch');
+        return;
+      }
+      addToast(
+        'success',
+        'Campaign Dispatched',
+        `Dispatched ${data.summary?.sentCount || 0} personalized emails (${data.summary?.suppressedCount || 0} suppressed, ${data.summary?.failedCount || 0} failed)`
+      );
+      refreshAll();
+    } catch (err: any) {
+      addToast('error', 'Broadcast Error', err.message);
+    }
+  };
+
   // Action: Add Contact
   const handleAddContact = async (contactData: any) => {
     try {
@@ -559,6 +582,7 @@ export function App() {
             <SendEmailView
               senders={senders}
               domains={domains}
+              contacts={contacts}
               onSendEmail={handleSendEmail}
               onSendTest={handleSendTest}
             />
@@ -580,6 +604,7 @@ export function App() {
               lists={lists}
               onCreateCampaign={handleCreateCampaign}
               onUpdateCampaignStatus={handleUpdateCampaignStatus}
+              onRunCampaign={handleRunCampaign}
             />
           )}
 

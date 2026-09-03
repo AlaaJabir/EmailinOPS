@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { db } from '../store.js';
+import { db, UnsubscribeToken } from '../store.js';
 import { Message, MessageEvent, Sender, Campaign, Contact, SuppressionItem, TechnicalLog } from '../../src/types.js';
 
 export interface AuthenticatedUser {
@@ -535,6 +535,115 @@ export class SupabaseService {
     }
 
     return db.suppressions;
+  }
+
+  /**
+   * Save an unsubscribe token record to Supabase
+   */
+  async saveUnsubscribeToken(record: UnsubscribeToken): Promise<void> {
+    if (this.isConfigured && this.client) {
+      try {
+        await this.client.from('unsubscribe_tokens').upsert(
+          {
+            token: record.token,
+            email: record.email,
+            contact_id: record.contactId || null,
+            message_id: record.messageId || null,
+            campaign_id: record.campaignId || null,
+            user_id: record.userId || null,
+            created_at: record.createdAt,
+            unsubscribed_at: record.unsubscribedAt || null,
+          },
+          { onConflict: 'token' }
+        );
+      } catch (err) {
+        // Non-blocking fallback
+      }
+    }
+  }
+
+  /**
+   * Fetch an unsubscribe token record from Supabase
+   */
+  async getUnsubscribeToken(token: string): Promise<UnsubscribeToken | null> {
+    if (this.isConfigured && this.client) {
+      try {
+        const { data, error } = await this.client
+          .from('unsubscribe_tokens')
+          .select('*')
+          .eq('token', token)
+          .maybeSingle();
+
+        if (!error && data) {
+          return {
+            token: data.token,
+            email: data.email,
+            contactId: data.contact_id,
+            messageId: data.message_id,
+            campaignId: data.campaign_id,
+            userId: data.user_id,
+            createdAt: data.created_at,
+            unsubscribedAt: data.unsubscribed_at,
+          };
+        }
+      } catch (err) {
+        // Fallback
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Update contact status to UNSUBSCRIBED in Supabase
+   */
+  async markContactUnsubscribed(email: string, userId?: string): Promise<void> {
+    if (this.isConfigured && this.client) {
+      try {
+        let query = this.client
+          .from('contacts')
+          .update({
+            status: 'UNSUBSCRIBED',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('email', email.toLowerCase().trim());
+
+        if (userId) {
+          query = query.eq('user_id', userId);
+        }
+
+        await query;
+      } catch (err) {
+        // Non-blocking
+      }
+    }
+  }
+
+  /**
+   * Add an entry to Supabase suppressions table
+   */
+  async addSuppression(item: {
+    email: string;
+    type: 'UNSUBSCRIBED' | 'HARD_BOUNCE' | 'COMPLAINT' | 'MANUAL';
+    reason: string;
+    source: string;
+    userId?: string;
+  }): Promise<void> {
+    if (this.isConfigured && this.client && item.userId) {
+      try {
+        await this.client.from('suppressions').upsert(
+          {
+            user_id: item.userId,
+            email: item.email.toLowerCase().trim(),
+            type: item.type,
+            reason: item.reason,
+            source: item.source,
+          },
+          { onConflict: 'user_id,email' }
+        );
+      } catch (err) {
+        // Non-blocking
+      }
+    }
   }
 }
 

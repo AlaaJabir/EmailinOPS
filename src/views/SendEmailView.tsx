@@ -1,26 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Send,
   Eye,
-  Code,
   Smartphone,
   Monitor,
-  Paperclip,
   Plus,
   Trash2,
-  AlertTriangle,
-  CheckCircle2,
-  FileText,
-  Sparkles,
-  HelpCircle,
   ShieldCheck,
   Zap,
+  MousePointerClick,
+  Sparkles,
+  UserCheck,
+  Copy,
+  Check,
 } from 'lucide-react';
-import { Sender, Domain } from '../types';
+import { Sender, Domain, Contact } from '../types';
 
 interface SendEmailViewProps {
   senders: Sender[];
   domains: Domain[];
+  contacts?: Contact[];
   onSendEmail: (payload: any) => Promise<any>;
   onSendTest: (payload: any) => Promise<any>;
 }
@@ -28,6 +27,7 @@ interface SendEmailViewProps {
 export const SendEmailView: React.FC<SendEmailViewProps> = ({
   senders,
   domains,
+  contacts = [],
   onSendEmail,
   onSendTest,
 }) => {
@@ -36,11 +36,11 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
   const [fromName, setFromName] = useState(senders[0]?.name || 'Acme Platform');
   const [fromEmail, setFromEmail] = useState(senders[0]?.fromEmail || 'security@transact.acme-corp.io');
   const [replyTo, setReplyTo] = useState(senders[0]?.replyTo || 'support@acme-corp.io');
-  const [to, setTo] = useState('enterprise-developer@example.com');
+  const [to, setTo] = useState('developer@acme-corp.io');
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
-  const [subject, setSubject] = useState('Critical Infrastructure Notice: Spool Queue Maintenance Window');
+  const [subject, setSubject] = useState('Critical Infrastructure Notice for {{company}}: Spool Maintenance');
   const [activeEditorTab, setActiveEditorTab] = useState<'html' | 'plaintext'>('html');
   const [htmlBody, setHtmlBody] = useState(`<!DOCTYPE html>
 <html>
@@ -53,35 +53,43 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
     </div>
     <h2 style="font-size: 20px; color: #ffffff; margin-bottom: 12px;">Scheduled Cluster Maintenance</h2>
     <p style="font-size: 14px; line-height: 1.6; color: #a1a1aa; margin-bottom: 20px;">
-      Hello engineering team,<br/><br/>
-      We are performing a rolling upgrade on the high-throughput KumoMTA spool nodes. Zero downtime is expected as connections will seamlessly failover to secondary Amazon SES upstream endpoints.
+      Hello {{first_name}},<br/><br/>
+      We are performing a rolling upgrade on the high-throughput KumoMTA spool nodes serving <strong>{{company}}</strong>. Zero downtime is expected as connections will seamlessly failover to secondary Amazon SES upstream endpoints.
     </p>
     <div style="background: #09090b; border: 1px solid #3f3f46; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-      <div style="font-size: 12px; color: #71717a; text-transform: uppercase; font-weight: 600;">Window Target</div>
-      <div style="font-size: 14px; font-weight: 600; color: #38bdf8; font-family: monospace; margin-top: 4px;">Sunday, 02:00 UTC - 04:00 UTC</div>
+      <div style="font-size: 12px; color: #71717a; text-transform: uppercase; font-weight: 600;">Recipient Account</div>
+      <div style="font-size: 14px; font-weight: 600; color: #38bdf8; font-family: monospace; margin-top: 4px;">{{email}}</div>
     </div>
     <a href="https://acme-corp.io/status" style="display: inline-block; background: #10b981; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; font-size: 13px;">View Live Telemetry Status &rarr;</a>
     <hr style="border: none; border-top: 1px solid #27272a; margin: 28px 0;" />
     <div style="font-size: 11px; color: #71717a; line-height: 1.5;">
-      You received this because your account has Ops Admin permissions.<br/>
-      <a href="https://transact.acme-corp.io/unsubscribe" style="color: #38bdf8; text-decoration: underline;">Manage notification preferences</a>
+      You received this message because you are registered with {{company}}.<br/>
+      <a href="{{unsubscribe_url}}" style="color: #38bdf8; text-decoration: underline;">Unsubscribe from these notifications</a>
     </div>
   </div>
 </body>
 </html>`);
-  const [plainText, setPlainText] = useState('Critical Infrastructure Notice: Scheduled maintenance on KumoMTA spool nodes.');
+  const [plainText, setPlainText] = useState(`Hello {{first_name}},\n\nScheduled maintenance notice for {{company}}.\n\nTo opt out: {{unsubscribe_url}}`);
+
+  // Tracking Toggles
+  const [enableOpenTracking, setEnableOpenTracking] = useState(true);
+  const [enableClickTracking, setEnableClickTracking] = useState(true);
 
   // Custom Headers
   const [customHeaders, setCustomHeaders] = useState<Array<{ key: string; value: string }>>([
     { key: 'X-KumoMTA-Queue', value: 'tier1-high-throughput' },
-    { key: 'X-Campaign-Tag', value: 'system-maintenance-2026' },
   ]);
 
-  // Preview options
+  // Preview options & Personalization simulation
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [previewMode, setPreviewMode] = useState<'personalized' | 'raw'>('personalized');
+  const [selectedPreviewContactId, setSelectedPreviewContactId] = useState<string>(contacts[0]?.id || '');
+  const [copiedVariable, setCopiedVariable] = useState<string | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testRecipient, setTestRecipient] = useState('qa-engineer@acme-corp.io');
+  const [testContactId, setTestContactId] = useState<string>(contacts[0]?.id || '');
 
   // Handle sender change
   const handleSenderChange = (id: string) => {
@@ -108,6 +116,47 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
     setCustomHeaders(updated);
   };
 
+  // Helper to insert or copy variable
+  const handleInsertVariable = (variableName: string) => {
+    const token = `{{${variableName}}}`;
+    setHtmlBody((prev) => `${prev} ${token}`);
+    navigator.clipboard?.writeText(token);
+    setCopiedVariable(variableName);
+    setTimeout(() => setCopiedVariable(null), 2000);
+  };
+
+  // Resolved Contact for Preview
+  const previewContact = useMemo(() => {
+    if (!selectedPreviewContactId) return contacts[0] || null;
+    return contacts.find((c) => c.id === selectedPreviewContactId) || null;
+  }, [contacts, selectedPreviewContactId]);
+
+  // Personalization resolver for Live Preview
+  const resolvePreviewContent = (content: string) => {
+    if (previewMode === 'raw' || !content) return content;
+
+    const firstName = previewContact?.firstName?.trim() || 'there';
+    const lastName = previewContact?.lastName?.trim() || '';
+    const company = previewContact?.company?.trim() || 'your organization';
+    const email = previewContact?.email?.trim() || to || 'recipient@domain.com';
+    const unsubUrl = `${window.location.origin}/unsubscribe/sample_preview_token`;
+
+    return content
+      .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
+      .replace(/\{\{\s*last_name\s*\}\}/gi, lastName)
+      .replace(/\{\{\s*company\s*\}\}/gi, company)
+      .replace(/\{\{\s*email\s*\}\}/gi, email)
+      .replace(/\{\{\s*unsubscribe_url\s*\}\}/gi, unsubUrl);
+  };
+
+  const renderedPreviewHtml = useMemo(() => {
+    return resolvePreviewContent(htmlBody);
+  }, [htmlBody, previewContact, previewMode, to]);
+
+  const renderedPreviewSubject = useMemo(() => {
+    return resolvePreviewContent(subject);
+  }, [subject, previewContact, previewMode, to]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -117,32 +166,66 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
       if (h.key.trim()) headersObj[h.key.trim()] = h.value.trim();
     });
 
-    await onSendEmail({
-      fromName,
-      fromEmail,
-      replyTo,
-      to,
-      cc: cc ? cc.split(',').map((s) => s.trim()) : undefined,
-      bcc: bcc ? bcc.split(',').map((s) => s.trim()) : undefined,
-      subject,
-      htmlBody,
-      plainText,
-      customHeaders: headersObj,
-      isMarketing: true,
-    });
-
-    setIsSubmitting(false);
+    try {
+      await onSendEmail({
+        fromName,
+        fromEmail,
+        replyTo,
+        to,
+        cc: cc ? cc.split(',').map((s) => s.trim()) : undefined,
+        bcc: bcc ? bcc.split(',').map((s) => s.trim()) : undefined,
+        subject,
+        htmlBody,
+        plainText,
+        customHeaders: headersObj,
+        enableOpenTracking,
+        enableClickTracking,
+        isMarketing: true,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDispatchTest = async () => {
+    const contactForTest = contacts.find((c) => c.id === testContactId);
+    // Pre-resolve variables for test recipient
+    const firstName = contactForTest?.firstName?.trim() || 'Tester';
+    const lastName = contactForTest?.lastName?.trim() || 'User';
+    const company = contactForTest?.company?.trim() || 'Acme Engineering';
+    const email = testRecipient;
+    const unsubUrl = `${window.location.origin}/unsubscribe/test_verification_token`;
+
+    const testSubject = subject
+      .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
+      .replace(/\{\{\s*last_name\s*\}\}/gi, lastName)
+      .replace(/\{\{\s*company\s*\}\}/gi, company)
+      .replace(/\{\{\s*email\s*\}\}/gi, email)
+      .replace(/\{\{\s*unsubscribe_url\s*\}\}/gi, unsubUrl);
+
+    const testHtml = htmlBody
+      .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
+      .replace(/\{\{\s*last_name\s*\}\}/gi, lastName)
+      .replace(/\{\{\s*company\s*\}\}/gi, company)
+      .replace(/\{\{\s*email\s*\}\}/gi, email)
+      .replace(/\{\{\s*unsubscribe_url\s*\}\}/gi, unsubUrl);
+
     await onSendTest({
       testEmail: testRecipient,
       fromEmail,
-      subject,
-      htmlBody,
+      subject: testSubject,
+      htmlBody: testHtml,
     });
     setShowTestModal(false);
   };
+
+  const templateVariables = [
+    { label: 'first_name', desc: 'Recipient First Name (Fallback: "there")' },
+    { label: 'last_name', desc: 'Recipient Last Name' },
+    { label: 'company', desc: 'Company or Organization (Fallback: "your team")' },
+    { label: 'email', desc: 'Recipient Email Address' },
+    { label: 'unsubscribe_url', desc: 'Secure RFC 8058 Opt-Out Token URL' },
+  ];
 
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto font-sans">
@@ -156,7 +239,7 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
             </span>
           </h1>
           <p className="text-xs text-[#888888] mt-1">
-            Compose and dispatch RFC 5322 compliant messages with automatic upstream SES routing
+            Personalized HTML templates with secure unsubscribe tokens and upstream Amazon SES routing
           </p>
         </div>
 
@@ -271,7 +354,7 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
                 className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white focus:border-white/30 focus:outline-none"
               />
               <div className="text-[11px] text-[#888888] mt-1">
-                Tip: Enter test emails like <span className="text-amber-300 font-mono">user@deadbox.invalid</span> to test real-time bounce capture!
+                If the recipient exists in Contacts, their actual record is used for personalizing variables.
               </div>
             </div>
 
@@ -302,16 +385,46 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
 
             <div>
               <label className="block text-xs font-medium text-[#888888] mb-1.5">
-                Subject Line
+                Subject Line (Personalization supported)
               </label>
               <input
                 type="text"
                 required
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="Message Subject..."
+                placeholder="Subject with {{first_name}} or {{company}}..."
                 className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs text-white focus:border-white/30 focus:outline-none font-medium"
               />
+            </div>
+          </div>
+
+          {/* Personalization Variable Bar */}
+          <div className="p-4 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-[#888888] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                Template Personalization Variables
+              </span>
+              <span className="text-[11px] text-[#888888]">Click tag to copy & insert</span>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              {templateVariables.map((v) => (
+                <button
+                  key={v.label}
+                  type="button"
+                  onClick={() => handleInsertVariable(v.label)}
+                  title={v.desc}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-sky-300 transition-colors"
+                >
+                  <span>{`{{${v.label}}}`}</span>
+                  {copiedVariable === v.label ? (
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-[#888888]" />
+                  )}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -354,7 +467,7 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
                 value={htmlBody}
                 onChange={(e) => setHtmlBody(e.target.value)}
                 className="w-full bg-[#050505] border border-white-10 rounded-sm p-3 text-xs font-mono text-zinc-200 focus:border-white/30 focus:outline-none leading-relaxed"
-                placeholder="<html><body>...</body></html>"
+                placeholder="<html><body>Hello {{first_name}}...</body></html>"
               />
             ) : (
               <textarea
@@ -362,12 +475,57 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
                 value={plainText}
                 onChange={(e) => setPlainText(e.target.value)}
                 className="w-full bg-[#050505] border border-white-10 rounded-sm p-3 text-xs font-mono text-zinc-200 focus:border-white/30 focus:outline-none"
-                placeholder="Plain text fallback message..."
+                placeholder="Hello {{first_name}}, plain text fallback message..."
               />
             )}
           </div>
 
-          {/* Custom Headers & Attachments */}
+          {/* Tracking & Telemetry Settings */}
+          <div className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-4">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[#888888] block">
+              Engagement Tracking (Zero Client JavaScript)
+            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="flex items-start gap-3 p-3 rounded-sm bg-[#050505] border border-white-10 cursor-pointer hover:border-white/20 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={enableOpenTracking}
+                  onChange={(e) => setEnableOpenTracking(e.target.checked)}
+                  className="mt-1 rounded-xs border-zinc-700 text-emerald-500 focus:ring-0 bg-zinc-900"
+                />
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+                    <Eye className="w-3.5 h-3.5 text-sky-400" />
+                    Open Tracking
+                  </div>
+                  <div className="text-[11px] text-[#888888] leading-tight">
+                    Appends a 1x1 transparent tracking pixel before &lt;/body&gt;
+                  </div>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-3 rounded-sm bg-[#050505] border border-white-10 cursor-pointer hover:border-white/20 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={enableClickTracking}
+                  onChange={(e) => setEnableClickTracking(e.target.checked)}
+                  className="mt-1 rounded-xs border-zinc-700 text-emerald-500 focus:ring-0 bg-zinc-900"
+                />
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+                    <MousePointerClick className="w-3.5 h-3.5 text-teal-400" />
+                    Click Tracking
+                  </div>
+                  <div className="text-[11px] text-[#888888] leading-tight">
+                    Rewrites &lt;a&gt; links through backend redirect without JS
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Custom Headers */}
           <div className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase tracking-[0.2em] text-[#888888]">
@@ -440,25 +598,59 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
 
         {/* Right Preview (5 cols) */}
         <div className="lg:col-span-5 space-y-4 sticky top-20">
-          <div className="p-4 rounded-sm bg-[#0F0F0F] border border-white-10 flex items-center justify-between">
-            <div className="text-xs font-semibold text-white">Live Client Preview</div>
-            <div className="flex items-center gap-1 bg-[#050505] p-1 rounded-sm border border-white-10">
-              <button
-                type="button"
-                onClick={() => setPreviewDevice('desktop')}
-                className={`p-1.5 rounded-xs ${previewDevice === 'desktop' ? 'bg-white text-black' : 'text-[#888888] hover:text-white'}`}
-                title="Desktop View"
+          <div className="p-4 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold text-white">Live Client Preview</div>
+              <div className="flex items-center gap-1 bg-[#050505] p-1 rounded-sm border border-white-10">
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`p-1.5 rounded-xs ${previewDevice === 'desktop' ? 'bg-white text-black' : 'text-[#888888] hover:text-white'}`}
+                  title="Desktop View"
+                >
+                  <Monitor className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`p-1.5 rounded-xs ${previewDevice === 'mobile' ? 'bg-white text-black' : 'text-[#888888] hover:text-white'}`}
+                  title="Mobile View"
+                >
+                  <Smartphone className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Personalization Contact Selector */}
+            <div className="space-y-1.5 pt-1 border-t border-white-10">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-[#888888] flex items-center gap-1 font-medium">
+                  <UserCheck className="w-3 h-3 text-sky-400" />
+                  Preview Contact:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(previewMode === 'personalized' ? 'raw' : 'personalized')}
+                  className="text-sky-400 hover:underline font-mono text-[10px]"
+                >
+                  {previewMode === 'personalized' ? 'Switch to Raw Tags' : 'Switch to Resolved'}
+                </button>
+              </div>
+
+              <select
+                value={selectedPreviewContactId}
+                onChange={(e) => setSelectedPreviewContactId(e.target.value)}
+                className="w-full bg-[#050505] border border-white-10 rounded-sm px-2.5 py-1.5 text-xs text-zinc-200 focus:border-white/30 focus:outline-none"
               >
-                <Monitor className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewDevice('mobile')}
-                className={`p-1.5 rounded-xs ${previewDevice === 'mobile' ? 'bg-white text-black' : 'text-[#888888] hover:text-white'}`}
-                title="Mobile View"
-              >
-                <Smartphone className="w-4 h-4" />
-              </button>
+                {contacts.length === 0 && (
+                  <option value="">Default Test Contact (John Doe / Acme)</option>
+                )}
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.firstName || 'No name'} {c.lastName || ''} — {c.company || 'No Company'} ({c.email})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -476,16 +668,16 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
                   <span className="font-mono text-[10px]">Just now</span>
                 </div>
                 <div className="text-[11px] font-mono text-[#888888] truncate">
-                  To: <span className="text-zinc-200">{to}</span>
+                  To: <span className="text-zinc-200">{previewContact?.email || to}</span>
                 </div>
-                <div className="text-xs font-medium text-white truncate pt-1">{subject}</div>
+                <div className="text-xs font-medium text-white truncate pt-1">{renderedPreviewSubject}</div>
               </div>
 
               {/* Rendered HTML Canvas */}
               <div className="p-2 bg-[#050505] min-h-[420px] max-h-[600px] overflow-y-auto">
                 <div
                   className="rounded-sm overflow-hidden"
-                  dangerouslySetInnerHTML={{ __html: htmlBody }}
+                  dangerouslySetInnerHTML={{ __html: renderedPreviewHtml }}
                 />
               </div>
             </div>
@@ -500,13 +692,13 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
             <div>
               <h2 className="text-sm font-semibold text-white">Send Test Verification</h2>
               <p className="text-xs text-[#888888] mt-1">
-                Dispatches a single copy of this email to verify DKIM signatures and rendered styling.
+                Dispatches a single copy of this email to verify DKIM signatures and rendered personalization.
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-medium text-[#888888] mb-1.5">
-                Test Recipient Address
+                Test Recipient Email Address
               </label>
               <input
                 type="email"
@@ -515,6 +707,25 @@ export const SendEmailView: React.FC<SendEmailViewProps> = ({
                 className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white focus:border-white/30 focus:outline-none"
               />
             </div>
+
+            {contacts.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-[#888888] mb-1.5">
+                  Resolve Variables Using Contact Record
+                </label>
+                <select
+                  value={testContactId}
+                  onChange={(e) => setTestContactId(e.target.value)}
+                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs text-white focus:border-white/30 focus:outline-none"
+                >
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.firstName} {c.lastName} ({c.company || 'No Company'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button

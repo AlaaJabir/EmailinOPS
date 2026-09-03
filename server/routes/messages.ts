@@ -5,6 +5,7 @@ import { suppressionService } from '../services/SuppressionService.js';
 import { complianceService } from '../services/ComplianceService.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { supabaseService } from '../services/SupabaseService.js';
+import { personalizationService } from '../services/PersonalizationService.js';
 
 export const messagesRouter = Router();
 
@@ -126,17 +127,104 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
   }
 
   try {
+    // 3. Correlation & URL resolution
+    const internalId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const baseUrl = personalizationService.getBaseUrl(req.get('host'));
+
+    // 4. Contact lookup for personalization
+    let contact = req.body.contact || db.findContactByEmail(recipient);
+    if (!contact && req.user && supabaseService.isConfigured) {
+      const userContacts = await supabaseService.getContacts(req.user.id);
+      contact = userContacts.find((c) => c.email.toLowerCase() === recipient.toLowerCase());
+    }
+
+    // 5. Generate secure unsubscribe token without exposing email in URL
+    const { token: unsubToken, unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({
+      email: recipient,
+      contactId: contact?.id,
+      messageId: internalId,
+      campaignId,
+      userId: req.user?.id,
+      baseUrl,
+    });
+
+    // 6. Personalize HTML body, subject, and plain text
+    let personalizedHtml = personalizationService.personalizeContent(htmlBody || '', {
+      contact,
+      email: recipient,
+      unsubscribeUrl,
+      privacyUrl: req.body.privacyUrl,
+      termsUrl: req.body.termsUrl,
+      customVariables: req.body.variables,
+    });
+
+    let personalizedSubject = personalizationService.personalizeContent(subject || '', {
+      contact,
+      email: recipient,
+      unsubscribeUrl,
+      privacyUrl: req.body.privacyUrl,
+      termsUrl: req.body.termsUrl,
+      customVariables: req.body.variables,
+    });
+
+    let personalizedPlainText = plainText
+      ? personalizationService.personalizeContent(plainText, {
+          contact,
+          email: recipient,
+          unsubscribeUrl,
+          privacyUrl: req.body.privacyUrl,
+          termsUrl: req.body.termsUrl,
+          customVariables: req.body.variables,
+        })
+      : undefined;
+
+    // 7. Click tracking URL rewriting (if enabled)
+    const clickTrackingEnabled =
+      req.body.enableClickTracking ?? db.settings?.tracking?.enableClickTracking ?? true;
+    if (clickTrackingEnabled && personalizedHtml) {
+      personalizedHtml = personalizationService.rewriteLinksForClickTracking(
+        personalizedHtml,
+        internalId,
+        baseUrl
+      );
+    }
+
+    // 8. Open tracking 1x1 pixel injection (if enabled)
+    const openTrackingEnabled =
+      req.body.enableOpenTracking ?? db.settings?.tracking?.enableOpenTracking ?? true;
+    if (openTrackingEnabled && personalizedHtml) {
+      personalizedHtml = personalizationService.injectOpenTrackingPixel(
+        personalizedHtml,
+        internalId,
+        baseUrl
+      );
+    }
+
+    // 9. RFC 8058 List-Unsubscribe and List-Unsubscribe-Post headers
+    const senderDomain = fromEmail.includes('@') ? fromEmail.split('@')[1] : 'transact.acme-corp.io';
+    const unsubHeaders = personalizationService.generateUnsubscribeHeaders(
+      unsubscribeUrl,
+      senderDomain
+    );
+
+    const mergedHeaders: Record<string, string> = {
+      ...unsubHeaders,
+      ...(customHeaders || {}),
+    };
+
     const result = await kumoMtaService.submitEmail({
+      internalId,
+      contactId: contact?.id,
       fromName,
       fromEmail,
       replyTo,
       to,
       cc,
       bcc,
-      subject,
-      htmlBody,
-      plainText,
-      customHeaders,
+      subject: personalizedSubject,
+      htmlBody: personalizedHtml,
+      plainText: personalizedPlainText,
+      customHeaders: mergedHeaders,
       campaignId,
       attachments,
       userId: req.user?.id,
@@ -145,6 +233,8 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
     res.json({
       success: true,
       result,
+      messageId: internalId,
+      unsubscribeUrl,
       warnings: validation.warnings,
     });
   } catch (err: any) {

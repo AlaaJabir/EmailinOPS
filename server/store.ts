@@ -14,6 +14,17 @@ import {
   DashboardStats,
 } from '../src/types.js';
 
+export interface UnsubscribeToken {
+  token: string;
+  email: string;
+  contactId?: string;
+  messageId?: string;
+  campaignId?: string;
+  userId?: string;
+  createdAt: string;
+  unsubscribedAt?: string;
+}
+
 // In-Memory Database Store mimicking PostgreSQL + Prisma relations
 class DatabaseStore {
   users: User[] = [];
@@ -27,6 +38,7 @@ class DatabaseStore {
   campaigns: Campaign[] = [];
   messages: Message[] = [];
   messageEvents: MessageEvent[] = [];
+  unsubscribeTokens: UnsubscribeToken[] = [];
   logs: TechnicalLog[] = [];
   settings: Record<string, any> = {};
   apiKeys: Array<{ id: string; name: string; keyPrefix: string; createdAt: string; lastUsedAt?: string }> = [];
@@ -404,8 +416,8 @@ class DatabaseStore {
         status: 'offline',
       },
       tracking: {
-        enableOpenTracking: false,
-        enableClickTracking: false,
+        enableOpenTracking: true,
+        enableClickTracking: true,
         trackingDomain: '',
         customHeaders: {},
       },
@@ -413,6 +425,8 @@ class DatabaseStore {
         enforceUnsubscribeHeader: true,
         autoSuppressHardBounces: true,
         autoSuppressComplaints: true,
+        privacyUrl: process.env.PRIVACY_URL || 'https://emailops.io/privacy',
+        termsUrl: process.env.TERMS_URL || 'https://emailops.io/terms',
       },
       prometheus: {
         enabled: true,
@@ -713,6 +727,72 @@ ses_reputation_bounce_rate ${m.ses_reputation_bounce_rate}
 # TYPE ses_reputation_complaint_rate gauge
 ses_reputation_complaint_rate ${m.ses_reputation_complaint_rate}
 `;
+  }
+
+  // Find contact by email address
+  findContactByEmail(email: string): Contact | undefined {
+    if (!email) return undefined;
+    const lower = email.toLowerCase().trim();
+    return this.contacts.find((c) => c.email.toLowerCase() === lower);
+  }
+
+  // Find contact by ID
+  findContactById(id: string): Contact | undefined {
+    return this.contacts.find((c) => c.id === id);
+  }
+
+  // Mark a contact as UNSUBSCRIBED and add to suppressions idempotently
+  unsubscribeContact(email: string, options?: { reason?: string; source?: string; contactId?: string }): {
+    contact?: Contact;
+    suppression: SuppressionItem;
+    wasAlreadyUnsubscribed: boolean;
+  } {
+    const cleanEmail = email.toLowerCase().trim();
+    const reason = options?.reason || 'User clicked unsubscribe link';
+    const source = options?.source || 'unsubscribe_link';
+    const timestamp = new Date().toISOString();
+
+    // 1. Update contact status if found
+    let contact = this.findContactByEmail(cleanEmail);
+    if (!contact && options?.contactId) {
+      contact = this.findContactById(options.contactId);
+    }
+
+    let wasAlreadyUnsubscribed = false;
+    if (contact) {
+      if (contact.status === 'UNSUBSCRIBED') {
+        wasAlreadyUnsubscribed = true;
+      }
+      contact.status = 'UNSUBSCRIBED';
+      contact.updatedAt = timestamp;
+    }
+
+    // 2. Add to suppressions list idempotently
+    let suppression = this.suppressions.find((s) => s.email.toLowerCase() === cleanEmail);
+    if (suppression) {
+      if (suppression.type === 'UNSUBSCRIBED') {
+        wasAlreadyUnsubscribed = true;
+      }
+      suppression.type = 'UNSUBSCRIBED';
+      suppression.reason = reason;
+      suppression.source = source;
+    } else {
+      suppression = {
+        id: `sup_unsub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        email: cleanEmail,
+        type: 'UNSUBSCRIBED',
+        reason,
+        source,
+        createdAt: timestamp,
+      };
+      this.suppressions.unshift(suppression);
+    }
+
+    return {
+      contact,
+      suppression,
+      wasAlreadyUnsubscribed,
+    };
   }
 }
 

@@ -3,8 +3,11 @@ import type { Transporter } from 'nodemailer';
 import { db } from '../store.js';
 import { Message, MessageEvent, MessageStatus } from '../../src/types.js';
 import { supabaseService } from './SupabaseService.js';
+import { suppressionService } from './SuppressionService.js';
 
 export interface SendEmailPayload {
+  internalId?: string;
+  contactId?: string;
   fromName?: string;
   fromEmail: string;
   replyTo?: string;
@@ -336,9 +339,20 @@ export class KumoMtaService {
       ? payload.fromEmail.split('@')[1]
       : 'transact.acme-corp.io';
     const rfcMessageId = this.generateRfcMessageId(domainPart);
-    const internalId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const internalId = payload.internalId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const toEmail = Array.isArray(payload.to) ? payload.to.join(', ') : payload.to;
     const primaryTo = Array.isArray(payload.to) ? payload.to[0] : payload.to;
+
+    // Defense-in-depth: Pre-flight suppression check immediately before SMTP dispatch
+    const suppressionCheck = suppressionService.isSuppressed(primaryTo);
+    if (suppressionCheck.suppressed) {
+      const errorText = `Cannot send email: recipient "${primaryTo}" is suppressed (${suppressionCheck.record?.type}: ${suppressionCheck.record?.reason})`;
+      this.logEvent('SUBMISSION_BLOCKED_SUPPRESSED', 'WARN', errorText, {
+        recipient: primaryTo,
+        suppression: suppressionCheck.record,
+      });
+      throw new Error(errorText);
+    }
 
     // Check configuration before submitting
     const validation = this.validateConfig();
