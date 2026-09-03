@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -30,6 +31,15 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  app.use(cors({
+    origin: [
+      'https://emailin-ops.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:5173',
+    ],
+    credentials: true,
+  }));
 
   // Middlewares - accept application/json AND text/plain (used by AWS SNS webhooks)
   app.use(express.json({ limit: '25mb', type: ['application/json', 'text/plain'] }));

@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // First attempt to get profile via authenticated backend API
       if (currentToken) {
-        const res = await fetch('/api/auth/me', {
+        const res = await fetch((import.meta.env.VITE_API_BASE_URL || '') + '/api/auth/me', {
           headers: {
             Authorization: `Bearer ${currentToken}`,
           },

@@ -56,7 +56,9 @@ export function App() {
   const authFetch = useCallback(
     (url: string, options: RequestInit = {}) => {
       const authHeaders = getAuthHeaders();
-      return fetch(url, {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+      const apiUrl = url.startsWith('http') ? url : apiBaseUrl + url;
+      return fetch(apiUrl, {
         ...options,
         headers: {
           ...authHeaders,
