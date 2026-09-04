@@ -9,10 +9,7 @@ export const webhooksRouter = Router();
 function isValidSnsSubscribeUrl(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
-    if (parsed.protocol !== 'https:') {
-      return false;
-    }
-    // AWS SNS endpoints match sns.<region>.amazonaws.com or sns.<region>.amazonaws.com.cn
+    if (parsed.protocol !== 'https:') return false;
     const host = parsed.hostname.toLowerCase();
     const snsRegex = /^sns\.[a-z0-9-]+\.amazonaws\.com(\.cn)?$/;
     return snsRegex.test(host);
@@ -21,21 +18,106 @@ function isValidSnsSubscribeUrl(urlStr: string): boolean {
   }
 }
 
+function cleanIdentifier(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const valueTrimmed = value.trim();
+  return valueTrimmed || undefined;
+}
+
+function normalizeKumoEventType(value: unknown): string | undefined {
+  const raw = cleanIdentifier(value);
+  if (!raw) return undefined;
+  const normalized = raw.toUpperCase().replace(/[\s-]+/g, '_');
+  const aliases: Record<string, string> = {
+    SENT: 'SENT',
+    SEND: 'SENT',
+    DELIVERED: 'DELIVERED',
+    DELIVERY: 'DELIVERED',
+    BOUNCED: 'BOUNCED',
+    BOUNCE: 'BOUNCED',
+    FAILED: 'FAILED',
+    FAILURE: 'FAILED',
+    REJECTED: 'REJECTED',
+    REJECT: 'REJECTED',
+    DELIVERY_DELAY: 'DELIVERY_DELAY',
+    DELAYED: 'DELIVERY_DELAY',
+    OPENED: 'OPENED',
+    OPEN: 'OPENED',
+    CLICKED: 'CLICKED',
+    CLICK: 'CLICKED',
+    COMPLAINED: 'COMPLAINED',
+    COMPLAINT: 'COMPLAINED',
+    UNSUBSCRIBED: 'UNSUBSCRIBED',
+    UNSUBSCRIBE: 'UNSUBSCRIBED',
+    RENDERING_FAILURE: 'RENDERING_FAILURE',
+  };
+  return aliases[normalized];
+}
+
+function extractKumoPayload(body: any): {
+  eventType?: string;
+  messageId?: string;
+  timestamp?: string;
+  meta: Record<string, any>;
+} {
+  const rawMeta = body?.meta;
+  const meta: Record<string, any> =
+    rawMeta && typeof rawMeta === 'object' && !Array.isArray(rawMeta)
+      ? { ...rawMeta }
+      : {};
+
+  // Accept both the current {eventType,messageId,meta} shape and common
+  // KumoMTA-style top-level identifier fields so correlation is resilient.
+  const eventType = normalizeKumoEventType(body?.eventType ?? body?.event_type ?? meta.eventType ?? meta.event_type);
+  const messageId =
+    cleanIdentifier(body?.messageId) ||
+    cleanIdentifier(body?.message_id) ||
+    cleanIdentifier(meta.messageId) ||
+    cleanIdentifier(meta.message_id) ||
+    cleanIdentifier(meta.rfcMessageId) ||
+    cleanIdentifier(meta.rfc_message_id) ||
+    cleanIdentifier(meta.internalId) ||
+    cleanIdentifier(meta.internal_id) ||
+    cleanIdentifier(meta.sesMessageId) ||
+    cleanIdentifier(meta.ses_message_id);
+  const timestamp =
+    cleanIdentifier(body?.timestamp) ||
+    cleanIdentifier(body?.eventTimestamp) ||
+    cleanIdentifier(meta.timestamp) ||
+    cleanIdentifier(meta.eventTimestamp);
+
+  return { eventType, messageId, timestamp, meta };
+}
+
 /**
  * GET /api/webhooks/status
- * Returns current webhook status and recent received SNS/SES telemetry
+ * Returns webhook listener health and recent telemetry from both SES and KumoMTA.
  */
-webhooksRouter.get('/status', (req: Request, res: Response) => {
-  const sesEvents = db.messageEvents.filter((e) =>
-    ['SENT', 'DELIVERED', 'BOUNCED', 'COMPLAINED', 'REJECTED', 'RENDERING_FAILURE', 'DELIVERY_DELAY'].includes(e.eventType)
-  );
+webhooksRouter.get('/status', (_req: Request, res: Response) => {
+  const trackedTypes = [
+    'SENT',
+    'DELIVERED',
+    'BOUNCED',
+    'COMPLAINED',
+    'REJECTED',
+    'RENDERING_FAILURE',
+    'DELIVERY_DELAY',
+  ];
+  const telemetryEvents = db.messageEvents.filter((e) => trackedTypes.includes(e.eventType));
+  const kumoEvents = db.messageEvents.filter((e) => e.eventData?.source === 'KumoMTA');
+  const sesEvents = db.messageEvents.filter((e) => e.eventData?.source === 'Amazon SES');
 
   res.json({
     status: 'healthy',
-    service: 'SES SNS Webhook Listener',
-    endpoint: '/api/webhooks/ses',
-    totalSesEventsRecorded: sesEvents.length,
-    recentEvents: sesEvents.slice(-10).reverse(),
+    service: 'EmailinOPS Webhook Listener',
+    endpoints: {
+      ses: '/api/webhooks/ses',
+      kumomta: '/api/webhooks/kumomta',
+    },
+    totalEventsRecorded: telemetryEvents.length,
+    kumoEventsRecorded: kumoEvents.length,
+    sesEventsRecorded: sesEvents.length,
+    recentEvents: telemetryEvents.slice(-10).reverse(),
     idempotencyCacheSize: db.processedEventIds.size,
     lastScraped: new Date().toISOString(),
   });
@@ -48,7 +130,6 @@ webhooksRouter.get('/status', (req: Request, res: Response) => {
 webhooksRouter.post('/ses', async (req: Request, res: Response) => {
   let body = req.body;
 
-  // Handle cases where body is a raw string or Buffer from express.json with text/plain
   if (typeof body === 'string') {
     try {
       body = JSON.parse(body);
@@ -67,7 +148,7 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
   } else if (Buffer.isBuffer(body)) {
     try {
       body = JSON.parse(body.toString('utf8'));
-    } catch (err: any) {
+    } catch {
       return res.status(400).json({ error: 'Malformed buffer payload in request body' });
     }
   }
@@ -78,7 +159,6 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
 
   const messageType = body.Type || body.type;
 
-  // 1. Handle AWS SNS Subscription Confirmation
   if (messageType === 'SubscriptionConfirmation') {
     const subscribeUrl = body.SubscribeURL;
     const topicArn = body.TopicArn;
@@ -89,7 +169,7 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
     }
 
     let confirmationSuccess = false;
-    let confirmationError: string | undefined = undefined;
+    let confirmationError: string | undefined;
 
     if (isValidSnsSubscribeUrl(subscribeUrl)) {
       try {
@@ -114,13 +194,7 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
       response: confirmationSuccess
         ? `Successfully confirmed SNS subscription for topic ${topicArn}`
         : `Received SNS subscription confirmation for topic ${topicArn} (fetch: ${confirmationError || 'pending manual confirmation'})`,
-      details: {
-        topicArn,
-        token: token ? '***' : undefined,
-        subscribeUrl,
-        confirmed: confirmationSuccess,
-        error: confirmationError,
-      },
+      details: { topicArn, token: token ? '***' : undefined, subscribeUrl, confirmed: confirmationSuccess, error: confirmationError },
     });
 
     return res.status(200).json({
@@ -133,7 +207,6 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
     });
   }
 
-  // 2. Handle AWS SNS Unsubscribe Confirmation
   if (messageType === 'UnsubscribeConfirmation') {
     const topicArn = body.TopicArn;
     db.logs.unshift({
@@ -145,20 +218,13 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
       response: `SNS UnsubscribeConfirmation received for topic ${topicArn}`,
       details: body,
     });
-
-    return res.status(200).json({
-      status: 'ok',
-      type: 'UnsubscribeConfirmation',
-      topicArn,
-    });
+    return res.status(200).json({ status: 'ok', type: 'UnsubscribeConfirmation', topicArn });
   }
 
-  // 3. Handle AWS SNS Notification
   if (messageType === 'Notification') {
     const snsMessageId = body.MessageId;
     const topicArn = body.TopicArn;
 
-    // Idempotency: skip already processed SNS message IDs
     if (snsMessageId && (db.hasProcessedEvent(snsMessageId) || (await supabaseService.isEventProcessed(snsMessageId)))) {
       return res.status(200).json({
         status: 'success',
@@ -190,50 +256,134 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing or invalid Message field in Notification' });
     }
 
-    const processResult = eventProcessor.processSesNotification(messagePayload, {
-      snsMessageId,
-      topicArn,
-    });
+    const processResult = eventProcessor.processSesNotification(messagePayload, { snsMessageId, topicArn });
 
     if (snsMessageId) {
       db.recordProcessedEvent(snsMessageId);
       await supabaseService.recordProcessedEvent(snsMessageId, 'SES_SNS');
     }
 
-    return res.status(200).json({
-      status: 'success',
-      ...processResult,
-    });
+    return res.status(200).json({ status: 'success', ...processResult });
   }
 
-  // 4. Handle direct SES event payload (without SNS envelope)
   if (body.eventType || body.notificationType) {
     const processResult = eventProcessor.processSesNotification(body);
-    return res.status(200).json({
-      status: 'success',
-      ...processResult,
-    });
+    return res.status(200).json({ status: 'success', ...processResult });
   }
 
-  // Unsupported payload structure
   return res.status(400).json({
     error: 'Unrecognized webhook payload structure. Expected SNS Notification or SES event object.',
     receivedKeys: Object.keys(body),
   });
 });
 
-// POST /api/webhooks/kumomta - Ingest KumoMTA webhook log events
+/**
+ * POST /api/webhooks/kumomta
+ * Ingest KumoMTA transport telemetry.
+ *
+ * KumoMTA transport events are deliberately kept separate from final SES
+ * delivery events: SENT means accepted by the next transport hop, while
+ * DELIVERED/BOUNCED/COMPLAINED should come from the authoritative provider
+ * event stream when SES is the upstream relay.
+ */
 webhooksRouter.post('/kumomta', (req: Request, res: Response) => {
-  const { eventType, messageId, meta } = req.body || {};
+  const { eventType, messageId, timestamp, meta } = extractKumoPayload(req.body || {});
 
-  if (messageId && eventType) {
-    const result = eventProcessor.processEvent({
-      messageId,
-      eventType: String(eventType).toUpperCase() as any,
-      eventData: meta,
+  if (!eventType || !messageId) {
+    db.logs.unshift({
+      id: `log_kumo_webhook_invalid_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      service: 'KumoMTA',
+      event: 'WEBHOOK_INVALID_PAYLOAD',
+      severity: 'WARN',
+      response: 'KumoMTA webhook acknowledged without processing because eventType or messageId was missing',
+      details: { receivedKeys: Object.keys(req.body || {}) },
     });
-    return res.json({ status: 'success', ...result });
+    return res.status(400).json({
+      status: 'error',
+      error: 'KumoMTA webhook requires eventType and messageId',
+    });
   }
 
-  return res.json({ status: 'success', acknowledged: true });
+  const eventKey = cleanIdentifier(meta.eventId) || cleanIdentifier(meta.event_id) || `${messageId}:${eventType}:${timestamp || 'none'}`;
+  if (db.hasProcessedEvent(`kumo:${eventKey}`)) {
+    return res.status(200).json({ status: 'success', duplicate: true, eventKey });
+  }
+
+  const eventData = {
+    ...meta,
+    source: 'KumoMTA',
+    webhookReceivedAt: new Date().toISOString(),
+    eventKey,
+  };
+
+  const processResult = eventProcessor.processEvent({
+    messageId,
+    eventType: eventType as any,
+    timestamp,
+    eventData,
+  });
+
+  if (!processResult.success) {
+    db.logs.unshift({
+      id: `log_kumo_webhook_orphan_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      service: 'KumoMTA',
+      event: 'WEBHOOK_ORPHAN_EVENT',
+      severity: 'WARN',
+      response: `KumoMTA event ${eventType} could not be correlated to message ${messageId}`,
+      details: eventData,
+    });
+    return res.status(202).json({ status: 'accepted', correlated: false, ...processResult });
+  }
+
+  db.recordProcessedEvent(`kumo:${eventKey}`);
+
+  const message = db.messages.find((m) => m.messageId === processResult.event?.messageId);
+  if (message) {
+    // Generic Kumo events need their aggregate counters updated here because
+    // the SES-specific processor owns SES aggregate accounting.
+    switch (eventType) {
+      case 'SENT':
+        if (message.status === 'QUEUED') {
+          message.status = 'SENT';
+          message.sentAt = timestamp || new Date().toISOString();
+        }
+        break;
+      case 'DELIVERED': {
+        const sender = db.senders.find((s) => s.id === message.senderId || s.fromEmail.toLowerCase() === message.fromEmail.toLowerCase());
+        if (sender && message.deliveredAt === timestamp) sender.deliveredCount += 1;
+        if (message.campaignId && message.deliveredAt === timestamp) {
+          const campaign = db.campaigns.find((c) => c.id === message.campaignId);
+          if (campaign) campaign.deliveredCount += 1;
+        }
+        break;
+      }
+      case 'BOUNCED': {
+        const sender = db.senders.find((s) => s.id === message.senderId || s.fromEmail.toLowerCase() === message.fromEmail.toLowerCase());
+        if (sender && message.bouncedAt === timestamp) sender.bouncedCount += 1;
+        if (message.campaignId && message.bouncedAt === timestamp) {
+          const campaign = db.campaigns.find((c) => c.id === message.campaignId);
+          if (campaign) campaign.bouncedCount += 1;
+        }
+        break;
+      }
+    }
+
+    supabaseService.updateMessageStatus({
+      messageId: message.messageId,
+      status: message.status,
+      deliveredAt: message.deliveredAt,
+      bouncedAt: message.bouncedAt,
+      bounceReason: message.bounceReason,
+      smtpResponse: message.smtpResponse,
+    }).catch(() => {});
+  }
+
+  return res.status(200).json({
+    status: 'success',
+    correlated: true,
+    eventKey,
+    ...processResult,
+  });
 });
