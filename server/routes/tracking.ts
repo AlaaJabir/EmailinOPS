@@ -18,10 +18,8 @@ function isValidRedirectUrl(target: string): boolean {
   if (!target || typeof target !== 'string') return false;
   try {
     const parsed = new URL(target);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return false;
-    }
-    // Disallow local loopback / link-local addresses in production
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+
     const hostname = parsed.hostname.toLowerCase();
     if (process.env.NODE_ENV === 'production') {
       if (
@@ -43,29 +41,19 @@ function isValidRedirectUrl(target: string): boolean {
 
 /**
  * GET /api/tracking/click/:messageId
- * Handles click tracking without JavaScript and performs secure 302 redirect.
+ * Records CLICKED and redirects to the original destination.
+ * URLSearchParams/query parsing already decodes the query value once,
+ * so do not decodeURIComponent() a second time.
  */
 trackingRouter.get('/click/:messageId', async (req: Request, res: Response) => {
   const { messageId } = req.params;
-  const rawUrl = req.query.url as string;
+  const destinationUrl = typeof req.query.url === 'string' ? req.query.url.trim() : '';
 
-  if (!rawUrl) {
-    return res.status(400).send('Missing target URL');
-  }
-
-  let destinationUrl = '';
-  try {
-    destinationUrl = decodeURIComponent(rawUrl);
-  } catch {
-    return res.status(400).send('Malformed URL encoding');
-  }
-
-  // Prevent open redirect attacks
+  if (!destinationUrl) return res.status(400).send('Missing target URL');
   if (!isValidRedirectUrl(destinationUrl)) {
     return res.status(400).send('Invalid or unauthorized redirect URL');
   }
 
-  // Record CLICKED event
   try {
     eventProcessor.processEvent({
       messageId,
@@ -82,18 +70,16 @@ trackingRouter.get('/click/:messageId', async (req: Request, res: Response) => {
     console.error('[ClickTracking] Failed to record event:', err);
   }
 
-  // Redirect to destination cleanly
-  res.redirect(302, destinationUrl);
+  return res.redirect(302, destinationUrl);
 });
 
 /**
  * GET /api/tracking/open/:messageId
- * Serves 1x1 transparent GIF tracking pixel and records OPENED event.
+ * Serves 1x1 transparent GIF and records OPENED.
  */
 trackingRouter.get('/open/:messageId', async (req: Request, res: Response) => {
   const { messageId } = req.params;
 
-  // Record OPENED event (idempotent, safe against failures)
   try {
     eventProcessor.processEvent({
       messageId,
@@ -109,7 +95,6 @@ trackingRouter.get('/open/:messageId', async (req: Request, res: Response) => {
     console.error('[OpenTracking] Failed to record event:', err);
   }
 
-  // Serve 1x1 transparent GIF with aggressive no-cache headers
   res.set({
     'Content-Type': 'image/gif',
     'Content-Length': TRANSPARENT_GIF.length.toString(),
@@ -118,5 +103,5 @@ trackingRouter.get('/open/:messageId', async (req: Request, res: Response) => {
     'Expires': '0',
   });
 
-  res.status(200).end(TRANSPARENT_GIF);
+  return res.status(200).end(TRANSPARENT_GIF);
 });
