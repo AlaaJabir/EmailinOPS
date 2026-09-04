@@ -482,12 +482,6 @@ webhooksRouter.post('/kumomta', (req: Request, res: Response) => {
         if (message.status === 'QUEUED') {
           message.status = 'SENT';
           message.sentAt = timestamp || new Date().toISOString();
-          const sender = db.senders.find((s) => s.id === message.senderId || s.fromEmail.toLowerCase() === message.fromEmail.toLowerCase());
-          if (sender) sender.sentCount += 1;
-          if (message.campaignId) {
-            const campaign = db.campaigns.find((c) => c.id === message.campaignId);
-            if (campaign) campaign.sentCount += 1;
-          }
         }
         break;
       case 'DELIVERED': {
@@ -509,6 +503,16 @@ webhooksRouter.post('/kumomta', (req: Request, res: Response) => {
         break;
       }
     }
+
+    // Persist any status/counter-related message fields changed by the Kumo event.
+    supabaseService.updateMessageStatus({
+      messageId: message.messageId,
+      status: message.status,
+      deliveredAt: message.deliveredAt,
+      bouncedAt: message.bouncedAt,
+      bounceReason: message.bounceReason,
+      smtpResponse: message.smtpResponse,
+    }).catch(() => {});
   }
 
   return res.status(200).json({
