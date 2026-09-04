@@ -90,7 +90,7 @@ model Domain {
   spfStatus           VerificationStatus @default(VERIFIED)
   dkimStatus          VerificationStatus @default(VERIFIED)
   dmarcStatus         VerificationStatus @default(VERIFIED)
-  sesStatus           VerificationStatus @default(VERIFIED)
+  sesStatus            VerificationStatus @default(VERIFIED)
   dkimSelector        String             @default("kumo1")
   dkimPublicKey       String             @default("v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC...")
   spfRecord           String             @default("v=spf1 include:_spf.kumomta.internal include:amazonses.com ~all")
@@ -130,8 +130,8 @@ model Contact {
   tags         String[]           @default([])
   status       ContactStatus      @default(ACTIVE)
   bounceReason String?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
   listMembers  ContactListMember[]
   messages     Message[]
 }
@@ -141,7 +141,7 @@ model ContactList {
   name        String
   description String?
   createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  updatedAt   DateTime             @updatedAt
   members     ContactListMember[]
   campaigns   Campaign[]
 }
@@ -153,13 +153,12 @@ model ContactListMember {
   list      ContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
   contact   Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   joinedAt  DateTime    @default(now())
-
   @@unique([listId, contactId])
 }
 
 model ApiKey {
   id         String   @id @default(uuid())
-  name       String
+  name        String
   keyPrefix  String
   keyHash    String
   userId     String
@@ -197,7 +196,7 @@ model Campaign {
   listId          String?
   list            ContactList?   @relation(fields: [listId], references: [id])
   templateId      String?
-  template       Template?       @relation(fields: [templateId], references: [id])
+  template        Template?      @relation(fields: [templateId], references: [id])
   subject         String
   htmlBody        String
   plainText       String?
@@ -239,9 +238,8 @@ model Message {
   plainText         String?
   customHeaders     Json?
   status            MessageStatus  @default(QUEUED)
-  provider          String
+  provider          String         @default("KumoMTA")
   providerMessageId String?
-  sesMessageId      String?
   smtpResponse      String?
   bounceType        String?
   bounceReason      String?
@@ -252,17 +250,28 @@ model Message {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   events            MessageEvent[]
+  attachments       MessageAttachment[]
 }
 
 model MessageEvent {
-  id          String    @id @default(uuid())
-  messageId   String
+  id         String    @id @default(uuid())
+  messageId  String
   message    Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  eventType   EventType
-  eventData   Json?
-  ipAddress   String?
-  userAgent   String?
-  geo         String?
-  timestamp   DateTime  @default(now())
-  createdAt   DateTime  @default(now())
+  eventType  EventType
+  eventData  Json?
+  timestamp  DateTime  @default(now())
+  ipAddress  String?
+  userAgent  String?
+  geo        String?
+}
+
+model MessageAttachment {
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  filename  String
+  fileSize  Int
+  mimeType  String
+  s3Url     String?
+  createdAt DateTime @default(now())
 }
