@@ -156,6 +156,8 @@ export interface Campaign {
   complaintCount: number;
   openCount: number;
   clickCount: number;
+  trackOpens: boolean;
+  trackClicks: boolean;
   createdAt: string;
 }
 
@@ -180,8 +182,8 @@ export interface MessageAttachment {
 
 export interface Message {
   id: string;
-  messageId: string; // RFC 5322 Message-ID format e.g. <abc-123@domain.com>
-  sesMessageId?: string; // Amazon SES mail.messageId e.g. 0102018f...
+  messageId: string;
+  sesMessageId?: string;
   campaignId?: string;
   campaignName?: string;
   senderId: string;
@@ -196,7 +198,7 @@ export interface Message {
   plainText?: string;
   customHeaders?: Record<string, string>;
   status: MessageStatus;
-  provider: string; // "KumoMTA+SES", "Amazon SES Direct", etc.
+  provider: string;
   providerMessageId?: string;
   smtpResponse?: string;
   bounceType?: 'Hard' | 'Soft' | 'Transient';
@@ -235,42 +237,18 @@ export interface DashboardStats {
   queued: number;
   opens: number;
   clicks: number;
-  deliveryRate: number; // percentage
-  bounceRate: number; // percentage
-  openRate: number; // percentage
-  clickRate: number; // percentage
+  deliveryRate: number;
+  bounceRate: number;
+  openRate: number;
+  clickRate: number;
   queueSize: number;
   sendingRatePerSec: number;
   kumoHealth: 'healthy' | 'degraded' | 'offline';
   sesHealth: 'healthy' | 'degraded' | 'offline';
-  timeseries: Array<{
-    time: string;
-    sent: number;
-    delivered: number;
-    bounced: number;
-    failed: number;
-    rejected?: number;
-  }>;
-  hourlyActivity: Array<{
-    hour: string;
-    volume: number;
-  }>;
-  topSenders: Array<{
-    id: string;
-    name: string;
-    email: string;
-    volume: number;
-    deliveryRate: number;
-    bounceRate: number;
-  }>;
-  topCampaigns: Array<{
-    id: string;
-    name: string;
-    sent: number;
-    delivered: number;
-    openRate: number;
-    clickRate: number;
-  }>;
+  timeseries: Array<{ time: string; sent: number; delivered: number; bounced: number; failed: number; rejected?: number }>;
+  hourlyActivity: Array<{ hour: string; volume: number }>;
+  topSenders: Array<{ id: string; name: string; email: string; volume: number; deliveryRate: number; bounceRate: number }>;
+  topCampaigns: Array<{ id: string; name: string; sent: number; delivered: number; openRate: number; clickRate: number }>;
 }
 
 export interface PrometheusMetrics {
