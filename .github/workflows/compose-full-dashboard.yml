@@ -1,0 +1,66 @@
+name: Compose full EmailOps dashboard
+
+on:
+  push:
+    paths:
+      - .github/workflows/compose-full-dashboard.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore the real delivery dashboard and append Kumo operations
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          good_commit = "950212f4a08200b7df79b62854a9b7458ff0d320"
+          path = Path("src/views/DashboardView.tsx")
+
+          old = subprocess.check_output(
+              ["git", "show", f"{good_commit}:src/views/DashboardView.tsx"],
+              text=True,
+          )
+
+          if "KumoOperationsDashboard" not in old:
+              old = old.replace(
+                  "import { StatusBadge } from '../components/StatusBadge';",
+                  "import { StatusBadge } from '../components/StatusBadge';\nimport { KumoOperationsDashboard } from './KumoOperationsDashboard';",
+                  1,
+              )
+
+          marker = "    </div>\n  );\n};\n"
+          if marker not in old:
+              raise SystemExit("Dashboard closing marker not found")
+
+          if "<KumoOperationsDashboard" not in old:
+              replacement = """    </div>\n\n      <div className=\"mt-10 -mx-8\">\n        <KumoOperationsDashboard\n          stats={stats}\n          recentMessages={recentMessages}\n          onSelectMessage={onSelectMessage}\n          onNavigateToSend={onNavigateToSend}\n          onRefresh={onRefresh}\n          isLoading={isLoading}\n        />\n      </div>\n    </div>\n  );\n};\n"""
+              old = old.replace(marker, replacement, 1)
+
+          path.write_text(old)
+
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commit composed dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/views/DashboardView.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: preserve delivery dashboard and add Kumo operations"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
