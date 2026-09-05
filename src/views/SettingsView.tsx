@@ -37,7 +37,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // KumoMTA form state
   const [kumoHost, setKumoHost] = useState(settings?.kumomta?.host || '127.0.0.1');
   const [kumoPort, setKumoPort] = useState(settings?.kumomta?.port || 2525);
-  const [kumoApiUrl, setKumoApiUrl] = useState(settings?.kumomta?.managementApiUrl || 'http://127.0.0.1:8008/api/v1');
+  const [kumoApiUrl, setKumoApiUrl] = useState(settings?.kumomta?.managementApiUrl || 'http://127.0.0.1:8000');
   const [kumoSpool, setKumoSpool] = useState(settings?.kumomta?.spoolDir || '/var/spool/kumomta');
   const [kumoConcurrency, setKumoConcurrency] = useState(settings?.kumomta?.maxConcurrency || 64);
   const [kumoRateLimit, setKumoRateLimit] = useState(settings?.kumomta?.rateLimitPerSec || 250);
