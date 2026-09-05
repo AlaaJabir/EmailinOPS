@@ -1,9 +1,9 @@
+import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import dotenv from 'dotenv';
 
 import { authRouter } from './server/routes/auth.js';
 import { messagesRouter } from './server/routes/messages.js';
@@ -22,8 +22,6 @@ import { trackingRouter } from './server/routes/tracking.js';
 import { db } from './server/store.js';
 import { kumoMtaService } from './server/services/KumoMtaService.js';
 import { sesProvider } from './server/services/SesProvider.js';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
