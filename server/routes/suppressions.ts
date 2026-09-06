@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { optionalAuth } from '../middleware/auth.js';
 import { supabaseService } from '../services/SupabaseService.js';
-import { db } from '../store.js';
 
 export const suppressionsRouter = Router();
 
@@ -20,19 +19,12 @@ suppressionsRouter.post('/', optionalAuth, async (req: Request, res: Response) =
   const type = req.body.type || 'MANUAL';
   const reason = req.body.reason || 'Manual suppression';
   if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email address is required' });
-  const client = supabaseService.getClient()!;
-  const { data: existing } = await client.from('suppressions').select('id').eq('user_id', req.user.id).eq('email', email).maybeSingle();
-  let data: any;
-  if (existing) {
-    const result = await client.from('suppressions').update({ type, reason, source: 'manual' }).eq('id', existing.id).eq('user_id', req.user.id).select('*').single();
-    if (result.error) return res.status(400).json({ error: result.error.message });
-    data = result.data;
-  } else {
-    const result = await client.from('suppressions').insert({ user_id: req.user.id, email, type, reason, source: 'manual' }).select('*').single();
-    if (result.error) return res.status(400).json({ error: result.error.message });
-    data = result.data;
-  }
-  return res.status(201).json({ success: true, suppression: { id: data.id, email: data.email, type: data.type, reason: data.reason, source: data.source, createdAt: data.created_at } });
+  try {
+    await supabaseService.upsertSuppression(req.user.id, email, type, reason, 'manual');
+    const { data, error } = await supabaseService.getClient()!.from('suppressions').select('*').eq('user_id', req.user.id).eq('email', email).maybeSingle();
+    if (error) return res.status(400).json({ error: error.message });
+    return res.status(201).json({ success: true, suppression: data ? { id: data.id, email: data.email, type: data.type, reason: data.reason, source: data.source, createdAt: data.created_at } : null });
+  } catch (e: any) { return res.status(400).json({ error: e?.message || 'Failed to save suppression' }); }
 });
 
 suppressionsRouter.delete('/:id', optionalAuth, async (req: Request, res: Response) => {
@@ -47,9 +39,17 @@ suppressionsRouter.post('/import', optionalAuth, async (req: Request, res: Respo
   if (!req.user || !supabaseService.isConfigured) return res.status(503).json({ error: 'Authenticated Supabase persistence is required' });
   const entries = req.body.entries;
   if (!Array.isArray(entries)) return res.status(400).json({ error: 'Valid entries array required' });
-  const rows = entries.filter((x: any) => x?.email?.includes('@')).map((x: any) => ({ user_id: req.user!.id, email: String(x.email).trim().toLowerCase(), type: x.type || 'MANUAL', reason: x.reason || 'Bulk import', source: 'csv_import' }));
+  const unique = new Map<string, any>();
+  for (const x of entries) {
+    const email = String(x?.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) continue;
+    unique.set(email, { user_id: req.user.id, email, type: x.type || 'MANUAL', reason: x.reason || 'Bulk import', source: 'csv_import' });
+  }
+  const rows = [...unique.values()];
   if (!rows.length) return res.json({ success: true, imported: 0 });
-  const { error } = await supabaseService.getClient()!.from('suppressions').upsert(rows, { onConflict: 'id' });
-  if (error) return res.status(400).json({ error: error.message });
-  return res.json({ success: true, imported: rows.length });
+  let imported = 0;
+  for (const row of rows) {
+    try { await supabaseService.upsertSuppression(req.user.id, row.email, row.type, row.reason, row.source); imported += 1; } catch (e) { /* continue; report count below */ }
+  }
+  return res.json({ success: true, imported, received: rows.length });
 });
