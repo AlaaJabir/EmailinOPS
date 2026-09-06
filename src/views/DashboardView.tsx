@@ -9,8 +9,7 @@ interface DashboardViewProps {
   onNavigateToSend: () => void;
   onRefresh: () => void;
   isLoading: boolean;
+  authFetch?: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = (props) => {
-  return <PowerDashboardView {...props} />;
-};
+export const DashboardView: React.FC<DashboardViewProps> = (props) => <PowerDashboardView {...props} />;
