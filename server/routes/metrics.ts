@@ -2,27 +2,30 @@ import { Router, Request, Response } from 'express';
 
 export const metricsRouter = Router();
 
-interface KumoMetric { value?: number | Record<string, number | Record<string, number>>; type?: string; help?: string; }
+interface KumoMetric { value?: number | Record<string, unknown>; type?: string; help?: string; }
 type KumoMetricsJson = Record<string, KumoMetric>;
+interface KumoMetricsData { [key: string]: any }
+interface KumoMetricsResult { live: boolean; source: string; data: KumoMetricsData }
 let previousDelivered = 0;
 let previousDeliveredAt = 0;
 
 function sumMetricValue(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (!value || typeof value !== 'object') return 0;
-  return Object.values(value as Record<string, unknown>).reduce((sum, item) => sum + sumMetricValue(item), 0);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 0;
+  return Object.values(value as Record<string, unknown>).reduce<number>((sum, item) => sum + sumMetricValue(item), 0);
 }
+
 function serviceMetricValue(metric: KumoMetric | undefined, service: string): number {
   if (!metric) return 0;
   const value = metric.value;
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const direct = (value as Record<string, unknown>)[service];
-    return typeof direct === 'number' ? direct : 0;
+    const direct = value[service];
+    return typeof direct === 'number' && Number.isFinite(direct) ? direct : 0;
   }
-  return typeof value === 'number' ? value : 0;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-async function fetchKumoMetrics(): Promise<{ live: boolean; source: string; data: Record<string, any> }> {
+async function fetchKumoMetrics(): Promise<KumoMetricsResult> {
   const endpoint = (process.env.KUMOMTA_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
   const started = Date.now();
   try {
@@ -43,7 +46,8 @@ async function fetchKumoMetrics(): Promise<{ live: boolean; source: string; data
       const now = Date.now();
       let deliveryRate = 0;
       if (previousDeliveredAt > 0 && now > previousDeliveredAt && deliveredTotal >= previousDelivered) deliveryRate = (deliveredTotal - previousDelivered) / ((now - previousDeliveredAt) / 1000);
-      previousDelivered = deliveredTotal; previousDeliveredAt = now;
+      previousDelivered = deliveredTotal;
+      previousDeliveredAt = now;
       const diskFreeBytes = sumMetricValue(json.disk_free_bytes?.value);
       const memoryUsage = sumMetricValue(json.memory_usage?.value);
       const cpu = sumMetricValue(json.process_cpu_usage_normalized?.value) || sumMetricValue(json.system_cpu_usage_normalized?.value);
@@ -76,7 +80,7 @@ async function fetchKumoMetrics(): Promise<{ live: boolean; source: string; data
 metricsRouter.get('/', async (req: Request, res: Response) => {
   const format = req.query.format || (req.headers.accept?.includes('application/json') ? 'json' : 'text');
   const kumo = await fetchKumoMetrics();
-  const data = { ...kumo.data, kumomta_live: kumo.live, kumomta_source: kumo.source };
+  const data: KumoMetricsData = { ...kumo.data, kumomta_live: kumo.live, kumomta_source: kumo.source };
   if (format === 'json') return res.json(data);
   res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
   const n = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : 0;
