@@ -63,7 +63,7 @@ export function App() {
   const handleRunCampaign=async(id:string)=>{try{const r=await authFetch(`/api/campaigns/${id}/send`,{method:'POST'});const text=await r.text();let d:any={};try{d=text?JSON.parse(text):{};}catch{}if(!r.ok){addToast('error','Campaign Dispatch Failed',d.error||'Failed');return;}addToast('success','Campaign Dispatched',`Sent ${d.summary?.sentCount||0}; suppressed ${d.summary?.suppressedCount||0}; failed ${d.summary?.failedCount||0}`);await refreshAll();}catch(e:any){addToast('error','Broadcast Error',e.message);}};
   const handleAddContact=(d:any)=>jsonAction('/api/contacts',d,'Contact added');
   const handleCreateList=(d:any)=>jsonAction('/api/contacts/lists',d,'Contact list created');
-  const handleImportCsv=(d:any[])=>jsonAction('/api/contacts/import-csv',{contacts:d},'CSV import completed');
+  const handleImportCsv=(d:any[])=>jsonAction('/api/contacts/import',{contacts:d},'CSV import completed');
   const handleAddSuppression=(d:any)=>jsonAction('/api/suppressions',d,'Address suppressed');
   const handleRemoveSuppression=async(id:string)=>{try{const r=await authFetch(`/api/suppressions/${id}`,{method:'DELETE'});if(r.ok){addToast('info','Suppression Removed');await fetchSuppressions();}else{const d=await r.json();addToast('error','Remove Failed',d.error);}}catch(e:any){addToast('error','Connection Error',e.message);}};
   const handleSaveSettings=(category:string,values:any)=>jsonAction('/api/settings',{category,values},`${category} settings saved`);
@@ -72,7 +72,7 @@ export function App() {
 
   if (isAuthLoading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"/></div>;
   if (!user) return <><AuthView/><ToastContainer toasts={toasts} onDismiss={removeToast}/></>;
-  return <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex antialiased font-sans"><Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} queueCount={stats?.queueSize} user={{name:profile?.fullName||user.email?.split('@')[0],email:user.email,role:profile?.role,plan:profile?.plan}} onLogout={logout}/><div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto"><Header onSimulateTraffic={undefined} isSimulating={false} onOpenQuickSend={()=>setCurrentTab('send')}/><main className="flex-1 pb-16">
+  return <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex antialiased font-sans"><Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} kumoStatus={stats?.kumoHealth} sesStatus={stats?.sesHealth} queueCount={stats?.queueSize ?? 0} user={{name:profile?.fullName||user.email?.split('@')[0],email:user.email,role:profile?.role,plan:profile?.plan}} onLogout={logout}/><div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto"><Header onSimulateTraffic={undefined} isSimulating={false} onOpenQuickSend={()=>setCurrentTab('send')}/><main className="flex-1 pb-16">
       {currentTab==='dashboard'&&<DashboardView stats={stats} recentMessages={messages.slice(0,10)} onSelectMessage={setSelectedMessage} onNavigateToSend={()=>setCurrentTab('send')} onRefresh={refreshAll} isLoading={isLoading} authFetch={authFetch} logs={logs}/>} 
       {currentTab==='send'&&<SendEmailView senders={senders} domains={domains} contacts={contacts} onSendEmail={handleSendEmail} onSendTest={handleSendTest} authFetch={authFetch}/>} 
       {currentTab==='senders'&&<SendersView senders={senders} domains={domains} onAddSender={handleAddSender} onAddDomain={handleAddDomain}/>} 
