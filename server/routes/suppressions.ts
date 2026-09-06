@@ -1,72 +1,55 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../store.js';
-import { suppressionService } from '../services/SuppressionService.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { supabaseService } from '../services/SupabaseService.js';
+import { db } from '../store.js';
 
 export const suppressionsRouter = Router();
 
-// GET /api/suppressions - Search and filter suppression list (scoped to user)
 suppressionsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
+  if (!req.user || !supabaseService.isConfigured) return res.status(503).json({ error: 'Authenticated Supabase persistence is required' });
   const { search, type } = req.query;
-  let list = [];
-  if (req.user && supabaseService.isConfigured) {
-    list = await supabaseService.getSuppressions(req.user.id);
+  let list = await supabaseService.getSuppressions(req.user.id);
+  if (search && typeof search === 'string') { const q = search.toLowerCase(); list = list.filter((s) => s.email.toLowerCase().includes(q) || s.reason.toLowerCase().includes(q)); }
+  if (type && typeof type === 'string' && type !== 'ALL') list = list.filter((s) => s.type === type);
+  return res.json({ suppressions: list, total: list.length });
+});
+
+suppressionsRouter.post('/', optionalAuth, async (req: Request, res: Response) => {
+  if (!req.user || !supabaseService.isConfigured) return res.status(503).json({ error: 'Authenticated Supabase persistence is required' });
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const type = req.body.type || 'MANUAL';
+  const reason = req.body.reason || 'Manual suppression';
+  if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email address is required' });
+  const client = supabaseService.getClient()!;
+  const { data: existing } = await client.from('suppressions').select('id').eq('user_id', req.user.id).eq('email', email).maybeSingle();
+  let data: any;
+  if (existing) {
+    const result = await client.from('suppressions').update({ type, reason, source: 'manual' }).eq('id', existing.id).eq('user_id', req.user.id).select('*').single();
+    if (result.error) return res.status(400).json({ error: result.error.message });
+    data = result.data;
   } else {
-    list = [...db.suppressions];
+    const result = await client.from('suppressions').insert({ user_id: req.user.id, email, type, reason, source: 'manual' }).select('*').single();
+    if (result.error) return res.status(400).json({ error: result.error.message });
+    data = result.data;
   }
-
-  if (search && typeof search === 'string') {
-    const q = search.toLowerCase();
-    list = list.filter((s) => s.email.toLowerCase().includes(q) || s.reason.toLowerCase().includes(q));
-  }
-
-  if (type && typeof type === 'string' && type !== 'ALL') {
-    list = list.filter((s) => s.type === type);
-  }
-
-  res.json({ suppressions: list, total: list.length });
+  return res.status(201).json({ success: true, suppression: { id: data.id, email: data.email, type: data.type, reason: data.reason, source: data.source, createdAt: data.created_at } });
 });
 
-// POST /api/suppressions - Add manual suppression
-suppressionsRouter.post('/', (req: Request, res: Response) => {
-  const { email, type = 'MANUAL', reason = 'Manual suppression' } = req.body;
-
-  if (!email || !email.includes('@')) {
-    return res.status(400).json({ error: 'Valid email address is required' });
-  }
-
-  const record = suppressionService.addSuppression(email, type, reason, 'manual');
-  res.json({ success: true, suppression: record });
+suppressionsRouter.delete('/:id', optionalAuth, async (req: Request, res: Response) => {
+  if (!req.user || !supabaseService.isConfigured) return res.status(503).json({ error: 'Authenticated Supabase persistence is required' });
+  const { error, count } = await supabaseService.getClient()!.from('suppressions').delete({ count: 'exact' }).eq('id', req.params.id).eq('user_id', req.user.id);
+  if (error) return res.status(400).json({ error: error.message });
+  if (!count) return res.status(404).json({ error: 'Suppression record not found' });
+  return res.json({ success: true, message: 'Suppression record deleted successfully' });
 });
 
-// DELETE /api/suppressions/:id - Explicit authorized removal
-suppressionsRouter.delete('/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const removed = suppressionService.removeSuppression(id);
-
-  if (!removed) {
-    return res.status(404).json({ error: 'Suppression record not found' });
-  }
-
-  res.json({ success: true, message: 'Suppression record deleted successfully' });
-});
-
-// POST /api/suppressions/import - Bulk import suppressions
-suppressionsRouter.post('/import', (req: Request, res: Response) => {
-  const { entries } = req.body; // Array of { email, type, reason }
-
-  if (!Array.isArray(entries)) {
-    return res.status(400).json({ error: 'Valid entries array required' });
-  }
-
-  let count = 0;
-  for (const item of entries) {
-    if (item.email && item.email.includes('@')) {
-      suppressionService.addSuppression(item.email, item.type || 'MANUAL', item.reason || 'Bulk import', 'csv_import');
-      count++;
-    }
-  }
-
-  res.json({ success: true, imported: count });
+suppressionsRouter.post('/import', optionalAuth, async (req: Request, res: Response) => {
+  if (!req.user || !supabaseService.isConfigured) return res.status(503).json({ error: 'Authenticated Supabase persistence is required' });
+  const entries = req.body.entries;
+  if (!Array.isArray(entries)) return res.status(400).json({ error: 'Valid entries array required' });
+  const rows = entries.filter((x: any) => x?.email?.includes('@')).map((x: any) => ({ user_id: req.user!.id, email: String(x.email).trim().toLowerCase(), type: x.type || 'MANUAL', reason: x.reason || 'Bulk import', source: 'csv_import' }));
+  if (!rows.length) return res.json({ success: true, imported: 0 });
+  const { error } = await supabaseService.getClient()!.from('suppressions').upsert(rows, { onConflict: 'id' });
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json({ success: true, imported: rows.length });
 });
