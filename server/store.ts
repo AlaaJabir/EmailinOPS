@@ -26,29 +26,18 @@ class DatabaseStore {
   processedEventIds: Set<string> = new Set<string>();
 
   constructor() {
-    // Demo fixtures are opt-in and never allowed in production.
-    if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO_DATA === 'true') {
-      this.seedInitialData();
-    }
+    if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO_DATA === 'true') this.seedInitialData();
   }
 
   seedInitialData() {
     const now = new Date();
     const iso = (minsAgo: number) => new Date(now.getTime() - minsAgo * 60000).toISOString();
-
-    // Existing demo fixture generator intentionally remains available only for local development.
-    // The original seed body is preserved below.
     this.users = [
       { id: 'usr_admin_01', email: 'admin@emailops.io', name: 'Alex Vance (Lead Email Architect)', role: 'ADMIN', createdAt: iso(10080) },
-      { id: 'usr_ops_02', email: 'ops@emailops.io', name: 'Sarah Chen (Deliverability Engineer)', role: 'OPERATOR', createdAt: iso(7200) },
+      { id: 'usr_ops_02', email: 'ops@emailops.io', name: 'Sarah Chen (Deliverability Engineer', role: 'OPERATOR', createdAt: iso(7200) },
     ];
-
-    this.domains = [
-      { id: 'dom_00', domainName: 'amiralucia.com', spfStatus: 'VERIFIED', dkimStatus: 'VERIFIED', dmarcStatus: 'VERIFIED', sesStatus: 'VERIFIED', dkimSelector: 'kumo2026', dkimPublicKey: 'v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...', spfRecord: 'v=spf1 include:_spf.kumomta.internal include:amazonses.com ~all', dmarcRecord: 'v=DMARC1; p=reject; pct=100; rua=mailto:dmarc@amiralucia.com', createdAt: iso(10000), updatedAt: iso(100) },
-    ];
-    this.senders = [
-      { id: 'snd_00', name: 'Amira Lucia', fromEmail: 'service@amiralucia.com', replyTo: 'service@amiralucia.com', domainId: 'dom_00', domainName: 'amiralucia.com', status: 'active', verification: 'VERIFIED', dailyLimit: 50000, hourlyLimit: 5000, sentCount: 0, deliveredCount: 0, bouncedCount: 0, complaintCount: 0, createdAt: iso(100) },
-    ];
+    this.domains = [{ id: 'dom_00', domainName: 'amiralucia.com', spfStatus: 'VERIFIED', dkimStatus: 'VERIFIED', dmarcStatus: 'VERIFIED', sesStatus: 'VERIFIED', dkimSelector: 'kumo2026', dkimPublicKey: 'demo-only', spfRecord: 'demo-only', dmarcRecord: 'demo-only', createdAt: iso(10000), updatedAt: iso(100) }];
+    this.senders = [{ id: 'snd_00', name: 'Amira Lucia', fromEmail: 'service@amiralucia.com', replyTo: 'service@amiralucia.com', domainId: 'dom_00', domainName: 'amiralucia.com', status: 'active', verification: 'VERIFIED', dailyLimit: 50000, hourlyLimit: 5000, sentCount: 0, deliveredCount: 0, bouncedCount: 0, complaintCount: 0, createdAt: iso(100) }];
     this.contacts = [];
     this.contactLists = [];
     this.listMemberships = [];
@@ -63,8 +52,13 @@ class DatabaseStore {
   hasProcessedEvent(id: string) { return this.processedEventIds.has(id); }
   recordProcessedEvent(id: string) { this.processedEventIds.add(id); }
 
-  findMessageForEvent(messageId: string) {
-    return this.messages.find((m) => m.messageId === messageId || m.id === messageId || m.sesMessageId === messageId);
+  findMessageForEvent(input: string | { internalId?: string; rfcMessageId?: string; sesMessageId?: string; recipient?: string }) {
+    const ids = typeof input === 'string' ? [input] : [input.internalId, input.rfcMessageId, input.sesMessageId].filter(Boolean) as string[];
+    const recipient = typeof input === 'string' ? undefined : input.recipient;
+    return this.messages.find((m) => {
+      if (ids.includes(m.messageId) || ids.includes(m.id) || (m.sesMessageId && ids.includes(m.sesMessageId))) return true;
+      return Boolean(recipient && m.toEmail.toLowerCase() === recipient.toLowerCase());
+    });
   }
 
   getPrometheusMetrics(): PrometheusMetrics {
@@ -93,15 +87,7 @@ class DatabaseStore {
     const queued = this.messages.filter((m) => ['QUEUED', 'SENDING'].includes(m.status)).length;
     const opens = this.messageEvents.filter((e) => e.eventType === 'OPENED').length;
     const clicks = this.messageEvents.filter((e) => e.eventType === 'CLICKED').length;
-    return {
-      totalSent: sent, delivered, bounced, failed, complaints: this.messages.filter((m) => m.status === 'COMPLAINED').length,
-      rejected: this.messages.filter((m) => m.status === 'REJECTED').length, deliveryDelayed: this.messages.filter((m) => m.status === 'DELIVERY_DELAYED').length,
-      renderingFailed: this.messages.filter((m) => m.status === 'RENDERING_FAILED').length, queued, opens, clicks,
-      deliveryRate: sent ? (delivered / sent) * 100 : 0, bounceRate: sent ? (bounced / sent) * 100 : 0,
-      openRate: sent ? (opens / sent) * 100 : 0, clickRate: sent ? (clicks / sent) * 100 : 0,
-      queueSize: queued, sendingRatePerSec: 0, kumoHealth: 'offline', sesHealth: 'offline',
-      timeseries: [], hourlyActivity: [], topSenders: [], topCampaigns: [],
-    };
+    return { totalSent: sent, delivered, bounced, failed, complaints: this.messages.filter((m) => m.status === 'COMPLAINED').length, rejected: this.messages.filter((m) => m.status === 'REJECTED').length, deliveryDelayed: this.messages.filter((m) => m.status === 'DELIVERY_DELAYED').length, renderingFailed: this.messages.filter((m) => m.status === 'RENDERING_FAILED').length, queued, opens, clicks, deliveryRate: sent ? (delivered / sent) * 100 : 0, bounceRate: sent ? (bounced / sent) * 100 : 0, openRate: sent ? (opens / sent) * 100 : 0, clickRate: sent ? (clicks / sent) * 100 : 0, queueSize: queued, sendingRatePerSec: 0, kumoHealth: 'offline', sesHealth: 'offline', timeseries: [], hourlyActivity: [], topSenders: [], topCampaigns: [] };
   }
 }
 
