@@ -18,11 +18,11 @@ async function isRecipientSuppressed(email: string, userId: string): Promise<any
   return suppressionService.isSuppressed(email).record || null;
 }
 
-async function preRegisterMessage(params: { internalId: string; messageId: string; senderId: string; fromName?: string; fromEmail: string; toEmail: string; replyTo?: string; cc?: string[]; bcc?: string[]; subject: string; htmlBody?: string; headHtml?: string; plainText?: string; customHeaders?: Record<string,string>; campaignId?: string; userId?: string; isTest?: boolean; openTrackingEnabled?: boolean; clickTrackingEnabled?: boolean; }): Promise<Message> {
+async function preRegisterMessage(params: { internalId: string; messageId: string; senderId: string; fromName?: string; fromEmail: string; toEmail: string; replyTo?: string; cc?: string[]; bcc?: string[]; subject: string; htmlBody?: string; headHtml?: string; plainText?: string; customHeaders?: Record<string,string>; campaignId?: string; userId?: string; isTest?: boolean; isMarketing?: boolean; openTrackingEnabled?: boolean; clickTrackingEnabled?: boolean; }): Promise<Message> {
   const now = new Date().toISOString();
   const message: Message = { id: params.internalId, messageId: params.messageId, campaignId: params.campaignId, senderId: params.senderId, fromName: params.fromName, fromEmail: params.fromEmail, toEmail: params.toEmail, replyTo: params.replyTo, cc: params.cc, bcc: params.bcc, subject: params.subject, htmlBody: params.htmlBody, plainText: params.plainText, customHeaders: params.customHeaders, status: 'QUEUED', provider: 'KumoMTA', queuedAt: now, createdAt: now, events: [{ id: `evt_preregister_${Date.now()}_${Math.random().toString(36).slice(2,7)}`, messageId: params.messageId, eventType: 'QUEUED', eventData: { phase: 'pre_registered', isTest: Boolean(params.isTest) }, timestamp: now }] };
   if (params.userId && supabaseService.isConfigured) {
-    await supabaseService.saveMessage({ ...message, headHtml: params.headHtml, isMarketing: false, openTrackingEnabled: params.openTrackingEnabled, clickTrackingEnabled: params.clickTrackingEnabled } as any, params.userId);
+    await supabaseService.saveMessage({ ...message, headHtml: params.headHtml, isMarketing: Boolean(params.isMarketing), openTrackingEnabled: params.openTrackingEnabled, clickTrackingEnabled: params.clickTrackingEnabled } as any, params.userId);
     await supabaseService.saveMessageEvent(message.events![0], params.userId);
   } else {
     const existing = db.messages.findIndex(m => m.id === message.id || m.messageId === message.messageId);
@@ -89,7 +89,7 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
     if (openTrackingEnabled && personalizedHtml) personalizedHtml = personalizationService.injectOpenTrackingPixel(personalizedHtml, internalId, baseUrl);
     const senderDomain = String(fromEmail || '').includes('@') ? String(fromEmail).split('@')[1] : '';
     const unsubHeaders = personalizationService.generateUnsubscribeHeaders(unsubscribeUrl, senderDomain);
-    const userHeaders = customHeaders && typeof customHeaders === 'object' ? customHeaders : {};
+    const userHeaders: Record<string, string> = customHeaders && typeof customHeaders === 'object' ? Object.fromEntries(Object.entries(customHeaders as Record<string, unknown>).map(([k,v]) => [k, String(v)])) : {};
     const reserved = new Set(Object.keys(unsubHeaders).map(k => k.toLowerCase()));
     const safeCustomHeaders = Object.fromEntries(Object.entries(userHeaders).filter(([k]) => !reserved.has(k.toLowerCase())));
     const mergedHeaders: Record<string, string> = { ...safeCustomHeaders, ...unsubHeaders };
@@ -97,7 +97,7 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
     const sender = senders.find(s => s.fromEmail.toLowerCase() === String(fromEmail).toLowerCase());
     if (!sender) return res.status(422).json({ error: 'Sender identity is not configured for the authenticated user' });
     if (sender.status !== 'active' || sender.verification !== 'VERIFIED') return res.status(422).json({ error: 'Sender must be active and verified before sending' });
-    await preRegisterMessage({ internalId, messageId: `pre.${internalId}@emailops.local`, senderId: sender.id, fromName, fromEmail, toEmail: recipients[0], replyTo, cc, bcc, subject: personalizedSubject, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), plainText: personalizedPlainText, customHeaders: mergedHeaders, campaignId, userId: req.user!.id, openTrackingEnabled, clickTrackingEnabled });
+    await preRegisterMessage({ internalId, messageId: `pre.${internalId}@emailops.local`, senderId: sender.id, fromName, fromEmail, toEmail: recipients[0], replyTo, cc, bcc, subject: personalizedSubject, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), plainText: personalizedPlainText, customHeaders: mergedHeaders, campaignId, userId: req.user!.id, isMarketing: Boolean(isMarketing), openTrackingEnabled, clickTrackingEnabled });
     const result = await kumoMtaService.submitEmail({ internalId, contactId: contact?.id, fromName, fromEmail, replyTo, to: recipients, cc, bcc, subject: personalizedSubject, htmlBody: personalizedHtml, plainText: personalizedPlainText, customHeaders: mergedHeaders, campaignId, attachments, userId: req.user!.id });
     return res.json({ success: true, result, messageId: internalId, unsubscribeUrl, warnings: validation.warnings });
   } catch (err: any) { return res.status(500).json({ error: err.message || 'Failed to submit email via KumoMTA' }); }
@@ -119,7 +119,7 @@ messagesRouter.post('/test', requireAuth, async (req: Request, res: Response) =>
     if (enableOpenTracking ?? true) personalizedHtml = personalizationService.injectOpenTrackingPixel(personalizedHtml, internalId, baseUrl);
     const senderDomain = fromEmail.includes('@') ? fromEmail.split('@')[1] : 'localhost';
     const unsubHeaders = personalizationService.generateUnsubscribeHeaders(unsubscribeUrl, senderDomain);
-    await preRegisterMessage({ internalId, messageId: `pre.${internalId}@emailops.local`, senderId: sender.id, fromEmail, toEmail: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), customHeaders: unsubHeaders, userId: req.user?.id, isTest: true, openTrackingEnabled: enableOpenTracking ?? true, clickTrackingEnabled: enableClickTracking ?? true });
+    await preRegisterMessage({ internalId, messageId: `pre.${internalId}@emailops.local`, senderId: sender.id, fromEmail, toEmail: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), customHeaders: unsubHeaders, userId: req.user?.id, isTest: true, isMarketing: false, openTrackingEnabled: enableOpenTracking ?? true, clickTrackingEnabled: enableClickTracking ?? true });
     const result = await kumoMtaService.submitEmail({ fromEmail, to: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, customHeaders: unsubHeaders, internalId, isTest: true, userId: req.user?.id });
     return res.json({ success: true, result, message: `Test email dispatched to ${testEmail} through KumoMTA spool.` });
   } catch (err: any) { return res.status(500).json({ error: err.message || 'Failed to send test email via KumoMTA' }); }
