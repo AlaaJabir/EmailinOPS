@@ -28,7 +28,8 @@ function isValidRedirectUrl(target: string): boolean {
         hostname === '::1' ||
         hostname.startsWith('10.') ||
         hostname.startsWith('192.168.') ||
-        hostname === '169.254.169.254'
+        hostname === '169.254.169.254' ||
+        hostname === '0.0.0.0'
       ) {
         return false;
       }
@@ -40,8 +41,39 @@ function isValidRedirectUrl(target: string): boolean {
 }
 
 /**
+ * Tracking metrics are intentionally unique at message level.
+ * Mailbox security scanners, link prefetchers and image proxies can request
+ * the same tracking URL multiple times. We always redirect/serve the pixel,
+ * but only record the first OPENED/CLICKED event for a message.
+ */
+function recordUniqueTrackingEvent(params: {
+  messageId: string;
+  eventType: 'OPENED' | 'CLICKED';
+  eventData?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
+}): void {
+  const message = db.findMessageForEvent({
+    internalId: params.messageId,
+    rfcMessageId: params.messageId,
+    sesMessageId: params.messageId,
+  });
+
+  if (!message) {
+    // Let EventProcessor keep its normal unmapped-event telemetry.
+    eventProcessor.processEvent(params);
+    return;
+  }
+
+  const alreadyRecorded = (message.events || []).some((event) => event.eventType === params.eventType);
+  if (alreadyRecorded) return;
+
+  eventProcessor.processEvent(params);
+}
+
+/**
  * GET /api/tracking/click/:messageId
- * Records CLICKED and redirects to the original destination.
+ * Records one unique CLICKED event and redirects to the original destination.
  * URLSearchParams/query parsing already decodes the query value once,
  * so do not decodeURIComponent() a second time.
  */
@@ -55,7 +87,7 @@ trackingRouter.get('/click/:messageId', async (req: Request, res: Response) => {
   }
 
   try {
-    eventProcessor.processEvent({
+    recordUniqueTrackingEvent({
       messageId,
       eventType: 'CLICKED',
       eventData: {
@@ -75,13 +107,13 @@ trackingRouter.get('/click/:messageId', async (req: Request, res: Response) => {
 
 /**
  * GET /api/tracking/open/:messageId
- * Serves 1x1 transparent GIF and records OPENED.
+ * Serves 1x1 transparent GIF and records one unique OPENED event.
  */
 trackingRouter.get('/open/:messageId', async (req: Request, res: Response) => {
   const { messageId } = req.params;
 
   try {
-    eventProcessor.processEvent({
+    recordUniqueTrackingEvent({
       messageId,
       eventType: 'OPENED',
       eventData: {
