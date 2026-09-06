@@ -62,44 +62,71 @@ messagesRouter.get('/:id', requireAuth, async (req: Request, res: Response) => {
   res.json({ message: { ...message, events: events.length > 0 ? events : message.events || [] } });
 });
 
-function asRecipients(value: unknown): string[] { if (Array.isArray(value)) return value.flatMap(v => String(v || '').split(',')).map(v => v.trim()).filter(Boolean); return String(value || '').split(',').map(v => v.trim()).filter(Boolean); }
+function asRecipients(value: unknown): string[] { return (Array.isArray(value) ? value.flatMap(v => String(v || '').split(',')) : String(value || '').split(',')).map(v => v.trim().toLowerCase()).filter(Boolean); }
 function buildHtml(headHtml: unknown, bodyHtml: unknown): string { const body = String(bodyHtml || ''); const head = String(headHtml || ''); if (!head.trim()) return body; if (/<html[\s>]/i.test(body)) return body.replace(/<head([^>]*)>/i, `<head$1>${head}`); return `<!doctype html><html><head><meta charset="utf-8">${head}</head><body>${body}</body></html>`; }
 
 messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) => {
   const { fromName, fromEmail, replyTo, to, cc, bcc, subject, htmlBody, headHtml, plainText, customHeaders, campaignId, attachments, isMarketing, enableOpenTracking, enableClickTracking } = req.body;
-  const recipients = asRecipients(to);
+  const recipients = [...new Set(asRecipients(to))];
+  const ccRecipients = [...new Set(asRecipients(cc))];
+  const bccRecipients = [...new Set(asRecipients(bcc))];
   const validation = complianceService.validateSendPayload({ fromEmail, to: recipients, isMarketing, htmlBody });
   if (!validation.valid) return res.status(400).json({ error: 'Compliance validation failed', details: validation.errors, warnings: validation.warnings });
   if (!recipients.length) return res.status(400).json({ error: 'At least one recipient is required' });
   const suppressed: any[] = [];
-  for (const email of recipients) { const record = await isRecipientSuppressed(email, req.user!.id); if (record) suppressed.push({ email, suppression: record }); }
+  for (const email of [...new Set([...recipients, ...ccRecipients, ...bccRecipients])]) {
+    const record = await isRecipientSuppressed(email, req.user!.id);
+    if (record) suppressed.push({ email, suppression: record });
+  }
   if (suppressed.length) return res.status(422).json({ error: 'Dispatch blocked because one or more recipients are suppressed.', suppressed });
   try {
-    const internalId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const baseUrl = personalizationService.getBaseUrl(req.get('host'));
-    let contact: any = req.body.contact;
-    if (!contact && supabaseService.isConfigured) { const userContacts = await supabaseService.getContacts(req.user!.id); contact = userContacts.find((c) => c.email.toLowerCase() === recipients[0].toLowerCase()); }
-    if (!contact && process.env.NODE_ENV !== 'production') contact = db.findContactByEmail(recipients[0]);
-    const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({ email: recipients[0], contactId: contact?.id, messageId: internalId, campaignId, userId: req.user?.id, baseUrl });
-    let personalizedHtml = personalizationService.personalizeContent(buildHtml(headHtml, htmlBody), { contact, email: recipients[0], unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
-    const personalizedSubject = personalizationService.personalizeContent(subject || '', { contact, email: recipients[0], unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
-    const personalizedPlainText = plainText ? personalizationService.personalizeContent(plainText, { contact, email: recipients[0], unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables }) : undefined;
-    const clickTrackingEnabled = enableClickTracking ?? true, openTrackingEnabled = enableOpenTracking ?? true;
-    if (clickTrackingEnabled && personalizedHtml) personalizedHtml = personalizationService.rewriteLinksForClickTracking(personalizedHtml, internalId, baseUrl);
-    if (openTrackingEnabled && personalizedHtml) personalizedHtml = personalizationService.injectOpenTrackingPixel(personalizedHtml, internalId, baseUrl);
-    const senderDomain = String(fromEmail || '').includes('@') ? String(fromEmail).split('@')[1] : '';
-    const unsubHeaders = personalizationService.generateUnsubscribeHeaders(unsubscribeUrl, senderDomain);
-    const userHeaders: Record<string, string> = customHeaders && typeof customHeaders === 'object' ? Object.fromEntries(Object.entries(customHeaders as Record<string, unknown>).map(([k,v]) => [k, String(v)])) : {};
-    const reserved = new Set(Object.keys(unsubHeaders).map(k => k.toLowerCase()));
-    const safeCustomHeaders = Object.fromEntries(Object.entries(userHeaders).filter(([k]) => !reserved.has(k.toLowerCase())));
-    const mergedHeaders: Record<string, string> = { ...safeCustomHeaders, ...unsubHeaders };
     const senders = await supabaseService.getSenders(req.user!.id);
     const sender = senders.find(s => s.fromEmail.toLowerCase() === String(fromEmail).toLowerCase());
     if (!sender) return res.status(422).json({ error: 'Sender identity is not configured for the authenticated user' });
     if (sender.status !== 'active' || sender.verification !== 'VERIFIED') return res.status(422).json({ error: 'Sender must be active and verified before sending' });
-    await preRegisterMessage({ internalId, messageId: `pre.${internalId}@emailops.local`, senderId: sender.id, fromName, fromEmail, toEmail: recipients[0], replyTo, cc, bcc, subject: personalizedSubject, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), plainText: personalizedPlainText, customHeaders: mergedHeaders, campaignId, userId: req.user!.id, isMarketing: Boolean(isMarketing), openTrackingEnabled, clickTrackingEnabled });
-    const result = await kumoMtaService.submitEmail({ internalId, contactId: contact?.id, fromName, fromEmail, replyTo, to: recipients, cc, bcc, subject: personalizedSubject, htmlBody: personalizedHtml, plainText: personalizedPlainText, customHeaders: mergedHeaders, campaignId, attachments, userId: req.user!.id });
-    return res.json({ success: true, result, messageId: internalId, unsubscribeUrl, warnings: validation.warnings });
+    if ((recipients.length > 1) && (ccRecipients.length || bccRecipients.length)) return res.status(400).json({ error: 'CC/BCC cannot be combined with multiple primary recipients. Send each primary recipient separately to keep tracking and analytics accurate.' });
+
+    const clickTrackingEnabled = enableClickTracking ?? true;
+    const openTrackingEnabled = enableOpenTracking ?? true;
+    const results: any[] = [];
+    const failures: any[] = [];
+
+    for (const recipient of recipients) {
+      const internalId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      let contact: any = req.body.contact;
+      if (!contact && supabaseService.isConfigured) {
+        const userContacts = await supabaseService.getContacts(req.user!.id);
+        contact = userContacts.find(c => c.email.toLowerCase() === recipient);
+      }
+      if (!contact && process.env.NODE_ENV !== 'production') contact = db.findContactByEmail(recipient);
+
+      const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({ email: recipient, contactId: contact?.id, messageId: internalId, campaignId, userId: req.user?.id, baseUrl });
+      let personalizedHtml = personalizationService.personalizeContent(buildHtml(headHtml, htmlBody), { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
+      const personalizedSubject = personalizationService.personalizeContent(subject || '', { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
+      const personalizedPlainText = plainText ? personalizationService.personalizeContent(plainText, { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables }) : undefined;
+      if (clickTrackingEnabled && personalizedHtml) personalizedHtml = personalizationService.rewriteLinksForClickTracking(personalizedHtml, internalId, baseUrl);
+      if (openTrackingEnabled && personalizedHtml) personalizedHtml = personalizationService.injectOpenTrackingPixel(personalizedHtml, internalId, baseUrl);
+
+      const senderDomain = String(fromEmail || '').includes('@') ? String(fromEmail).split('@')[1] : '';
+      const unsubHeaders = personalizationService.generateUnsubscribeHeaders(unsubscribeUrl, senderDomain);
+      const userHeaders: Record<string, string> = customHeaders && typeof customHeaders === 'object' ? Object.fromEntries(Object.entries(customHeaders as Record<string, unknown>).map(([k,v]) => [k, String(v)])) : {};
+      const reserved = new Set(Object.keys(unsubHeaders).map(k => k.toLowerCase()));
+      const safeCustomHeaders = Object.fromEntries(Object.entries(userHeaders).filter(([k]) => !reserved.has(k.toLowerCase())));
+      const mergedHeaders: Record<string, string> = { ...safeCustomHeaders, ...unsubHeaders };
+
+      await preRegisterMessage({ internalId, messageId: `pre.${internalId}@emailops.local`, senderId: sender.id, fromName, fromEmail, toEmail: recipient, replyTo, cc: ccRecipients, bcc: bccRecipients, subject: personalizedSubject, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), plainText: personalizedPlainText, customHeaders: mergedHeaders, campaignId, userId: req.user!.id, isMarketing: Boolean(isMarketing), openTrackingEnabled, clickTrackingEnabled });
+
+      try {
+        const result = await kumoMtaService.submitEmail({ internalId, contactId: contact?.id, fromName, fromEmail, replyTo, to: recipient, cc: ccRecipients, bcc: bccRecipients, subject: personalizedSubject, htmlBody: personalizedHtml, plainText: personalizedPlainText, customHeaders: mergedHeaders, campaignId, attachments, userId: req.user!.id });
+        results.push({ recipient, messageId: internalId, result, unsubscribeUrl });
+      } catch (error: any) {
+        failures.push({ recipient, messageId: internalId, error: error?.message || 'KumoMTA submission failed' });
+      }
+    }
+
+    if (!results.length) return res.status(502).json({ success: false, error: 'All recipients failed to submit to KumoMTA', failures, warnings: validation.warnings });
+    return res.status(failures.length ? 207 : 200).json({ success: failures.length === 0, result: results.length === 1 ? results[0].result : results.map(r => r.result), results, failures, messageIds: results.map(r => r.messageId), warnings: validation.warnings });
   } catch (err: any) { return res.status(500).json({ error: err.message || 'Failed to submit email via KumoMTA' }); }
 });
 
