@@ -5,8 +5,6 @@ import { ToastContainer, ToastMessage } from './components/Toast';
 import { MessageDetailModal } from './components/MessageDetailModal';
 import { useAuth } from './context/AuthContext';
 import { AuthView } from './views/AuthView';
-
-// Views
 import { DashboardView } from './views/DashboardView';
 import { SendEmailView } from './views/SendEmailView';
 import { SendersView } from './views/SendersView';
@@ -17,23 +15,10 @@ import { SuppressionView } from './views/SuppressionView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { LogsView } from './views/LogsView';
 import { SettingsView } from './views/SettingsView';
-
-import {
-  DashboardStats,
-  Message,
-  Sender,
-  Domain,
-  Campaign,
-  Contact,
-  ContactList,
-  Suppression,
-  ServiceLog,
-  ApiKey,
-} from './types';
+import { DashboardStats, Message, Sender, Domain, Campaign, Contact, ContactList, Suppression, ServiceLog, ApiKey } from './types';
 
 export function App() {
-  const { user, profile, logout, isLoading: isAuthLoading, isConfigured, getAuthHeaders } = useAuth();
-
+  const { user, profile, logout, isLoading: isAuthLoading, getAuthHeaders } = useAuth();
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -46,637 +31,72 @@ export function App() {
   const [logs, setLogs] = useState<ServiceLog[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Authenticated fetch wrapper that automatically attaches Supabase JWT
-  const authFetch = useCallback(
-    (url: string, options: RequestInit = {}) => {
-      const authHeaders = getAuthHeaders();
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const apiUrl = url.startsWith('http') ? url : apiBaseUrl + url;
-      return fetch(apiUrl, {
-        ...options,
-        headers: {
-          ...authHeaders,
-          ...(options.headers || {}),
-        },
-      });
-    },
-    [getAuthHeaders]
-  );
+  const authFetch = useCallback((url: string, options: RequestInit = {}) => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+    const apiUrl = url.startsWith('http') ? url : apiBaseUrl + url;
+    return fetch(apiUrl, { ...options, headers: { ...getAuthHeaders(), ...(options.headers || {}) } });
+  }, [getAuthHeaders]);
 
   const addToast = (type: 'success' | 'error' | 'info', title: string, message?: string) => {
     const id = `toast_${Date.now()}_${Math.random()}`;
-    setToasts((prev) => [...prev, { id, type, title, message }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 5000);
+    setToasts(prev => [...prev, { id, type, title, message }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
   };
+  const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
+  const fetchStats = useCallback(async () => { try { const res = await authFetch('/api/dashboard/stats'); if (res.ok) setStats(await res.json()); } catch (e) { console.error(e); } }, [authFetch]);
+  const fetchMessages = useCallback(async () => { try { const res = await authFetch('/api/messages?limit=100'); if (res.ok) { const d = await res.json(); setMessages(d.messages || []); } } catch (e) { console.error(e); } }, [authFetch]);
+  const fetchSendersAndDomains = useCallback(async () => { try { const [a,b] = await Promise.all([authFetch('/api/senders'), authFetch('/api/senders/domains')]); if(a.ok){const d=await a.json();setSenders(d.senders||[]);} if(b.ok){const d=await b.json();setDomains(d.domains||[]);} } catch(e){console.error(e);} },[authFetch]);
+  const fetchCampaigns = useCallback(async () => { try { const r=await authFetch('/api/campaigns'); if(r.ok){const d=await r.json();setCampaigns(d.campaigns||[]);} } catch(e){console.error(e);} },[authFetch]);
+  const fetchContactsAndLists = useCallback(async () => { try { const [a,b]=await Promise.all([authFetch('/api/contacts'),authFetch('/api/contacts/lists')]); if(a.ok){const d=await a.json();setContacts(d.contacts||[]);} if(b.ok){const d=await b.json();setLists(d.lists||[]);} } catch(e){console.error(e);} },[authFetch]);
+  const fetchSuppressions = useCallback(async () => { try { const r=await authFetch('/api/suppressions'); if(r.ok){const d=await r.json();setSuppressions(d.suppressions||[]);} } catch(e){console.error(e);} },[authFetch]);
+  const fetchLogs = useCallback(async () => { try { const r=await authFetch('/api/logs?limit=100'); if(r.ok){const d=await r.json();setLogs(d.logs||[]);} } catch(e){console.error(e);} },[authFetch]);
+  const fetchSettings = useCallback(async () => { try { const r=await authFetch('/api/settings'); if(r.ok){const d=await r.json();setSettings(d.settings||{});setApiKeys(d.apiKeys||[]);} } catch(e){console.error(e);} },[authFetch]);
 
-  // Data fetchers
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/dashboard/stats');
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
-  }, [authFetch]);
+  const refreshAll = useCallback(async () => { setIsLoading(true); try { await Promise.all([fetchStats(),fetchMessages(),fetchSendersAndDomains(),fetchCampaigns(),fetchContactsAndLists(),fetchSuppressions(),fetchLogs(),fetchSettings()]); } finally { setIsLoading(false); } },[fetchStats,fetchMessages,fetchSendersAndDomains,fetchCampaigns,fetchContactsAndLists,fetchSuppressions,fetchLogs,fetchSettings]);
+  useEffect(() => { refreshAll(); const id=setInterval(()=>{fetchStats();fetchMessages();},6000); return ()=>clearInterval(id); },[refreshAll,fetchStats,fetchMessages]);
 
-  const fetchMessages = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/messages?limit=100');
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data.messages || []);
-      }
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-    }
-  }, [authFetch]);
+  const jsonAction = async (url:string, body:any, success:string) => { try { const r=await authFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const d=await r.json(); if(!r.ok){addToast('error','Request Failed',d.error||'Request failed');return false;} addToast('success',success); await refreshAll(); return true; } catch(e:any){addToast('error','Connection Error',e.message);return false;} };
+  const handleSendEmail = (payload:any) => jsonAction('/api/messages/send',payload,'Email injected into KumoMTA spool');
+  const handleSendTest = (payload:any) => jsonAction('/api/messages/test',payload,`Test dispatched to ${payload.testEmail}`);
+  const handleSimulateTraffic = async () => { setIsSimulating(true); try { await jsonAction('/api/seed/simulate-traffic',{count:5},'Simulation batch injected'); } finally { setIsSimulating(false); } };
+  const handleAddSender=(d:any)=>jsonAction('/api/senders',d,'Sender identity registered');
+  const handleAddDomain=(d:any)=>jsonAction('/api/senders/domains',d,'Domain registered');
+  const handleCreateCampaign=(d:any)=>jsonAction('/api/campaigns',d,`Campaign "${d.name}" created`);
+  const handleUpdateCampaignStatus=async(id:string,status:string)=>{try{const r=await authFetch(`/api/campaigns/${id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});const d=await r.json();if(!r.ok){addToast('error','Campaign Update Failed',d.error||'Request failed');return;}addToast('info','Campaign Updated',status);await fetchCampaigns();}catch(e:any){addToast('error','Connection Error',e.message);}};
+  const handleRunCampaign=async(id:string)=>{try{const r=await authFetch(`/api/campaigns/${id}/send`,{method:'POST'});const d=await r.json();if(!r.ok){addToast('error','Campaign Dispatch Failed',d.error||'Failed');return;}addToast('success','Campaign Dispatched',`Sent ${d.summary?.sentCount||0}; suppressed ${d.summary?.suppressedCount||0}; failed ${d.summary?.failedCount||0}`);await refreshAll();}catch(e:any){addToast('error','Broadcast Error',e.message);}};
+  const handleAddContact=(d:any)=>jsonAction('/api/contacts',d,'Contact added');
+  const handleCreateList=(d:any)=>jsonAction('/api/contacts/lists',d,'Contact list created');
+  const handleImportCsv=(d:any[])=>jsonAction('/api/contacts/import-csv',{contacts:d},'CSV import completed');
+  const handleAddSuppression=(d:any)=>jsonAction('/api/suppressions',d,'Address suppressed');
+  const handleRemoveSuppression=async(id:string)=>{try{const r=await authFetch(`/api/suppressions/${id}`,{method:'DELETE'});if(r.ok){addToast('info','Suppression Removed');await fetchSuppressions();}else{const d=await r.json();addToast('error','Remove Failed',d.error);}}catch(e:any){addToast('error','Connection Error',e.message);}};
+  const handleSaveSettings=(category:string,values:any)=>jsonAction('/api/settings',{category,values},`${category} settings saved`);
+  const handleCreateApiKey=async(name:string)=>{const r=await authFetch('/api/settings/api-keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});const d=await r.json();await fetchSettings();return {secretToken:d.secretToken};};
+  const handleRevokeApiKey=async(id:string)=>{try{const r=await authFetch(`/api/settings/api-keys/${id}`,{method:'DELETE'});if(r.ok){addToast('info','API Key Revoked');await fetchSettings();}}catch(e:any){addToast('error','Error revoking key',e.message);}};
 
-  const fetchSendersAndDomains = useCallback(async () => {
-    try {
-      const [resSenders, resDomains] = await Promise.all([
-        authFetch('/api/senders'),
-        authFetch('/api/senders/domains'),
-      ]);
-      if (resSenders.ok) {
-        const data = await resSenders.json();
-        setSenders(data.senders || []);
-      }
-      if (resDomains.ok) {
-        const data = await resDomains.json();
-        setDomains(data.domains || []);
-      }
-    } catch (err) {
-      console.error('Error fetching senders/domains:', err);
-    }
-  }, [authFetch]);
+  if (isAuthLoading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"/></div>;
+  if (!user) return <><AuthView/><ToastContainer toasts={toasts} onDismiss={removeToast}/></>;
 
-  const fetchCampaigns = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/campaigns');
-      if (res.ok) {
-        const data = await res.json();
-        setCampaigns(data.campaigns || []);
-      }
-    } catch (err) {
-      console.error('Error fetching campaigns:', err);
-    }
-  }, [authFetch]);
-
-  const fetchContactsAndLists = useCallback(async () => {
-    try {
-      const [resContacts, resLists] = await Promise.all([
-        authFetch('/api/contacts'),
-        authFetch('/api/contacts/lists'),
-      ]);
-      if (resContacts.ok) {
-        const data = await resContacts.json();
-        setContacts(data.contacts || []);
-      }
-      if (resLists.ok) {
-        const data = await resLists.json();
-        setLists(data.lists || []);
-      }
-    } catch (err) {
-      console.error('Error fetching contacts:', err);
-    }
-  }, [authFetch]);
-
-  const fetchSuppressions = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/suppressions');
-      if (res.ok) {
-        const data = await res.json();
-        setSuppressions(data.suppressions || []);
-      }
-    } catch (err) {
-      console.error('Error fetching suppressions:', err);
-    }
-  }, [authFetch]);
-
-  const fetchLogs = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/logs?limit=100');
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs || []);
-      }
-    } catch (err) {
-      console.error('Error fetching logs:', err);
-    }
-  }, [authFetch]);
-
-  const fetchSettings = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/settings');
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data.settings || {});
-        setApiKeys(data.apiKeys || []);
-      }
-    } catch (err) {
-      console.error('Error fetching settings:', err);
-    }
-  }, [authFetch]);
-
-  const refreshAll = useCallback(async () => {
-    setIsLoading(true);
-    await Promise.all([
-      fetchStats(),
-      fetchMessages(),
-      fetchSendersAndDomains(),
-      fetchCampaigns(),
-      fetchContactsAndLists(),
-      fetchSuppressions(),
-      fetchLogs(),
-      fetchSettings(),
-    ]);
-    setIsLoading(false);
-  }, [
-    fetchStats,
-    fetchMessages,
-    fetchSendersAndDomains,
-    fetchCampaigns,
-    fetchContactsAndLists,
-    fetchSuppressions,
-    fetchLogs,
-    fetchSettings,
-  ]);
-
-  // Initial load + periodic polling for real-time dashboard telemetry
-  useEffect(() => {
-    refreshAll();
-    const interval = setInterval(() => {
-      fetchStats();
-      fetchMessages();
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [refreshAll, fetchStats, fetchMessages]);
-
-  // Action: Send Email
-  const handleSendEmail = async (payload: any) => {
-    try {
-      const res = await authFetch('/api/messages/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (data.code === 'SUPPRESSED_RECIPIENT') {
-          addToast('error', 'Suppressed Recipient Blocked', `Recipient is listed in active suppression table: ${data.error}`);
-        } else {
-          addToast('error', 'Dispatch Failed', data.error || 'Could not spool email');
-        }
-        return;
-      }
-
-      addToast(
-        'success',
-        'Injected into KumoMTA Spool',
-        `RFC Message-ID: ${data.messageId || data.result?.messageId}`
-      );
-      refreshAll();
-    } catch (err: any) {
-      addToast('error', 'Connection Error', err.message);
-    }
-  };
-
-  // Action: Send Test Email
-  const handleSendTest = async (payload: any) => {
-    try {
-      const res = await authFetch('/api/messages/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        addToast('error', 'Test Failed', data.error || 'Could not send test');
-        return;
-      }
-
-      addToast('success', 'Test Dispatched', `Verification email sent to ${payload.testEmail}`);
-      refreshAll();
-    } catch (err: any) {
-      addToast('error', 'Connection Error', err.message);
-    }
-  };
-
-  // Action: Simulate Traffic Stream
-  const handleSimulateTraffic = async () => {
-    setIsSimulating(true);
-    try {
-      const res = await authFetch('/api/seed/simulate-traffic', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: 5 }),
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        addToast('info', 'Simulated Live Traffic Batch', `Injected ${data.count} test messages into KumoMTA spool`);
-        await refreshAll();
-      }
-    } catch (err: any) {
-      addToast('error', 'Simulator Error', err.message);
-    } finally {
-      setIsSimulating(false);
-    }
-  };
-
-  // Action: Add Sender
-  const handleAddSender = async (senderData: any) => {
-    try {
-      const res = await authFetch('/api/senders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(senderData),
-      });
-      if (res.ok) {
-        addToast('success', 'Sender Identity Registered', `${senderData.name} (${senderData.fromEmail})`);
-        fetchSendersAndDomains();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error adding sender', err.message);
-    }
-  };
-
-  // Action: Add Domain
-  const handleAddDomain = async (domainData: any) => {
-    try {
-      const res = await authFetch('/api/senders/domains', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(domainData),
-      });
-      if (res.ok) {
-        addToast('success', 'Domain Registered', `DNS records generated for ${domainData.domainName}`);
-        fetchSendersAndDomains();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error adding domain', err.message);
-    }
-  };
-
-  // Action: Create Campaign
-  const handleCreateCampaign = async (campaignData: any) => {
-    try {
-      const res = await authFetch('/api/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(campaignData),
-      });
-      if (res.ok) {
-        addToast('success', 'Campaign Created', `Scheduled campaign "${campaignData.name}"`);
-        fetchCampaigns();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error creating campaign', err.message);
-    }
-  };
-
-  // Action: Update Campaign Status
-  const handleUpdateCampaignStatus = async (id: string, status: string) => {
-    try {
-      const res = await authFetch(`/api/campaigns/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (res.ok) {
-        addToast('info', 'Campaign Status Updated', `Status changed to ${status}`);
-        fetchCampaigns();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error updating campaign', err.message);
-    }
-  };
-
-  // Action: Run Personalized Campaign Broadcast
-  const handleRunCampaign = async (id: string) => {
-    try {
-      addToast('info', 'Broadcasting Campaign', 'Evaluating suppressions and generating personalized tokens...');
-      const res = await authFetch(`/api/campaigns/${id}/send`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        addToast('error', 'Campaign Dispatch Failed', data.error || 'Failed to dispatch');
-        return;
-      }
-      addToast(
-        'success',
-        'Campaign Dispatched',
-        `Dispatched ${data.summary?.sentCount || 0} personalized emails (${data.summary?.suppressedCount || 0} suppressed, ${data.summary?.failedCount || 0} failed)`
-      );
-      refreshAll();
-    } catch (err: any) {
-      addToast('error', 'Broadcast Error', err.message);
-    }
-  };
-
-  // Action: Add Contact
-  const handleAddContact = async (contactData: any) => {
-    try {
-      const res = await authFetch('/api/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contactData),
-      });
-      if (res.ok) {
-        addToast('success', 'Contact Added', `${contactData.email} saved to directory`);
-        fetchContactsAndLists();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error adding contact', err.message);
-    }
-  };
-
-  // Action: Create List
-  const handleCreateList = async (listData: any) => {
-    try {
-      const res = await authFetch('/api/contacts/lists', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(listData),
-      });
-      if (res.ok) {
-        addToast('success', 'Contact List Created', `List "${listData.name}" is ready`);
-        fetchContactsAndLists();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error creating list', err.message);
-    }
-  };
-
-  // Action: Import CSV
-  const handleImportCsv = async (csvContacts: any[]) => {
-    try {
-      const res = await authFetch('/api/contacts/import-csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contacts: csvContacts }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        addToast(
-          'success',
-          'CSV Ingest Complete',
-          `Imported ${data.importedCount} contacts (${data.suppressedBlockedCount} suppressed duplicates skipped)`
-        );
-        fetchContactsAndLists();
-      }
-    } catch (err: any) {
-      addToast('error', 'CSV Import Failed', err.message);
-    }
-  };
-
-  // Action: Add Suppression
-  const handleAddSuppression = async (suppressionData: any) => {
-    try {
-      const res = await authFetch('/api/suppressions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(suppressionData),
-      });
-      if (res.ok) {
-        addToast('success', 'Address Suppressed', `${suppressionData.email} added to compliance blocklist`);
-        fetchSuppressions();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error adding suppression', err.message);
-    }
-  };
-
-  // Action: Remove Suppression
-  const handleRemoveSuppression = async (id: string) => {
-    try {
-      const res = await authFetch(`/api/suppressions/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        addToast('info', 'Suppression Removed', 'Address unblocked for future delivery attempts');
-        fetchSuppressions();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error removing suppression', err.message);
-    }
-  };
-
-  // Action: Save Settings
-  const handleSaveSettings = async (category: string, values: any) => {
-    try {
-      const res = await authFetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, values }),
-      });
-      if (res.ok) {
-        addToast('success', 'Configuration Saved', `${category.toUpperCase()} settings updated successfully`);
-        fetchSettings();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error saving settings', err.message);
-    }
-  };
-
-  // Action: Create API Key
-  const handleCreateApiKey = async (name: string) => {
-    const res = await authFetch('/api/settings/api-keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const data = await res.json();
-    fetchSettings();
-    return { secretToken: data.secretToken };
-  };
-
-  // Action: Revoke API Key
-  const handleRevokeApiKey = async (id: string) => {
-    try {
-      const res = await authFetch(`/api/settings/api-keys/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        addToast('info', 'API Key Revoked', 'Token invalidated immediately');
-        fetchSettings();
-      }
-    } catch (err: any) {
-      addToast('error', 'Error revoking key', err.message);
-    }
-  };
-
-  // Authentication Loading Screen
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center font-sans">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-          <div className="text-[11px] font-mono text-[#888888] tracking-widest uppercase">
-            Authenticating EmailOps Session...
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Unauthenticated: Show Supabase Authentication View
-  if (!user) {
-    return (
-      <>
-        <AuthView />
-        <ToastContainer toasts={toasts} onDismiss={removeToast} />
-      </>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex flex-row antialiased font-sans selection:bg-white/20 selection:text-white">
-      {/* Sidebar Navigation */}
-      <Sidebar
-        currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        queueCount={stats?.queueSize || 14}
-        user={{
-          name: profile?.fullName || user.email?.split('@')[0],
-          email: user.email,
-          role: profile?.role,
-          plan: profile?.plan,
-        }}
-        onLogout={logout}
-      />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
-        <Header
-          onSimulateTraffic={handleSimulateTraffic}
-          isSimulating={isSimulating}
-          onOpenQuickSend={() => setCurrentTab('send')}
-        />
-
-        <main className="flex-1 pb-16">
-          {currentTab === 'dashboard' && (
-            <DashboardView
-              stats={stats}
-              recentMessages={messages.slice(0, 10)}
-              onSelectMessage={setSelectedMessage}
-              onNavigateToSend={() => setCurrentTab('send')}
-              onRefresh={refreshAll}
-              isLoading={isLoading}
-            />
-          )}
-
-          {currentTab === 'send' && (
-            <SendEmailView
-              senders={senders}
-              domains={domains}
-              contacts={contacts}
-              onSendEmail={handleSendEmail}
-              onSendTest={handleSendTest}
-            />
-          )}
-
-          {currentTab === 'senders' && (
-            <SendersView
-              senders={senders}
-              domains={domains}
-              onAddSender={handleAddSender}
-              onAddDomain={handleAddDomain}
-            />
-          )}
-
-          {currentTab === 'campaigns' && (
-            <CampaignsView
-              campaigns={campaigns}
-              senders={senders}
-              lists={lists}
-              onCreateCampaign={handleCreateCampaign}
-              onUpdateCampaignStatus={handleUpdateCampaignStatus}
-              onRunCampaign={handleRunCampaign}
-            />
-          )}
-
-          {currentTab === 'messages' && (
-            <MessagesView
-              messages={messages}
-              senders={senders}
-              campaigns={campaigns}
-              onSelectMessage={setSelectedMessage}
-              onRefresh={fetchMessages}
-              isLoading={isLoading}
-            />
-          )}
-
-          {currentTab === 'contacts' && (
-            <ContactsView
-              contacts={contacts}
-              lists={lists}
-              onAddContact={handleAddContact}
-              onCreateList={handleCreateList}
-              onImportCsv={handleImportCsv}
-            />
-          )}
-
-          {currentTab === 'suppression' && (
-            <SuppressionView
-              suppressions={suppressions}
-              onAddSuppression={handleAddSuppression}
-              onRemoveSuppression={handleRemoveSuppression}
-            />
-          )}
-
-          {currentTab === 'analytics' && (
-            <AnalyticsView
-              stats={stats}
-              senders={senders}
-              campaigns={campaigns}
-            />
-          )}
-
-          {currentTab === 'logs' && (
-            <LogsView
-              logs={logs}
-              onRefresh={fetchLogs}
-              isLoading={isLoading}
-            />
-          )}
-
-          {currentTab === 'settings' && (
-            <SettingsView
-              settings={settings}
-              apiKeys={apiKeys}
-              onSaveSettings={handleSaveSettings}
-              onCreateApiKey={handleCreateApiKey}
-              onRevokeApiKey={handleRevokeApiKey}
-            />
-          )}
-        </main>
-      </div>
-
-      {/* Message Inspection Detail Modal */}
-      <MessageDetailModal
-        message={selectedMessage}
-        onClose={() => setSelectedMessage(null)}
-      />
-
-      {/* Toast Notification Stack */}
-      <ToastContainer toasts={toasts} onDismiss={removeToast} />
-    </div>
-  );
+  return <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex antialiased font-sans">
+    <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} queueCount={stats?.queueSize} user={{name:profile?.fullName||user.email?.split('@')[0],email:user.email,role:profile?.role,plan:profile?.plan}} onLogout={logout}/>
+    <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto"><Header onSimulateTraffic={handleSimulateTraffic} isSimulating={isSimulating} onOpenQuickSend={()=>setCurrentTab('send')}/><main className="flex-1 pb-16">
+      {currentTab==='dashboard'&&<DashboardView stats={stats} recentMessages={messages.slice(0,10)} onSelectMessage={setSelectedMessage} onNavigateToSend={()=>setCurrentTab('send')} onRefresh={refreshAll} isLoading={isLoading} authFetch={authFetch}/>} 
+      {currentTab==='send'&&<SendEmailView senders={senders} domains={domains} contacts={contacts} onSendEmail={handleSendEmail} onSendTest={handleSendTest}/>} 
+      {currentTab==='senders'&&<SendersView senders={senders} domains={domains} onAddSender={handleAddSender} onAddDomain={handleAddDomain}/>} 
+      {currentTab==='campaigns'&&<CampaignsView campaigns={campaigns} senders={senders} lists={lists} onCreateCampaign={handleCreateCampaign} onUpdateCampaignStatus={handleUpdateCampaignStatus} onRunCampaign={handleRunCampaign}/>} 
+      {currentTab==='messages'&&<MessagesView messages={messages} senders={senders} campaigns={campaigns} onSelectMessage={setSelectedMessage} onRefresh={fetchMessages} isLoading={isLoading}/>} 
+      {currentTab==='contacts'&&<ContactsView contacts={contacts} lists={lists} onAddContact={handleAddContact} onCreateList={handleCreateList} onImportCsv={handleImportCsv}/>} 
+      {currentTab==='suppression'&&<SuppressionView suppressions={suppressions} onAddSuppression={handleAddSuppression} onRemoveSuppression={handleRemoveSuppression}/>} 
+      {currentTab==='analytics'&&<AnalyticsView stats={stats} senders={senders} campaigns={campaigns}/>} 
+      {currentTab==='logs'&&<LogsView logs={logs} onRefresh={fetchLogs} isLoading={isLoading}/>} 
+      {currentTab==='settings'&&<SettingsView settings={settings} apiKeys={apiKeys} onSaveSettings={handleSaveSettings} onCreateApiKey={handleCreateApiKey} onRevokeApiKey={handleRevokeApiKey}/>} 
+    </main></div>
+    <MessageDetailModal message={selectedMessage} onClose={()=>setSelectedMessage(null)}/><ToastContainer toasts={toasts} onDismiss={removeToast}/>
+  </div>;
 }
-
 export default App;
