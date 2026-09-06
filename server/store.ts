@@ -57,13 +57,16 @@ class DatabaseStore {
     return this.contacts.find((c) => c.email.trim().toLowerCase() === normalized);
   }
 
-  unsubscribeContact(email: string) {
+  unsubscribeContact(email: string, options?: { reason?: string; source?: string; contactId?: string }) {
     const normalized = email.trim().toLowerCase();
-    const contact = this.contacts.find((c) => c.email.trim().toLowerCase() === normalized);
-    if (!contact) return false;
+    const contact = options?.contactId
+      ? this.contacts.find((c) => c.id === options.contactId && c.email.trim().toLowerCase() === normalized)
+      : this.contacts.find((c) => c.email.trim().toLowerCase() === normalized);
+    if (!contact) return { wasAlreadyUnsubscribed: false };
+    const wasAlreadyUnsubscribed = contact.status === 'UNSUBSCRIBED';
     contact.status = 'UNSUBSCRIBED';
     contact.updatedAt = new Date().toISOString();
-    return true;
+    return { wasAlreadyUnsubscribed };
   }
 
   findMessageForEvent(input: string | { internalId?: string; rfcMessageId?: string; sesMessageId?: string; recipient?: string }) {
