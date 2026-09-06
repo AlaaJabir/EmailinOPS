@@ -52,6 +52,20 @@ class DatabaseStore {
   hasProcessedEvent(id: string) { return this.processedEventIds.has(id); }
   recordProcessedEvent(id: string) { this.processedEventIds.add(id); }
 
+  findContactByEmail(email: string) {
+    const normalized = email.trim().toLowerCase();
+    return this.contacts.find((c) => c.email.trim().toLowerCase() === normalized);
+  }
+
+  unsubscribeContact(email: string) {
+    const normalized = email.trim().toLowerCase();
+    const contact = this.contacts.find((c) => c.email.trim().toLowerCase() === normalized);
+    if (!contact) return false;
+    contact.status = 'UNSUBSCRIBED';
+    contact.updatedAt = new Date().toISOString();
+    return true;
+  }
+
   findMessageForEvent(input: string | { internalId?: string; rfcMessageId?: string; sesMessageId?: string; recipient?: string }) {
     const ids = typeof input === 'string' ? [input] : [input.internalId, input.rfcMessageId, input.sesMessageId].filter(Boolean) as string[];
     const recipient = typeof input === 'string' ? undefined : input.recipient;
