@@ -4,7 +4,6 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-
 import { authRouter } from './server/routes/auth.js';
 import { messagesRouter } from './server/routes/messages.js';
 import { campaignsRouter } from './server/routes/campaigns.js';
@@ -23,6 +22,7 @@ import { templatesRouter } from './server/routes/templates.js';
 import { db } from './server/store.js';
 import { kumoMtaService } from './server/services/KumoMtaService.js';
 import { sesProvider } from './server/services/SesProvider.js';
+import { supabaseService } from './server/services/SupabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,13 +35,16 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
   app.use((req, res, next) => { if (req.path.startsWith('/api') && req.path !== '/api/metrics') console.log(`[API] ${req.method} ${req.path}`); next(); });
 
-  app.get('/api/health', async (req, res) => {
-    const kumoHealth = await kumoMtaService.checkHealth();
-    const sesHealth = await sesProvider.checkHealth();
-    const isHealthy = kumoHealth.status === 'healthy';
-    res.status(200).json({ status: isHealthy ? 'healthy' : 'degraded', timestamp: new Date().toISOString(), services: { api: 'healthy', database: 'healthy', kumomta: kumoHealth, amazon_ses: sesHealth } });
+  app.get('/api/health', async (_req, res) => {
+    const [kumoHealth, sesHealth, database] = await Promise.all([
+      kumoMtaService.checkHealth(),
+      sesProvider.checkHealth(),
+      supabaseService.health(),
+    ]);
+    const status = kumoHealth.status === 'healthy' && database.healthy ? 'healthy' : 'degraded';
+    res.status(status === 'healthy' ? 200 : 503).json({ status, timestamp: new Date().toISOString(), services: { api: 'healthy', database, kumomta: kumoHealth, amazon_ses: sesHealth } });
   });
-  app.get('/api/health/kumomta', async (req, res) => { const kumoHealth = await kumoMtaService.checkHealth(); res.status(kumoHealth.status === 'healthy' ? 200 : 503).json(kumoHealth); });
+  app.get('/api/health/kumomta', async (_req, res) => { const kumoHealth = await kumoMtaService.checkHealth(); res.status(kumoHealth.status === 'healthy' ? 200 : 503).json(kumoHealth); });
   app.get('/api/dashboard/stats', (req, res) => res.json(db.getDashboardStats()));
 
   app.use('/api/auth', authRouter);
@@ -55,7 +58,7 @@ async function startServer() {
   app.use('/api/settings', settingsRouter);
   app.use('/api/metrics', metricsRouter);
   app.use('/api/webhooks', webhooksRouter);
-  app.use('/api/seed', seedRouter);
+  if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO_DATA === 'true') app.use('/api/seed', seedRouter);
   app.use('/api/tracking', trackingRouter);
   app.use('/api/unsubscribe', unsubscribeRouter);
   app.use('/api/templates', templatesRouter);
