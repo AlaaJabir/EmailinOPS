@@ -42,13 +42,8 @@ export function App() {
     return fetch(apiUrl, { ...options, headers: { ...getAuthHeaders(), ...(options.headers || {}) } });
   }, [getAuthHeaders]);
 
-  const addToast = (type: 'success' | 'error' | 'info', title: string, message?: string) => {
-    const id = `toast_${Date.now()}_${Math.random()}`;
-    setToasts(prev => [...prev, { id, type, title, message }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
-  };
+  const addToast = (type: 'success' | 'error' | 'info', title: string, message?: string) => { const id = `toast_${Date.now()}_${Math.random()}`; setToasts(prev => [...prev, { id, type, title, message }]); setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000); };
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
-
   const fetchStats = useCallback(async () => { try { const res = await authFetch('/api/dashboard/stats'); if (res.ok) setStats(await res.json()); } catch (e) { console.error(e); } }, [authFetch]);
   const fetchMessages = useCallback(async () => { try { const res = await authFetch('/api/messages?limit=100'); if (res.ok) { const d = await res.json(); setMessages(d.messages || []); } } catch (e) { console.error(e); } }, [authFetch]);
   const fetchSendersAndDomains = useCallback(async () => { try { const [a,b] = await Promise.all([authFetch('/api/senders'), authFetch('/api/senders/domains')]); if(a.ok){const d=await a.json();setSenders(d.senders||[]);} if(b.ok){const d=await b.json();setDomains(d.domains||[]);} } catch(e){console.error(e);} },[authFetch]);
@@ -57,10 +52,8 @@ export function App() {
   const fetchSuppressions = useCallback(async () => { try { const r=await authFetch('/api/suppressions'); if(r.ok){const d=await r.json();setSuppressions(d.suppressions||[]);} } catch(e){console.error(e);} },[authFetch]);
   const fetchLogs = useCallback(async () => { try { const r=await authFetch('/api/logs?limit=100'); if(r.ok){const d=await r.json();setLogs(d.logs||[]);} } catch(e){console.error(e);} },[authFetch]);
   const fetchSettings = useCallback(async () => { try { const r=await authFetch('/api/settings'); if(r.ok){const d=await r.json();setSettings(d.settings||{});setApiKeys(d.apiKeys||[]);} } catch(e){console.error(e);} },[authFetch]);
-
   const refreshAll = useCallback(async () => { setIsLoading(true); try { await Promise.all([fetchStats(),fetchMessages(),fetchSendersAndDomains(),fetchCampaigns(),fetchContactsAndLists(),fetchSuppressions(),fetchLogs(),fetchSettings()]); } finally { setIsLoading(false); } },[fetchStats,fetchMessages,fetchSendersAndDomains,fetchCampaigns,fetchContactsAndLists,fetchSuppressions,fetchLogs,fetchSettings]);
   useEffect(() => { refreshAll(); const id=setInterval(()=>{fetchStats();fetchMessages();},6000); return ()=>clearInterval(id); },[refreshAll,fetchStats,fetchMessages]);
-
   const jsonAction = async (url:string, body:any, success:string) => { try { const r=await authFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const d=await r.json(); if(!r.ok){addToast('error','Request Failed',d.error||'Request failed');return false;} addToast('success',success); await refreshAll(); return true; } catch(e:any){addToast('error','Connection Error',e.message);return false;} };
   const handleSendEmail = (payload:any) => jsonAction('/api/messages/send',payload,'Email injected into KumoMTA spool');
   const handleSendTest = (payload:any) => jsonAction('/api/messages/test',payload,`Test dispatched to ${payload.testEmail}`);
@@ -81,12 +74,9 @@ export function App() {
 
   if (isAuthLoading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"/></div>;
   if (!user) return <><AuthView/><ToastContainer toasts={toasts} onDismiss={removeToast}/></>;
-
-  return <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex antialiased font-sans">
-    <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} queueCount={stats?.queueSize} user={{name:profile?.fullName||user.email?.split('@')[0],email:user.email,role:profile?.role,plan:profile?.plan}} onLogout={logout}/>
-    <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto"><Header onSimulateTraffic={handleSimulateTraffic} isSimulating={isSimulating} onOpenQuickSend={()=>setCurrentTab('send')}/><main className="flex-1 pb-16">
+  return <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex antialiased font-sans"><Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} queueCount={stats?.queueSize} user={{name:profile?.fullName||user.email?.split('@')[0],email:user.email,role:profile?.role,plan:profile?.plan}} onLogout={logout}/><div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto"><Header onSimulateTraffic={handleSimulateTraffic} isSimulating={isSimulating} onOpenQuickSend={()=>setCurrentTab('send')}/><main className="flex-1 pb-16">
       {currentTab==='dashboard'&&<DashboardView stats={stats} recentMessages={messages.slice(0,10)} onSelectMessage={setSelectedMessage} onNavigateToSend={()=>setCurrentTab('send')} onRefresh={refreshAll} isLoading={isLoading} authFetch={authFetch}/>} 
-      {currentTab==='send'&&<SendEmailView senders={senders} domains={domains} contacts={contacts} onSendEmail={handleSendEmail} onSendTest={handleSendTest}/>} 
+      {currentTab==='send'&&<SendEmailView senders={senders} domains={domains} contacts={contacts} onSendEmail={handleSendEmail} onSendTest={handleSendTest} authFetch={authFetch}/>} 
       {currentTab==='senders'&&<SendersView senders={senders} domains={domains} onAddSender={handleAddSender} onAddDomain={handleAddDomain}/>} 
       {currentTab==='campaigns'&&<CampaignsView campaigns={campaigns} senders={senders} lists={lists} onCreateCampaign={handleCreateCampaign} onUpdateCampaignStatus={handleUpdateCampaignStatus} onRunCampaign={handleRunCampaign}/>} 
       {currentTab==='messages'&&<MessagesView messages={messages} senders={senders} campaigns={campaigns} onSelectMessage={setSelectedMessage} onRefresh={fetchMessages} isLoading={isLoading}/>} 
@@ -95,8 +85,6 @@ export function App() {
       {currentTab==='analytics'&&<AnalyticsView stats={stats} senders={senders} campaigns={campaigns}/>} 
       {currentTab==='logs'&&<LogsView logs={logs} onRefresh={fetchLogs} isLoading={isLoading}/>} 
       {currentTab==='settings'&&<SettingsView settings={settings} apiKeys={apiKeys} onSaveSettings={handleSaveSettings} onCreateApiKey={handleCreateApiKey} onRevokeApiKey={handleRevokeApiKey}/>} 
-    </main></div>
-    <MessageDetailModal message={selectedMessage} onClose={()=>setSelectedMessage(null)}/><ToastContainer toasts={toasts} onDismiss={removeToast}/>
-  </div>;
+    </main></div><MessageDetailModal message={selectedMessage} onClose={()=>setSelectedMessage(null)}/><ToastContainer toasts={toasts} onDismiss={removeToast}/></div>;
 }
 export default App;
