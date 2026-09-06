@@ -1,19 +1,22 @@
 import { Router, Request, Response } from 'express';
-import { Sender, Domain } from '../../src/types.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { supabaseService } from '../services/SupabaseService.js';
 import { db } from '../store.js';
 
 export const sendersRouter = Router();
 
+function allowLocalFallback() { return process.env.NODE_ENV !== 'production'; }
+
 sendersRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
   if (req.user && supabaseService.isConfigured) return res.json({ senders: await supabaseService.getSenders(req.user.id) });
-  return res.json({ senders: db.senders });
+  if (allowLocalFallback()) return res.json({ senders: db.senders });
+  return res.status(401).json({ error: 'Authentication required' });
 });
 
 sendersRouter.get('/domains', optionalAuth, async (req: Request, res: Response) => {
   if (req.user && supabaseService.isConfigured) return res.json({ domains: await supabaseService.getDomains(req.user.id) });
-  return res.json({ domains: db.domains });
+  if (allowLocalFallback()) return res.json({ domains: db.domains });
+  return res.status(401).json({ error: 'Authentication required' });
 });
 
 sendersRouter.post('/', optionalAuth, async (req: Request, res: Response) => {
@@ -21,7 +24,8 @@ sendersRouter.post('/', optionalAuth, async (req: Request, res: Response) => {
   const { name, fromEmail, replyTo, domainId, dailyLimit, hourlyLimit } = req.body;
   if (!name || !fromEmail) return res.status(400).json({ error: 'Name and fromEmail are required' });
   const normalized = String(fromEmail).trim().toLowerCase();
-  const domain = (await supabaseService.getDomains(req.user.id)).find((d) => d.id === domainId) || (await supabaseService.getDomains(req.user.id)).find((d) => normalized.endsWith(`@${d.domainName}`));
+  const domains = await supabaseService.getDomains(req.user.id);
+  const domain = domains.find((d) => d.id === domainId) || domains.find((d) => normalized.endsWith(`@${d.domainName}`));
   if (!domain) return res.status(400).json({ error: 'A valid sending domain belonging to this account is required' });
   const sender = { user_id: req.user.id, domain_id: domain.id, name: String(name).trim(), from_email: normalized, reply_to: replyTo ? String(replyTo).trim().toLowerCase() : normalized, status: 'active', verification: domain.spfStatus === 'VERIFIED' && domain.dkimStatus === 'VERIFIED' && domain.dmarcStatus === 'VERIFIED' ? 'VERIFIED' : 'PENDING', daily_limit: Number(dailyLimit) || 50000, hourly_limit: Number(hourlyLimit) || 5000 };
   const client = supabaseService.getClient()!;
