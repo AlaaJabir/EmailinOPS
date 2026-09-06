@@ -1,172 +1,98 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../store.js';
-import { Contact, ContactList } from '../../src/types.js';
 import { optionalAuth } from '../middleware/auth.js';
+import { db } from '../store.js';
 import { supabaseService } from '../services/SupabaseService.js';
 
 export const contactsRouter = Router();
 
-// GET /api/contacts - List contacts with filter & search (scoped to user)
+function requirePersistence(req: Request, res: Response) {
+  if (!req.user || !supabaseService.isConfigured || !supabaseService.getClient()) {
+    res.status(503).json({ error: 'Authenticated Supabase persistence is required' });
+    return false;
+  }
+  return true;
+}
+
 contactsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
-  const { search, status, listId } = req.query;
-  let list: Contact[] = [];
-  if (req.user && supabaseService.isConfigured) {
-    list = await supabaseService.getContacts(req.user.id);
-  } else {
-    list = [...db.contacts];
-  }
-
-  if (search && typeof search === 'string') {
-    const q = search.toLowerCase();
-    list = list.filter(
-      (c) =>
-        c.email.toLowerCase().includes(q) ||
-        (c.firstName && c.firstName.toLowerCase().includes(q)) ||
-        (c.lastName && c.lastName.toLowerCase().includes(q)) ||
-        (c.company && c.company.toLowerCase().includes(q))
-    );
-  }
-
-  if (status && typeof status === 'string' && status !== 'ALL') {
-    list = list.filter((c) => c.status === status);
-  }
-
-  res.json({ contacts: list });
+  if (!req.user || !supabaseService.isConfigured) return res.status(401).json({ error: 'Authentication required' });
+  try {
+    let contacts = await supabaseService.getContacts(req.user.id);
+    const { search, status, listId } = req.query;
+    if (listId && typeof listId === 'string') {
+      const { data: members, error } = await supabaseService.getClient()!.from('contact_list_members').select('contact_id').eq('list_id', listId);
+      if (error) return res.status(400).json({ error: error.message });
+      const ids = new Set((members || []).map((m: any) => m.contact_id));
+      contacts = contacts.filter((c) => ids.has(c.id));
+    }
+    if (search && typeof search === 'string') {
+      const q = search.toLowerCase();
+      contacts = contacts.filter((c) => c.email.toLowerCase().includes(q) || c.firstName?.toLowerCase().includes(q) || c.lastName?.toLowerCase().includes(q) || c.company?.toLowerCase().includes(q));
+    }
+    if (status && typeof status === 'string' && status !== 'ALL') contacts = contacts.filter((c) => c.status === status);
+    return res.json({ contacts });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/contacts - Add single contact
-contactsRouter.post('/', (req: Request, res: Response) => {
+contactsRouter.post('/', optionalAuth, async (req: Request, res: Response) => {
+  if (!requirePersistence(req, res)) return;
   const { email, firstName, lastName, company, tags, listId } = req.body;
-
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
-  }
-
-  const existing = db.contacts.find((c) => c.email.toLowerCase() === email.toLowerCase());
-  if (existing) {
-    return res.status(409).json({ error: 'Contact already exists' });
-  }
-
-  const newContact: Contact = {
-    id: `cnt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    email: email.toLowerCase(),
-    firstName,
-    lastName,
-    company,
-    tags: Array.isArray(tags) ? tags : tags ? [tags] : [],
-    status: 'ACTIVE',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  db.contacts.unshift(newContact);
-
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized || !normalized.includes('@')) return res.status(400).json({ error: 'Valid email is required' });
+  const client = supabaseService.getClient()!;
+  const { data: existing } = await client.from('contacts').select('id').eq('user_id', req.user!.id).eq('email', normalized).maybeSingle();
+  if (existing) return res.status(409).json({ error: 'Contact already exists' });
+  const { data, error } = await client.from('contacts').insert({ user_id: req.user!.id, email: normalized, first_name: firstName || null, last_name: lastName || null, company: company || null, tags: Array.isArray(tags) ? tags : tags ? [tags] : [], status: 'ACTIVE' }).select('*').single();
+  if (error) return res.status(400).json({ error: error.message });
   if (listId) {
-    db.listMemberships.push({
-      listId,
-      contactId: newContact.id,
-      joinedAt: new Date().toISOString(),
-    });
-    const targetList = db.contactLists.find((l) => l.id === listId);
-    if (targetList) targetList.memberCount += 1;
+    const { error: memberError } = await client.from('contact_list_members').insert({ list_id: listId, contact_id: data.id });
+    if (memberError) return res.status(400).json({ error: memberError.message });
   }
-
-  res.json({ success: true, contact: newContact });
+  return res.status(201).json({ success: true, contact: { id: data.id, email: data.email, firstName: data.first_name, lastName: data.last_name, company: data.company, tags: data.tags || [], status: data.status, createdAt: data.created_at, updatedAt: data.updated_at } });
 });
 
-// POST /api/contacts/import - Import CSV contacts
-contactsRouter.post('/import', (req: Request, res: Response) => {
+contactsRouter.post('/import', optionalAuth, async (req: Request, res: Response) => {
+  if (!requirePersistence(req, res)) return;
   const { contacts, listId } = req.body;
-
-  if (!Array.isArray(contacts) || contacts.length === 0) {
-    return res.status(400).json({ error: 'Valid array of contacts required' });
-  }
-
-  let imported = 0;
-  let skippedSuppressed = 0;
-  let skippedDuplicates = 0;
-
+  if (!Array.isArray(contacts) || !contacts.length) return res.status(400).json({ error: 'Valid array of contacts required' });
+  const client = supabaseService.getClient()!;
+  const { data: existingRows } = await client.from('contacts').select('email').eq('user_id', req.user!.id);
+  const existing = new Set((existingRows || []).map((r: any) => String(r.email).toLowerCase()));
+  const { data: suppressionRows } = await client.from('suppressions').select('email').eq('user_id', req.user!.id);
+  const suppressed = new Set((suppressionRows || []).map((r: any) => String(r.email).toLowerCase()));
+  const rows: any[] = [];
+  let skippedSuppressed = 0, skippedDuplicates = 0;
   for (const item of contacts) {
-    if (!item.email || !item.email.includes('@')) continue;
-    const emailNorm = item.email.toLowerCase().trim();
-
-    // Check suppression
-    if (db.suppressions.some((s) => s.email.toLowerCase() === emailNorm)) {
-      skippedSuppressed++;
-      continue;
-    }
-
-    // Check duplicate
-    if (db.contacts.some((c) => c.email.toLowerCase() === emailNorm)) {
-      skippedDuplicates++;
-      continue;
-    }
-
-    const newContact: Contact = {
-      id: `cnt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      email: emailNorm,
-      firstName: item.firstName || item.name?.split(' ')[0],
-      lastName: item.lastName || item.name?.split(' ').slice(1).join(' '),
-      company: item.company,
-      tags: item.tags ? (Array.isArray(item.tags) ? item.tags : [item.tags]) : ['csv-import'],
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    db.contacts.unshift(newContact);
-    imported++;
-
-    if (listId) {
-      db.listMemberships.push({
-        listId,
-        contactId: newContact.id,
-        joinedAt: new Date().toISOString(),
-      });
+    const email = String(item?.email || '').trim().toLowerCase();
+    if (!email.includes('@')) continue;
+    if (suppressed.has(email)) { skippedSuppressed++; continue; }
+    if (existing.has(email) || rows.some((r) => r.email === email)) { skippedDuplicates++; continue; }
+    rows.push({ user_id: req.user!.id, email, first_name: item.firstName || item.name?.split(' ')[0] || null, last_name: item.lastName || item.name?.split(' ').slice(1).join(' ') || null, company: item.company || null, tags: item.tags ? (Array.isArray(item.tags) ? item.tags : [item.tags]) : ['csv-import'], status: 'ACTIVE' });
+  }
+  let imported = 0;
+  if (rows.length) {
+    const { data, error } = await client.from('contacts').insert(rows).select('id,email');
+    if (error) return res.status(400).json({ error: error.message });
+    imported = data?.length || 0;
+    if (listId && data?.length) {
+      const { error: memberError } = await client.from('contact_list_members').insert(data.map((r: any) => ({ list_id: listId, contact_id: r.id })));
+      if (memberError) return res.status(400).json({ error: memberError.message });
     }
   }
-
-  if (listId) {
-    const targetList = db.contactLists.find((l) => l.id === listId);
-    if (targetList) targetList.memberCount += imported;
-  }
-
-  db.logs.unshift({
-    id: `log_imp_${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    service: 'Application',
-    event: 'CSV_CONTACT_IMPORT_COMPLETED',
-    severity: 'INFO',
-    response: `Imported ${imported} clean contacts (Skipped ${skippedSuppressed} suppressed, ${skippedDuplicates} duplicates)`,
-  });
-
-  res.json({
-    success: true,
-    imported,
-    skippedSuppressed,
-    skippedDuplicates,
-    totalReceived: contacts.length,
-  });
+  return res.json({ success: true, imported, skippedSuppressed, skippedDuplicates, totalReceived: contacts.length });
 });
 
-// GET /api/contacts/lists - Get all contact lists
-contactsRouter.get('/lists', (req: Request, res: Response) => {
-  res.json({ lists: db.contactLists });
+contactsRouter.get('/lists', optionalAuth, async (req: Request, res: Response) => {
+  if (!req.user || !supabaseService.isConfigured) return res.status(401).json({ error: 'Authentication required' });
+  const { data, error } = await supabaseService.getClient()!.from('contact_lists').select('*').eq('user_id', req.user.id).order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json({ lists: data || [] });
 });
 
-// POST /api/contacts/lists - Create contact list
-contactsRouter.post('/lists', (req: Request, res: Response) => {
+contactsRouter.post('/lists', optionalAuth, async (req: Request, res: Response) => {
+  if (!requirePersistence(req, res)) return;
   const { name, description } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
-
-  const newList: ContactList = {
-    id: `lst_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    name,
-    description,
-    memberCount: 0,
-    createdAt: new Date().toISOString(),
-  };
-
-  db.contactLists.unshift(newList);
-  res.json({ success: true, list: newList });
+  const { data, error } = await supabaseService.getClient()!.from('contact_lists').insert({ user_id: req.user!.id, name: String(name).trim(), description: description || null }).select('*').single();
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(201).json({ success: true, list: data });
 });
