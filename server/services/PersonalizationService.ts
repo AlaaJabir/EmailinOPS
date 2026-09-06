@@ -37,23 +37,26 @@ export class PersonalizationService {
    * Determine base URL for unsubscribe, tracking, and compliance links
    */
   getBaseUrl(reqOrHost?: string): string {
-    if (process.env.APP_URL) {
-      return process.env.APP_URL.replace(/\/+$/, '');
-    }
-    if (process.env.BACKEND_URL) {
-      return process.env.BACKEND_URL.replace(/\/+$/, '');
-    }
-    if (process.env.BASE_URL) {
-      return process.env.BASE_URL.replace(/\/+$/, '');
-    }
-    if (reqOrHost) {
-      const host = reqOrHost.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-      const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-      return `${proto}://${host}`;
-    }
-    // Default fallback
-    return 'http://localhost:3000';
+  if (process.env.BACKEND_URL) {
+    return process.env.BACKEND_URL.replace(/\/+$/, '');
   }
+
+  if (process.env.APP_URL) {
+    return process.env.APP_URL.replace(/\/+$/, '');
+  }
+
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL.replace(/\/+$/, '');
+  }
+
+  if (reqOrHost) {
+    const host = reqOrHost.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    return `${proto}://${host}`;
+  }
+
+  return 'http://localhost:3000';
+}
 
   /**
    * Generate an opaque, cryptographically random unsubscribe token
