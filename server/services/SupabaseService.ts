@@ -243,3 +243,5 @@ export class SupabaseService {
     return db.suppressions;
   }
 }
+
+export const supabaseService = new SupabaseService();
