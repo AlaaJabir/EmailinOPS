@@ -1,66 +1,64 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { db } from '../store.js';
+import { requireAuth } from '../middleware/auth.js';
+import { supabaseService } from '../services/SupabaseService.js';
 
 export const settingsRouter = Router();
+settingsRouter.use(requireAuth);
 
-// GET /api/settings - Get configuration settings
-settingsRouter.get('/', (req: Request, res: Response) => {
-  res.json({
-    settings: db.settings,
-    apiKeys: db.apiKeys,
-  });
-});
-
-// POST /api/settings - Update settings
-settingsRouter.post('/', (req: Request, res: Response) => {
-  const { category, values } = req.body;
-  if (!category || !values) {
-    return res.status(400).json({ error: 'Category and values are required' });
+settingsRouter.get('/', async (req: Request, res: Response) => {
+  try {
+    if (supabaseService.isConfigured) {
+      const [settings, apiKeys] = await Promise.all([
+        supabaseService.getSettings(req.user!.id),
+        supabaseService.getApiKeys(req.user!.id),
+      ]);
+      return res.json({ settings, apiKeys });
+    }
+    return res.json({ settings: db.settings, apiKeys: db.apiKeys });
+  } catch (err: any) {
+    return res.status(503).json({ error: err?.message || 'Unable to load settings' });
   }
-
-  db.settings[category] = { ...db.settings[category], ...values };
-
-  db.logs.unshift({
-    id: `log_set_${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    service: 'Application',
-    event: 'CONFIGURATION_UPDATED',
-    severity: 'INFO',
-    response: `Settings category "${category}" updated`,
-    details: values,
-  });
-
-  res.json({ success: true, settings: db.settings });
 });
 
-// POST /api/settings/api-keys - Generate new API key
-settingsRouter.post('/api-keys', (req: Request, res: Response) => {
-  const { name } = req.body;
+settingsRouter.post('/', async (req: Request, res: Response) => {
+  const { category, values } = req.body;
+  if (!category || !values || typeof values !== 'object') return res.status(400).json({ error: 'Category and values are required' });
+  try {
+    if (supabaseService.isConfigured) {
+      const settings = await supabaseService.upsertSettings(req.user!.id, category, values);
+      return res.json({ success: true, settings });
+    }
+    db.settings[category] = { ...(db.settings[category] || {}), ...values };
+    return res.json({ success: true, settings: db.settings });
+  } catch (err: any) {
+    return res.status(503).json({ error: err?.message || 'Unable to save settings' });
+  }
+});
+
+settingsRouter.post('/api-keys', async (req: Request, res: Response) => {
+  const name = String(req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
+  if (!supabaseService.isConfigured) return res.status(503).json({ error: 'Supabase persistence is required for API keys' });
 
-  const rawKey = `em_live_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
-  const keyPrefix = rawKey.substring(0, 12) + '...';
-
-  const keyObj = {
-    id: `key_${Date.now()}`,
-    name,
-    keyPrefix,
-    createdAt: new Date().toISOString(),
-    lastUsedAt: undefined,
-  };
-
-  db.apiKeys.unshift(keyObj);
-
-  res.json({
-    success: true,
-    apiKey: keyObj,
-    secretToken: rawKey, // Only shown once upon creation
-  });
+  const rawKey = `em_live_${crypto.randomBytes(24).toString('base64url')}`;
+  const keyPrefix = `${rawKey.slice(0, 12)}...`;
+  const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+  try {
+    const apiKey = await supabaseService.createApiKey(req.user!.id, name, keyPrefix, keyHash);
+    return res.json({ success: true, apiKey, secretToken: rawKey });
+  } catch (err: any) {
+    return res.status(503).json({ error: err?.message || 'Unable to create API key' });
+  }
 });
 
-// DELETE /api/settings/api-keys/:id - Revoke API key
-settingsRouter.delete('/api-keys/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  db.apiKeys = db.apiKeys.filter((k) => k.id !== id);
-  res.json({ success: true, message: 'API Key revoked' });
+settingsRouter.delete('/api-keys/:id', async (req: Request, res: Response) => {
+  if (!supabaseService.isConfigured) return res.status(503).json({ error: 'Supabase persistence is required for API keys' });
+  try {
+    await supabaseService.revokeApiKey(req.user!.id, req.params.id);
+    return res.json({ success: true, message: 'API Key revoked' });
+  } catch (err: any) {
+    return res.status(503).json({ error: err?.message || 'Unable to revoke API key' });
+  }
 });
