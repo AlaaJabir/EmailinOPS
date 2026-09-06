@@ -1,6 +1,6 @@
 import React from 'react';
 import { PowerDashboardView } from './PowerDashboardView';
-import { DashboardStats, Message } from '../types';
+import { DashboardStats, Message, ServiceLog } from '../types';
 
 interface DashboardViewProps {
   stats: DashboardStats | null;
@@ -10,6 +10,7 @@ interface DashboardViewProps {
   onRefresh: () => void;
   isLoading: boolean;
   authFetch?: (url: string, options?: RequestInit) => Promise<Response>;
+  logs?: ServiceLog[];
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = (props) => <PowerDashboardView {...props} />;
