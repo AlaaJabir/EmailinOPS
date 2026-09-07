@@ -18,7 +18,11 @@ import { SettingsView } from './views/SettingsView';
 import { ImportHistoryPanel } from './components/ImportHistoryPanel';
 import { DashboardStats, Message, Sender, Domain, Campaign, Contact, ContactList, Suppression, ServiceLog, ApiKey } from './types';
 
-const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || import.meta.env.NEXT_PUBLIC_API_URL || 'https://api.emailinops.com').replace(/\/$/, '');
+const API_BASE_URL = String(
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.NEXT_PUBLIC_API_URL ||
+  'https://emailops-api.amiralucia.com'
+).replace(/\/$/, '');
 
 export function App() {
   const { user, profile, logout, isLoading: isAuthLoading, getAuthHeaders } = useAuth();
@@ -61,7 +65,7 @@ export function App() {
   const handleSendTest=(payload:any)=>jsonAction('/api/messages/test',payload,`Test dispatched to ${payload.testEmail}`);
   const handleAddSender=(d:any)=>jsonAction('/api/senders',d,'Sender identity registered');
   const handleAddDomain=(d:any)=>jsonAction('/api/senders/domains',d,'Domain registered');
-  const handleCreateCampaign=(d:any)=>jsonAction('/api/campaigns',d,`Campaign "${d.name}" created`);
+  const handleCreateCampaign=(d:any)=>jsonAction('/api/campaigns',d,`Campaign \"${d.name}\" created`);
   const handleUpdateCampaignStatus=async(id:string,status:string)=>{try{const r=await authFetch(`/api/campaigns/${id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});const text=await r.text();let d:any={};try{d=text?JSON.parse(text):{};}catch{}if(!r.ok){addToast('error','Campaign Update Failed',d.error||'Request failed');return;}addToast('info','Campaign Updated',status);await fetchCampaigns();}catch(e:any){addToast('error','Connection Error',e.message);}};
   const handleRunCampaign=async(id:string)=>{try{const r=await authFetch(`/api/campaigns/${id}/send`,{method:'POST'});const text=await r.text();let d:any={};try{d=text?JSON.parse(text):{};}catch{}if(!r.ok){addToast('error','Campaign Dispatch Failed',d.error||'Failed');return;}addToast('success','Campaign Dispatched',`Sent ${d.summary?.sentCount||0}; suppressed ${d.summary?.suppressedCount||0}; failed ${d.summary?.failedCount||0}`);await refreshAll();}catch(e:any){addToast('error','Broadcast Error',e.message);}};
   const handleAddContact=(d:any)=>jsonAction('/api/contacts',d,'Contact added');
