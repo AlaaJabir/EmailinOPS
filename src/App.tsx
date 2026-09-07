@@ -18,6 +18,8 @@ import { SettingsView } from './views/SettingsView';
 import { ImportHistoryPanel } from './components/ImportHistoryPanel';
 import { DashboardStats, Message, Sender, Domain, Campaign, Contact, ContactList, Suppression, ServiceLog, ApiKey } from './types';
 
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || import.meta.env.NEXT_PUBLIC_API_URL || 'https://api.emailinops.com').replace(/\/$/, '');
+
 export function App() {
   const { user, profile, logout, isLoading: isAuthLoading, getAuthHeaders } = useAuth();
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -38,8 +40,7 @@ export function App() {
   const [isLoading, setIsLoading] = useState(false);
 
   const authFetch = useCallback((url: string, options: RequestInit = {}) => {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-    const apiUrl = url.startsWith('http') ? url : apiBaseUrl + url;
+    const apiUrl = url.startsWith('http') ? url : API_BASE_URL + url;
     return fetch(apiUrl, { ...options, headers: { ...getAuthHeaders(), ...(options.headers || {}) } });
   }, [getAuthHeaders]);
 
