@@ -166,8 +166,12 @@ export class KumoMtaService {
       throw new Error(errorText);
     }
 
-    const sender = db.senders.find((s) => s.fromEmail.toLowerCase() === payload.fromEmail.toLowerCase());
-    const senderId = sender ? sender.id : db.senders[0]?.id || 'snd_01';
+    let sender = db.senders.find((s) => s.fromEmail.toLowerCase() === payload.fromEmail.toLowerCase());
+    if (payload.userId && supabaseService.isConfigured && supabaseService.getClient()) {
+      const supabaseSenders = await supabaseService.getSenders(payload.userId);
+      sender = supabaseSenders.find((s) => s.fromEmail.toLowerCase() === payload.fromEmail.toLowerCase());
+    }
+    const senderId = sender?.id || 'snd_01';
     const senderDisplayName = payload.fromName || sender?.name || this.config.fromName;
     const sesConfigurationSet = process.env.SES_CONFIGURATION_SET || db.settings?.ses?.configurationSet;
     const customHeaders: Record<string, string> = {
@@ -224,7 +228,7 @@ export class KumoMtaService {
       db.messageEvents.push(initialEvent);
       supabaseService.saveMessage(newMsg, payload.userId || 'usr_admin_01').catch(() => {});
       supabaseService.saveMessageEvent(initialEvent, payload.userId || 'usr_admin_01').catch(() => {});
-      if (sender) sender.sentCount += 1;
+      if (sender && 'sentCount' in sender) sender.sentCount += 1;
       this.logEvent('SUBMISSION_ACCEPTED', 'SUCCESS', `KumoMTA accepted email for spooling in ${latencyMs}ms: ${smtpResponse}`, { internalId, rfcMessageId, kumoHost: this.config.host, kumoPort: this.config.port, latencyMs, accepted: info.accepted, rejected: info.rejected, response: smtpResponse }, rfcMessageId);
       return { success: true, messageId: internalId, rfcMessageId, kumoResponse: smtpResponse, provider: 'KumoMTA', status: messageStatus, smtpResponse, accepted: (info.accepted as string[]) || [primaryTo], rejected: (info.rejected as string[]) || [], latencyMs };
     } catch (err: any) {
