@@ -1,12 +1,14 @@
 import React from 'react';
 import { PowerDashboardView } from './PowerDashboardView';
-import { DashboardStats, Message, ServiceLog } from '../types';
+import { DashboardStats, Domain, Message, ServiceLog } from '../types';
 
 interface DashboardViewProps {
   stats: DashboardStats | null;
+  domains?: Domain[];
   recentMessages: Message[];
   onSelectMessage: (message: Message) => void;
   onNavigateToSend: () => void;
+  onNavigateToCampaigns?: () => void;
   onRefresh: () => void;
   isLoading: boolean;
   authFetch?: (url: string, options?: RequestInit) => Promise<Response>;
