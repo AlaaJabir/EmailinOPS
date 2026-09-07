@@ -25,6 +25,11 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const API_BASE_URL = String(
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.NEXT_PUBLIC_API_URL ||
+  'https://emailops-api.amiralucia.com'
+).replace(/\/$/, '');
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -35,9 +40,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (currentUser: SupabaseUser, currentToken?: string) => {
     try {
-      // First attempt to get profile via authenticated backend API
       if (currentToken) {
-        const res = await fetch((import.meta.env.VITE_API_BASE_URL || '') + '/api/auth/me', {
+        const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: {
             Authorization: `Bearer ${currentToken}`,
           },
@@ -57,7 +61,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Fallback: derive from user metadata or profile table
       const meta = currentUser.user_metadata || {};
       setProfile({
         id: currentUser.id,
@@ -67,7 +70,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         plan: meta.plan || 'PRO',
       });
     } catch {
-      // In case of network glitch, populate safe defaults from JWT metadata
       const meta = currentUser.user_metadata || {};
       setProfile({
         id: currentUser.id,
@@ -87,7 +89,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let mounted = true;
 
-    // 1. Get initial session
     supabase.auth.getSession().then(({ data: { session: initSession }, error: sessionError }) => {
       if (!mounted) return;
       if (sessionError) {
@@ -101,7 +102,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     });
 
-    // 2. Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!mounted) return;
       setSession(newSession);
@@ -178,7 +178,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: authError.message };
       }
 
-      // Check if email confirmation is required by Supabase project settings
       if (data.user && !data.session) {
         return {
           success: true,
