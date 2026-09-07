@@ -22,24 +22,20 @@ export class SesProvider implements EmailProvider {
 
   async checkHealth(): Promise<{ status: 'healthy' | 'degraded' | 'offline'; region: string; quota: any }> {
     const hasCredentials = Boolean(process.env.SES_SMTP_USERNAME && process.env.SES_SMTP_PASSWORD);
-    const hasEvents = db.messageEvents.some(
-      (e) => e.eventType === 'DELIVERED' || e.eventType === 'BOUNCED' || e.eventType === 'SENT'
-    );
     return {
-      status: hasEvents || hasCredentials ? 'healthy' : 'offline',
+      status: hasCredentials ? 'healthy' : 'offline',
       region: this.region,
       quota: {
-        max24HourSend: 0,
-        sentLast24Hours: db.messages.length,
-        maxSendRate: 0,
-        bounceRatePercent: db.getDashboardStats().bounceRate,
-        complaintRatePercent: 0,
-        accountStatus: hasCredentials ? 'Configured' : hasEvents ? 'Active Webhook Telemetry' : 'Offline / Unconfigured',
+        max24HourSend: null,
+        sentLast24Hours: null,
+        maxSendRate: null,
+        bounceRatePercent: null,
+        complaintRatePercent: null,
+        accountStatus: hasCredentials ? 'Configured' : 'Offline / Unconfigured',
       },
     };
   }
 
-  // Ingest Amazon SNS Bounce Notification
   async processBounceWebhook(payload: {
     bounceType?: 'Permanent' | 'Transient' | string;
     bouncedRecipients?: Array<{ emailAddress: string; status?: string; diagnosticCode?: string }>;
@@ -56,7 +52,6 @@ export class SesProvider implements EmailProvider {
     });
   }
 
-  // Ingest Amazon SNS Complaint Notification
   async processComplaintWebhook(payload: {
     complainedRecipients?: Array<{ emailAddress: string }>;
     complaintFeedbackType?: string;
@@ -73,8 +68,7 @@ export class SesProvider implements EmailProvider {
     });
   }
 
-  // Process arbitrary SES event notification
-  async processNotification(payload: SesEventPayload, meta?: { snsMessageId?: string; topicArn?: string }) {
+  processNotification(payload: SesEventPayload, meta?: { snsMessageId?: string; topicArn?: string }) {
     return eventProcessor.processSesNotification(payload, meta);
   }
 }
