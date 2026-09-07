@@ -23,6 +23,32 @@ interface ImportRecord {
 
 const resumeKey = (file: File) => `emailops-import:${file.name}:${file.size}`;
 
+const readJson = async <T = any>(response: Response, fallbackMessage: string): Promise<T> => {
+  const text = await response.text();
+  let data: any = null;
+
+  if (text.trim()) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      const contentType = response.headers.get('content-type') || 'unknown';
+      const looksLikeHtml = /<\s*!doctype\s+html|<\s*html[\s>]/i.test(text);
+      if (looksLikeHtml) {
+        throw new Error(`API returned HTML instead of JSON (HTTP ${response.status}). Check the API server, Nginx proxy, and VITE_API_BASE_URL.`);
+      }
+      throw new Error(`Invalid API response (HTTP ${response.status}, ${contentType}).`);
+    }
+  } else {
+    data = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || data?.message || fallbackMessage);
+  }
+
+  return data as T;
+};
+
 export const ImportHistoryPanel: React.FC<{
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
   onUseAudience: (listId: string) => void;
@@ -36,10 +62,8 @@ export const ImportHistoryPanel: React.FC<{
   const load = async () => {
     try {
       const r = await authFetch('/api/imports');
-      if (r.ok) {
-        const d = await r.json();
-        setImports(d.imports || []);
-      }
+      const d = await readJson<{ imports?: ImportRecord[] }>(r, 'Failed to load import history');
+      setImports(d.imports || []);
     } catch (e: any) {
       setError(e.message || 'Failed to load import history');
     }
@@ -55,7 +79,7 @@ export const ImportHistoryPanel: React.FC<{
 
     try {
       const historyResponse = await authFetch('/api/imports');
-      const historyData = historyResponse.ok ? await historyResponse.json() : { imports: [] };
+      const historyData = await readJson<{ imports?: ImportRecord[] }>(historyResponse, 'Failed to load import history');
       const history: ImportRecord[] = historyData.imports || [];
 
       const savedId = localStorage.getItem(resumeKey(file));
@@ -75,9 +99,8 @@ export const ImportHistoryPanel: React.FC<{
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: file.name, filename: file.name, sourceSizeBytes: file.size }),
         });
-        const sd = await start.json();
-        if (!start.ok) throw new Error(sd.error || 'Could not start import');
-        imp = sd.import as ImportRecord;
+        const sd = await readJson<{ import: ImportRecord }>(start, 'Could not start import');
+        imp = sd.import;
       }
 
       localStorage.setItem(resumeKey(file), imp.id);
@@ -102,10 +125,9 @@ export const ImportHistoryPanel: React.FC<{
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chunk, chunkId, offset, sourceSizeBytes: file.size }),
         });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Import chunk failed');
+        const d = await readJson<{ import: ImportRecord; nextOffset?: number }>(r, 'Import chunk failed');
 
-        imp = d.import as ImportRecord;
+        imp = d.import;
         setCurrent(imp);
         offset = Number(d.nextOffset ?? imp.upload_offset_bytes ?? end);
       }
@@ -115,8 +137,7 @@ export const ImportHistoryPanel: React.FC<{
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
       });
-      const dd = await done.json();
-      if (!done.ok) throw new Error(dd.error || 'Import completion failed');
+      const dd = await readJson<{ import: ImportRecord }>(done, 'Import completion failed');
 
       localStorage.removeItem(resumeKey(file));
       setCurrent(dd.import);
