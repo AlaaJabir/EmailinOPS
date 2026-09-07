@@ -1,6 +1,7 @@
 alter table if exists public.email_imports
   add column if not exists source_size_bytes bigint not null default 0,
-  add column if not exists upload_offset_bytes bigint not null default 0;
+  add column if not exists upload_offset_bytes bigint not null default 0,
+  add column if not exists last_chunk_id text;
 
 -- Import history must preserve every source row, including invalid,
 -- duplicate and suppressed rows. Deduplication is handled by row status,
