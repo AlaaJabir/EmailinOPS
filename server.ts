@@ -9,6 +9,7 @@ import { messagesRouter } from './server/routes/messages.js';
 import { campaignsRouter } from './server/routes/campaigns.js';
 import { sendersRouter } from './server/routes/senders.js';
 import { contactsRouter } from './server/routes/contacts.js';
+import { importsRouter } from './server/routes/imports.js';
 import { suppressionsRouter } from './server/routes/suppressions.js';
 import { analyticsRouter } from './server/routes/analytics.js';
 import { logsRouter } from './server/routes/logs.js';
@@ -66,7 +67,7 @@ async function startServer() {
   app.get('/api/health', async (_req,res)=>{const [kumoHealth,sesHealth,database]=await Promise.all([kumoMtaService.checkHealth(),sesProvider.checkHealth(),supabaseService.health()]);const status=kumoHealth.status==='healthy'&&database.healthy?'healthy':'degraded';res.status(status==='healthy'?200:503).json({status,timestamp:new Date().toISOString(),services:{api:'healthy',database,kumomta:kumoHealth,amazon_ses:sesHealth}});});
   app.get('/api/health/kumomta',async(_req,res)=>{const k=await kumoMtaService.checkHealth();res.status(k.status==='healthy'?200:503).json(k);});
   app.get('/api/dashboard/stats', optionalAuth, async(req,res)=>{if(!req.user||!supabaseService.isConfigured)return res.status(401).json({error:'Authentication required'});try{return res.json(await dashboardStats(req.user.id));}catch(err:any){return res.status(503).json({error:'Failed to load dashboard statistics',details:err?.message||String(err)});}});
-  app.use('/api/auth',authRouter);app.use('/api/messages',messagesRouter);app.use('/api/campaigns',campaignsRouter);app.use('/api/senders',sendersRouter);app.use('/api/contacts',contactsRouter);app.use('/api/suppressions',suppressionsRouter);app.use('/api/analytics',analyticsRouter);app.use('/api/logs',logsRouter);app.use('/api/settings',settingsRouter);app.use('/api/metrics',metricsRouter);app.use('/api/webhooks',webhooksRouter);if(process.env.NODE_ENV!=='production'&&process.env.ENABLE_DEMO_DATA==='true')app.use('/api/seed',seedRouter);app.use('/api/tracking',trackingRouter);app.use('/api/unsubscribe',unsubscribeRouter);app.use('/api/templates',templatesRouter);app.use('/unsubscribe',unsubscribeRouter);
+  app.use('/api/auth',authRouter);app.use('/api/messages',messagesRouter);app.use('/api/campaigns',campaignsRouter);app.use('/api/senders',sendersRouter);app.use('/api/contacts',contactsRouter);app.use('/api/imports',importsRouter);app.use('/api/suppressions',suppressionsRouter);app.use('/api/analytics',analyticsRouter);app.use('/api/logs',logsRouter);app.use('/api/settings',settingsRouter);app.use('/api/metrics',metricsRouter);app.use('/api/webhooks',webhooksRouter);if(process.env.NODE_ENV!=='production'&&process.env.ENABLE_DEMO_DATA==='true')app.use('/api/seed',seedRouter);app.use('/api/tracking',trackingRouter);app.use('/api/unsubscribe',unsubscribeRouter);app.use('/api/templates',templatesRouter);app.use('/unsubscribe',unsubscribeRouter);
   if(process.env.NODE_ENV!=='production'){const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares);}else{const distPath=path.join(process.cwd(),'dist');app.use(express.static(distPath));app.get('*',(req,res)=>res.sendFile(path.join(distPath,'index.html')));}
   app.listen(PORT,'0.0.0.0',()=>console.log(`[EmailOps] Server started on http://0.0.0.0:${PORT}`));
 }
