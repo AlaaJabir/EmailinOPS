@@ -6,14 +6,409 @@ export const importsRouter = Router();
 const BATCH_SIZE = 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function clientOr503(req: Request, res: Response) { if (!req.user || !supabaseService.isConfigured || !supabaseService.getClient()) { res.status(503).json({ error: 'Authenticated Supabase persistence is required' }); return null; } return supabaseService.getClient()!; }
-function parseCsvLine(line: string) { const out:string[]=[]; let cur='',quoted=false; for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){cur+='"';i++;}else quoted=!quoted;}else if(ch===','&&!quoted){out.push(cur.trim());cur='';}else cur+=ch;}out.push(cur.trim());return out.map(v=>v.replace(/^['"]|['"]$/g,'').trim()); }
-function parseRows(text:string,startRow:number){const rows:any[]=[];let rowNumber=startRow;for(const line of text.replace(/\r/g,'').split('\n')){if(!line.trim())continue;const cols=parseCsvLine(line);const email=String(cols[0]||'').trim().toLowerCase();rowNumber++;if(!EMAIL_RE.test(email))rows.push({rowNumber,email:email||'',normalizedEmail:email,firstName:cols[1]||null,lastName:cols[2]||null,company:cols[3]||null,valid:false,reason:'INVALID_EMAIL'});else rows.push({rowNumber,email,normalizedEmail:email,firstName:cols[1]||null,lastName:cols[2]||null,company:cols[3]||null,valid:true});}return rows;}
+type ImportRow = {
+  rowNumber: number;
+  email: string;
+  normalizedEmail: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
+  valid: boolean;
+};
 
-async function processRows(client:any,req:Request,importId:string,rows:any[]){if(!rows.length)return{valid:0,invalid:0,duplicate:0,suppressed:0,imported:0};const userId=req.user!.id;let valid=0,invalid=0,duplicate=0,suppressed=0,imported=0;const unique=new Map<string,any>();for(const r of rows){if(!r.valid){invalid++;continue;}if(!unique.has(r.normalizedEmail))unique.set(r.normalizedEmail,r);else duplicate++;}const emails=[...unique.keys()];if(emails.length){const existingRows=await client.from('email_import_rows').select('normalized_email').eq('import_id',importId).in('normalized_email',emails);if(existingRows.error)throw new Error(existingRows.error.message);for(const r of existingRows.data||[]){unique.delete(String(r.normalized_email));duplicate++;}}if(unique.size){const suppressionRows=await client.from('suppressions').select('email').eq('user_id',userId).in('email',[...unique.keys()]);if(suppressionRows.error)throw new Error(suppressionRows.error.message);const suppressedSet=new Set((suppressionRows.data||[]).map((r:any)=>String(r.email).toLowerCase()));for(const email of suppressedSet){unique.delete(email);suppressed++;}}const staged:any[]=[...unique.values()];valid+=staged.length;for(let i=0;i<staged.length;i+=BATCH_SIZE){const batch:any[]=staged.slice(i,i+BATCH_SIZE);const contactsExisting=await client.from('contacts').select('id,email').eq('user_id',userId).in('email',batch.map((r:any)=>r.normalizedEmail));if(contactsExisting.error)throw new Error(contactsExisting.error.message);const contactMap=new Map<string,string>((contactsExisting.data||[]).map((r:any)=>[String(r.email).toLowerCase(),String(r.id)]));const missing=batch.filter((r:any)=>!contactMap.has(r.normalizedEmail));if(missing.length){const ins=await client.from('contacts').insert(missing.map((r:any)=>({user_id:userId,email:r.normalizedEmail,first_name:r.firstName,last_name:r.lastName,company:r.company,tags:['import'],status:'ACTIVE'}))).select('id,email');if(ins.error)throw new Error(ins.error.message);for(const c of ins.data||[])contactMap.set(String(c.email).toLowerCase(),String(c.id));}const stageRows=batch.map((r:any)=>({import_id:importId,user_id:userId,email:r.email,normalized_email:r.normalizedEmail,first_name:r.firstName,last_name:r.lastName,company:r.company,row_number:r.rowNumber,status:'IMPORTED',contact_id:contactMap.get(r.normalizedEmail)||null}));const stagedInsert=await client.from('email_import_rows').insert(stageRows);if(stagedInsert.error)throw new Error(stagedInsert.error.message);const listMembers=batch.map((r:any)=>({list_id:(req as any).__importListId,contact_id:contactMap.get(r.normalizedEmail)})).filter((r:any)=>r.contact_id);if(listMembers.length){const memberInsert=await client.from('contact_list_members').upsert(listMembers,{onConflict:'list_id,contact_id',ignoreDuplicates:true});if(memberInsert.error)throw new Error(memberInsert.error.message);}imported+=batch.length;await client.from('email_imports').update({processed_rows:imported,imported_rows:imported,valid_rows:valid,invalid_rows:invalid,duplicate_rows:duplicate,suppressed_rows:suppressed,updated_at:new Date().toISOString()}).eq('id',importId).eq('user_id',userId);}return{valid,invalid,duplicate,suppressed,imported};}
+type ImportStats = {
+  processed_rows: number;
+  total_rows: number;
+  valid_rows: number;
+  invalid_rows: number;
+  duplicate_rows: number;
+  suppressed_rows: number;
+  imported_rows: number;
+};
 
-importsRouter.get('/',optionalAuth,async(req,res)=>{const c=clientOr503(req,res);if(!c)return;const{data,error}=await c.from('email_imports').select('*').eq('user_id',req.user!.id).order('created_at',{ascending:false}).limit(100);if(error)return res.status(400).json({error:error.message});return res.json({imports:data||[]});});
-importsRouter.post('/start',optionalAuth,async(req,res)=>{const c=clientOr503(req,res);if(!c)return;const name=String(req.body?.name||req.body?.filename||'Email import').trim().slice(0,200);const filename=String(req.body?.filename||name).trim().slice(0,255);const list=await c.from('contact_lists').insert({user_id:req.user!.id,name,description:`Imported audience · ${filename}`}).select('id').single();if(list.error)return res.status(400).json({error:list.error.message});const created=await c.from('email_imports').insert({user_id:req.user!.id,name,original_filename:filename,status:'PROCESSING',list_id:list.data.id,started_at:new Date().toISOString(),processed_rows:0}).select('*').single();if(created.error)return res.status(400).json({error:created.error.message});return res.status(201).json({success:true,import:created.data});});
-importsRouter.post('/:id/chunk',optionalAuth,async(req,res)=>{const c=clientOr503(req,res);if(!c)return;const found=await c.from('email_imports').select('*').eq('id',req.params.id).eq('user_id',req.user!.id).maybeSingle();if(found.error)return res.status(400).json({error:found.error.message});if(!found.data)return res.status(404).json({error:'Import not found'});if(['COMPLETED','CANCELLED'].includes(found.data.status))return res.status(409).json({error:`Import is ${found.data.status.toLowerCase()}`});const chunk=String(req.body?.chunk||'');if(!chunk)return res.status(400).json({error:'Chunk is required'});const combined=String(found.data.parser_tail||'')+chunk;const parts=combined.replace(/\r/g,'').split('\n');const tail=parts.pop()||'';const rows=parseRows(parts.join('\n'),Number(found.data.processed_rows||0));(req as any).__importListId=found.data.list_id;try{const result=await processRows(c,req,req.params.id,rows);const totalRows=Number(found.data.total_rows||0)+parts.filter(x=>x.trim()).length;await c.from('email_imports').update({parser_tail:tail,total_rows:totalRows,updated_at:new Date().toISOString()}).eq('id',req.params.id).eq('user_id',req.user!.id);return res.json({success:true,...result,processedRows:Number(found.data.processed_rows||0)+rows.length});}catch(err:any){await c.from('email_imports').update({status:'FAILED',error_message:err?.message||String(err),updated_at:new Date().toISOString()}).eq('id',req.params.id).eq('user_id',req.user!.id);return res.status(500).json({error:err?.message||'Import processing failed'});}});
-importsRouter.post('/:id/complete',optionalAuth,async(req,res)=>{const c=clientOr503(req,res);if(!c)return;const found=await c.from('email_imports').select('*').eq('id',req.params.id).eq('user_id',req.user!.id).maybeSingle();if(found.error)return res.status(400).json({error:found.error.message});if(!found.data)return res.status(404).json({error:'Import not found'});(req as any).__importListId=found.data.list_id;try{if(found.data.parser_tail)await processRows(c,req,req.params.id,parseRows(found.data.parser_tail,Number(found.data.processed_rows||0)));const done=await c.from('email_imports').update({status:'COMPLETED',parser_tail:null,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',req.params.id).eq('user_id',req.user!.id).select('*').single();if(done.error)return res.status(400).json({error:done.error.message});return res.json({success:true,import:done.data});}catch(err:any){await c.from('email_imports').update({status:'FAILED',error_message:err?.message||String(err),updated_at:new Date().toISOString()}).eq('id',req.params.id).eq('user_id',req.user!.id);return res.status(500).json({error:err?.message||'Import completion failed'});}});
-importsRouter.post('/:id/cancel',optionalAuth,async(req,res)=>{const c=clientOr503(req,res);if(!c)return;const{data,error}=await c.from('email_imports').update({status:'CANCELLED',completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',req.params.id).eq('user_id',req.user!.id).in('status',['PENDING','PROCESSING','FAILED']).select('*').maybeSingle();if(error)return res.status(400).json({error:error.message});if(!data)return res.status(404).json({error:'Import not found or already finalized'});return res.json({success:true,import:data});});
+function clientOr503(req: Request, res: Response) {
+  const client = supabaseService.getClient();
+  if (!req.user || !supabaseService.isConfigured || !client) {
+    res.status(503).json({ error: 'Authenticated Supabase persistence is required' });
+    return null;
+  }
+  return client;
+}
+
+function parseCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (quoted && line[i + 1] === '"') {
+        cur += '"';
+        i += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (ch === ',' && !quoted) {
+      out.push(cur.trim());
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur.trim());
+  return out.map((value) => value.replace(/^['"]|['"]$/g, '').trim());
+}
+
+function parseRows(text: string, startRow: number): ImportRow[] {
+  const rows: ImportRow[] = [];
+  let rowNumber = startRow;
+  for (const line of text.replace(/\r/g, '').split('\n')) {
+    if (!line.trim()) continue;
+    const cols = parseCsvLine(line);
+    const email = String(cols[0] || '').trim().toLowerCase();
+    rowNumber += 1;
+    rows.push({
+      rowNumber,
+      email,
+      normalizedEmail: email,
+      firstName: cols[1] || null,
+      lastName: cols[2] || null,
+      company: cols[3] || null,
+      valid: EMAIL_RE.test(email),
+    });
+  }
+  return rows;
+}
+
+function addStats(base: ImportStats, delta: { processed: number; total: number; valid: number; invalid: number; duplicate: number; suppressed: number; imported: number }): ImportStats {
+  return {
+    processed_rows: base.processed_rows + delta.processed,
+    total_rows: base.total_rows + delta.total,
+    valid_rows: base.valid_rows + delta.valid,
+    invalid_rows: base.invalid_rows + delta.invalid,
+    duplicate_rows: base.duplicate_rows + delta.duplicate,
+    suppressed_rows: base.suppressed_rows + delta.suppressed,
+    imported_rows: base.imported_rows + delta.imported,
+  };
+}
+
+async function processRows(client: any, req: Request, importId: string, rows: ImportRow[], baseStats: ImportStats, listId: string) {
+  if (!rows.length) return { stats: baseStats, imported: 0, invalid: 0, duplicate: 0, suppressed: 0, valid: 0 };
+
+  const userId = req.user!.id;
+  const rowNumbers = rows.map((row) => row.rowNumber);
+  const existingStage = await client
+    .from('email_import_rows')
+    .select('row_number, normalized_email, contact_id, status')
+    .eq('import_id', importId)
+    .in('row_number', rowNumbers);
+  if (existingStage.error) throw new Error(existingStage.error.message);
+
+  const alreadyProcessed = new Map<number, any>((existingStage.data || []).map((row: any) => [Number(row.row_number), row]));
+  const freshRows = rows.filter((row) => !alreadyProcessed.has(row.rowNumber));
+
+  let invalid = 0;
+  let duplicate = 0;
+  let suppressed = 0;
+  let imported = 0;
+  let valid = 0;
+
+  const firstByEmail = new Map<string, ImportRow>();
+  for (const row of freshRows) {
+    if (!row.valid) {
+      invalid += 1;
+      continue;
+    }
+    if (firstByEmail.has(row.normalizedEmail)) {
+      duplicate += 1;
+      continue;
+    }
+    firstByEmail.set(row.normalizedEmail, row);
+  }
+
+  const candidates = [...firstByEmail.values()];
+  const candidateEmails = candidates.map((row) => row.normalizedEmail);
+
+  const priorSameImport = candidateEmails.length
+    ? await client.from('email_import_rows').select('normalized_email, contact_id, status').eq('import_id', importId).in('normalized_email', candidateEmails)
+    : { data: [], error: null };
+  if (priorSameImport.error) throw new Error(priorSameImport.error.message);
+
+  const priorMap = new Map<string, any>();
+  for (const row of priorSameImport.data || []) priorMap.set(String(row.normalized_email).toLowerCase(), row);
+
+  const suppressionRows = candidateEmails.length
+    ? await client.from('suppressions').select('email').eq('user_id', userId).in('email', candidateEmails)
+    : { data: [], error: null };
+  if (suppressionRows.error) throw new Error(suppressionRows.error.message);
+  const suppressedSet = new Set((suppressionRows.data || []).map((row: any) => String(row.email).toLowerCase()));
+
+  const accepted: ImportRow[] = [];
+  const statusByRow = new Map<number, string>();
+  const contactIdByRow = new Map<number, string | null>();
+
+  for (const row of freshRows) {
+    if (!row.valid) {
+      statusByRow.set(row.rowNumber, 'INVALID');
+      continue;
+    }
+    if (statusByRow.has(row.rowNumber)) continue;
+    if (priorMap.has(row.normalizedEmail)) {
+      duplicate += 1;
+      statusByRow.set(row.rowNumber, 'DUPLICATE');
+      contactIdByRow.set(row.rowNumber, priorMap.get(row.normalizedEmail)?.contact_id || null);
+      continue;
+    }
+    if (suppressedSet.has(row.normalizedEmail)) {
+      suppressed += 1;
+      statusByRow.set(row.rowNumber, 'SUPPRESSED');
+      continue;
+    }
+    accepted.push(row);
+    statusByRow.set(row.rowNumber, 'IMPORTED');
+  }
+
+  valid = accepted.length;
+
+  for (let i = 0; i < accepted.length; i += BATCH_SIZE) {
+    const batch = accepted.slice(i, i + BATCH_SIZE);
+    const emails = batch.map((row) => row.normalizedEmail);
+    const contactsExisting = await client.from('contacts').select('id,email').eq('user_id', userId).in('email', emails);
+    if (contactsExisting.error) throw new Error(contactsExisting.error.message);
+
+    const contactMap = new Map<string, string>((contactsExisting.data || []).map((row: any) => [String(row.email).toLowerCase(), String(row.id)]));
+    const missing = batch.filter((row) => !contactMap.has(row.normalizedEmail));
+
+    if (missing.length) {
+      const inserted = await client
+        .from('contacts')
+        .insert(missing.map((row) => ({
+          user_id: userId,
+          email: row.normalizedEmail,
+          first_name: row.firstName,
+          last_name: row.lastName,
+          company: row.company,
+          tags: ['import'],
+          status: 'ACTIVE',
+        })))
+        .select('id,email');
+
+      if (inserted.error) {
+        const retry = await client.from('contacts').select('id,email').eq('user_id', userId).in('email', missing.map((row) => row.normalizedEmail));
+        if (retry.error) throw new Error(inserted.error.message);
+        for (const contact of retry.data || []) contactMap.set(String(contact.email).toLowerCase(), String(contact.id));
+      } else {
+        for (const contact of inserted.data || []) contactMap.set(String(contact.email).toLowerCase(), String(contact.id));
+      }
+    }
+
+    for (const row of batch) contactIdByRow.set(row.rowNumber, contactMap.get(row.normalizedEmail) || null);
+
+    const listMembers = batch
+      .map((row) => ({ list_id: listId, contact_id: contactMap.get(row.normalizedEmail) }))
+      .filter((member: any) => member.contact_id);
+    if (listMembers.length) {
+      const memberInsert = await client.from('contact_list_members').upsert(listMembers, { onConflict: 'list_id,contact_id', ignoreDuplicates: true });
+      if (memberInsert.error) throw new Error(memberInsert.error.message);
+    }
+    imported += batch.length;
+  }
+
+  const stageRows = freshRows.map((row) => ({
+    import_id: importId,
+    user_id: userId,
+    email: row.email,
+    normalized_email: row.normalizedEmail,
+    first_name: row.firstName,
+    last_name: row.lastName,
+    company: row.company,
+    row_number: row.rowNumber,
+    status: statusByRow.get(row.rowNumber) || 'FAILED',
+    contact_id: contactIdByRow.get(row.rowNumber) || null,
+  }));
+
+  if (stageRows.length) {
+    const stagedInsert = await client.from('email_import_rows').upsert(stageRows, { onConflict: 'import_id,row_number', ignoreDuplicates: true });
+    if (stagedInsert.error) throw new Error(stagedInsert.error.message);
+  }
+
+  const stats = addStats(baseStats, {
+    processed: freshRows.length,
+    total: freshRows.length,
+    valid,
+    invalid,
+    duplicate,
+    suppressed,
+    imported,
+  });
+
+  return { stats, imported, invalid, duplicate, suppressed, valid };
+}
+
+importsRouter.get('/', optionalAuth, async (req, res) => {
+  const client = clientOr503(req, res);
+  if (!client) return;
+  const { data, error } = await client.from('email_imports').select('*').eq('user_id', req.user!.id).order('created_at', { ascending: false }).limit(100);
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json({ imports: data || [] });
+});
+
+importsRouter.post('/start', optionalAuth, async (req, res) => {
+  const client = clientOr503(req, res);
+  if (!client) return;
+  const name = String(req.body?.name || req.body?.filename || 'Email import').trim().slice(0, 200);
+  const filename = String(req.body?.filename || name).trim().slice(0, 255);
+  const sourceSizeBytes = Math.max(0, Number(req.body?.sourceSizeBytes || 0));
+
+  const list = await client.from('contact_lists').insert({ user_id: req.user!.id, name, description: `Imported audience · ${filename}` }).select('id').single();
+  if (list.error) return res.status(400).json({ error: list.error.message });
+
+  const created = await client.from('email_imports').insert({
+    user_id: req.user!.id,
+    name,
+    original_filename: filename,
+    status: 'PROCESSING',
+    list_id: list.data.id,
+    source_size_bytes: sourceSizeBytes,
+    upload_offset_bytes: 0,
+    processed_rows: 0,
+    total_rows: 0,
+    valid_rows: 0,
+    invalid_rows: 0,
+    duplicate_rows: 0,
+    suppressed_rows: 0,
+    imported_rows: 0,
+    started_at: new Date().toISOString(),
+  }).select('*').single();
+
+  if (created.error) return res.status(400).json({ error: created.error.message });
+  return res.status(201).json({ success: true, import: created.data });
+});
+
+importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
+  const client = clientOr503(req, res);
+  if (!client) return;
+
+  const importId = req.params.id;
+  const found = await client.from('email_imports').select('*').eq('id', importId).eq('user_id', req.user!.id).maybeSingle();
+  if (found.error) return res.status(400).json({ error: found.error.message });
+  if (!found.data) return res.status(404).json({ error: 'Import not found' });
+  if (['COMPLETED', 'CANCELLED'].includes(found.data.status)) return res.status(409).json({ error: `Import is ${found.data.status.toLowerCase()}` });
+
+  const chunk = String(req.body?.chunk || '');
+  const chunkId = String(req.body?.chunkId || '');
+  const offset = Math.max(0, Number(req.body?.offset || 0));
+  const sourceSizeBytes = Math.max(0, Number(req.body?.sourceSizeBytes || found.data.source_size_bytes || 0));
+  if (!chunk) return res.status(400).json({ error: 'Chunk is required' });
+  if (!chunkId) return res.status(400).json({ error: 'chunkId is required' });
+
+  if (found.data.last_chunk_id === chunkId) {
+    return res.json({ success: true, duplicateChunk: true, import: found.data, processedRows: Number(found.data.processed_rows || 0), nextOffset: Number(found.data.upload_offset_bytes || 0) });
+  }
+
+  const expectedOffset = Number(found.data.upload_offset_bytes || 0);
+  if (offset !== expectedOffset) {
+    return res.status(409).json({ error: 'Upload offset mismatch', expectedOffset, receivedOffset: offset });
+  }
+
+  const combined = String(found.data.parser_tail || '') + chunk;
+  const parts = combined.replace(/\r/g, '').split('\n');
+  const tail = parts.pop() || '';
+  const rows = parseRows(parts.join('\n'), Number(found.data.processed_rows || 0));
+  const baseStats: ImportStats = {
+    processed_rows: Number(found.data.processed_rows || 0),
+    total_rows: Number(found.data.total_rows || 0),
+    valid_rows: Number(found.data.valid_rows || 0),
+    invalid_rows: Number(found.data.invalid_rows || 0),
+    duplicate_rows: Number(found.data.duplicate_rows || 0),
+    suppressed_rows: Number(found.data.suppressed_rows || 0),
+    imported_rows: Number(found.data.imported_rows || 0),
+  };
+
+  try {
+    const result = await processRows(client, req, importId, rows, baseStats, String(found.data.list_id));
+    const receivedBytes = Buffer.byteLength(chunk, 'utf8');
+    const nextOffset = offset + receivedBytes;
+    const updated = await client.from('email_imports').update({
+      parser_tail: tail,
+      source_size_bytes: sourceSizeBytes,
+      upload_offset_bytes: nextOffset,
+      processed_rows: result.stats.processed_rows,
+      total_rows: result.stats.total_rows,
+      valid_rows: result.stats.valid_rows,
+      invalid_rows: result.stats.invalid_rows,
+      duplicate_rows: result.stats.duplicate_rows,
+      suppressed_rows: result.stats.suppressed_rows,
+      imported_rows: result.stats.imported_rows,
+      updated_at: new Date().toISOString(),
+    }).eq('id', importId).eq('user_id', req.user!.id).select('*').single();
+    if (updated.error) throw new Error(updated.error.message);
+
+    return res.json({
+      success: true,
+      ...result,
+      import: updated.data,
+      processedRows: result.stats.processed_rows,
+      nextOffset,
+      completeBytes: sourceSizeBytes > 0 && nextOffset >= sourceSizeBytes,
+    });
+  } catch (err: any) {
+    await client.from('email_imports').update({ status: 'FAILED', error_message: err?.message || String(err), updated_at: new Date().toISOString() }).eq('id', importId).eq('user_id', req.user!.id);
+    return res.status(500).json({ error: err?.message || 'Import processing failed' });
+  }
+});
+
+importsRouter.post('/:id/complete', optionalAuth, async (req, res) => {
+  const client = clientOr503(req, res);
+  if (!client) return;
+  const found = await client.from('email_imports').select('*').eq('id', req.params.id).eq('user_id', req.user!.id).maybeSingle();
+  if (found.error) return res.status(400).json({ error: found.error.message });
+  if (!found.data) return res.status(404).json({ error: 'Import not found' });
+
+  try {
+    let stats: ImportStats = {
+      processed_rows: Number(found.data.processed_rows || 0),
+      total_rows: Number(found.data.total_rows || 0),
+      valid_rows: Number(found.data.valid_rows || 0),
+      invalid_rows: Number(found.data.invalid_rows || 0),
+      duplicate_rows: Number(found.data.duplicate_rows || 0),
+      suppressed_rows: Number(found.data.suppressed_rows || 0),
+      imported_rows: Number(found.data.imported_rows || 0),
+    };
+
+    if (found.data.parser_tail) {
+      const rows = parseRows(found.data.parser_tail, stats.processed_rows);
+      const result = await processRows(client, req, req.params.id, rows, stats, String(found.data.list_id));
+      stats = result.stats;
+    }
+
+    const done = await client.from('email_imports').update({
+      status: 'COMPLETED',
+      parser_tail: null,
+      processed_rows: stats.processed_rows,
+      total_rows: stats.total_rows,
+      valid_rows: stats.valid_rows,
+      invalid_rows: stats.invalid_rows,
+      duplicate_rows: stats.duplicate_rows,
+      suppressed_rows: stats.suppressed_rows,
+      imported_rows: stats.imported_rows,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', req.params.id).eq('user_id', req.user!.id).select('*').single();
+
+    if (done.error) return res.status(400).json({ error: done.error.message });
+    return res.json({ success: true, import: done.data });
+  } catch (err: any) {
+    await client.from('email_imports').update({ status: 'FAILED', error_message: err?.message || String(err), updated_at: new Date().toISOString() }).eq('id', req.params.id).eq('user_id', req.user!.id);
+    return res.status(500).json({ error: err?.message || 'Import completion failed' });
+  }
+});
+
+importsRouter.post('/:id/cancel', optionalAuth, async (req, res) => {
+  const client = clientOr503(req, res);
+  if (!client) return;
+  const { data, error } = await client.from('email_imports').update({ status: 'CANCELLED', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', req.params.id).eq('user_id', req.user!.id).in('status', ['PENDING', 'PROCESSING', 'FAILED']).select('*').maybeSingle();
+  if (error) return res.status(400).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'Import not found or already finalized' });
+  return res.json({ success: true, import: data });
+});
