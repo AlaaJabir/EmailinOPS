@@ -59,8 +59,6 @@ describe('KumoMTA Real Integration - Step 1 Suite', () => {
 
     it('should report healthy when transporter verify succeeds', async () => {
       const service = new KumoMtaService({ host: '127.0.0.1', port: 25 });
-      
-      // Inject mock successful transporter
       const mockTransporter: any = {
         verify: async () => true,
         sendMail: async () => ({ response: '250 OK' }),
@@ -75,8 +73,6 @@ describe('KumoMTA Real Integration - Step 1 Suite', () => {
 
     it('should report offline with error message when transporter verify fails', async () => {
       const service = new KumoMtaService({ host: '127.0.0.1', port: 25 });
-      
-      // Inject mock failing transporter
       const mockTransporter: any = {
         verify: async () => {
           throw new Error('Connection refused: 127.0.0.1:25');
@@ -140,7 +136,6 @@ describe('KumoMTA Real Integration - Step 1 Suite', () => {
       assert.ok(capturedMailOptions.headers['List-Unsubscribe']);
       assert.ok(capturedMailOptions.headers['X-KumoMTA-Queue']);
 
-      // Check database storage
       const saved = db.messages.find((m) => m.id === result.messageId);
       assert.ok(saved);
       assert.strictEqual(saved?.status, 'QUEUED');
@@ -149,7 +144,6 @@ describe('KumoMTA Real Integration - Step 1 Suite', () => {
 
     it('should handle SMTP 550 rejection and update status to FAILED', async () => {
       const service = new KumoMtaService({ host: '127.0.0.1', port: 25 });
-
       const mockTransporter: any = {
         sendMail: async () => {
           const err: any = new Error('550 5.1.1 Recipient address rejected: User unknown');
@@ -169,11 +163,38 @@ describe('KumoMTA Real Integration - Step 1 Suite', () => {
         await service.submitEmail(payload);
       }, /550 5.1.1 Recipient address rejected/);
 
-      // Check database recorded the failure
       const failedMsg = db.messages.find((m) => m.toEmail === 'nonexistent@invalid-domain.com');
       assert.ok(failedMsg);
       assert.strictEqual(failedMsg?.status, 'FAILED');
       assert.ok(failedMsg?.smtpResponse?.includes('550'));
+    });
+
+    it('should submit successfully when db.settings is undefined', async () => {
+      const originalSettings = db.settings;
+      try {
+        (db as any).settings = undefined;
+        const service = new KumoMtaService({ host: '127.0.0.1', port: 25 });
+        const mockTransporter: any = {
+          sendMail: async (options: any) => ({
+            messageId: options.messageId,
+            response: '250 2.0.0 OK: queued in KumoMTA spool',
+            accepted: [options.to],
+            rejected: [],
+          }),
+        };
+        service.setTransporter(mockTransporter);
+
+        const result = await service.submitEmail({
+          fromEmail: 'alerts@transact.acme-corp.io',
+          to: 'optional-settings@example.com',
+          subject: 'Optional Settings Regression',
+        });
+
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(result.status, 'QUEUED');
+      } finally {
+        (db as any).settings = originalSettings;
+      }
     });
   });
 
@@ -203,7 +224,6 @@ describe('KumoMTA Real Integration - Step 1 Suite', () => {
         subject: 'Security Log Audit',
       });
 
-      // Verify that no log in db.logs contains secretPassword
       for (const log of db.logs) {
         const strLog = JSON.stringify(log);
         assert.strictEqual(
@@ -233,7 +253,6 @@ describe('KumoMTA Real Integration - Step 1 Suite', () => {
       };
       service.setTransporter(mockTransporter);
 
-      // Even if toEmail contains "bounce", real submission goes through transporter
       const result = await service.submitEmail({
         fromEmail: 'security@transact.acme-corp.io',
         to: 'user-bounce-testing@example.com',
