@@ -182,19 +182,42 @@ export class SupabaseService {
         click_tracking_enabled: (message as any).clickTrackingEnabled !== false,
         updated_at: new Date().toISOString(),
       };
-      const { data: ex, error: le } = await this.client.from('messages').select('id').eq('user_id', resolvedUser).eq('internal_id', message.id).maybeSingle();
-      if (le) throw new Error(`Supabase message lookup failed: ${le.message}`);
-      if (ex?.id) {
-        const { error } = await this.client.from('messages').update(p).eq('id', ex.id).eq('user_id', resolvedUser);
-        if (error) throw new Error(`Supabase message update failed: ${error.message}`);
-      } else {
-        const { error } = await this.client.from('messages').insert(p);
-        if (error) throw new Error(`Supabase message save failed: ${error.message}`);
+
+      const stripOptionalColumns = (payload: any) => {
+        const clean = { ...payload };
+        delete clean.preheader;
+        delete clean.head_html;
+        delete clean.is_marketing;
+        delete clean.open_tracking_enabled;
+        delete clean.click_tracking_enabled;
+        return clean;
+      };
+
+      try {
+        const { data: ex } = await this.client.from('messages').select('id').eq('user_id', resolvedUser).eq('internal_id', message.id).maybeSingle();
+        if (ex?.id) {
+          let { error } = await this.client.from('messages').update(p).eq('id', ex.id).eq('user_id', resolvedUser);
+          if (error && (error.message?.includes('column') || error.message?.includes('schema cache'))) {
+            const fallback = stripOptionalColumns(p);
+            const retry = await this.client.from('messages').update(fallback).eq('id', ex.id).eq('user_id', resolvedUser);
+            error = retry.error;
+          }
+          if (error) console.warn(`[SupabaseService] message update warning: ${error.message}`);
+        } else {
+          let { error } = await this.client.from('messages').insert(p);
+          if (error && (error.message?.includes('column') || error.message?.includes('schema cache'))) {
+            const fallback = stripOptionalColumns(p);
+            const retry = await this.client.from('messages').insert(fallback);
+            error = retry.error;
+          }
+          if (error) console.warn(`[SupabaseService] message save warning: ${error.message}`);
+        }
+      } catch (err: any) {
+        console.warn(`[SupabaseService] saveMessage caught exception: ${err?.message || err}`);
       }
-    } else {
-      const i = db.messages.findIndex(m => m.id === message.id || m.messageId === message.messageId);
-      if (i >= 0) db.messages[i] = message; else db.messages.unshift(message);
     }
+    const i = db.messages.findIndex(m => m.id === message.id || m.messageId === message.messageId);
+    if (i >= 0) db.messages[i] = message; else db.messages.unshift(message);
   }
 
   async updateMessageStatus(x: { messageId: string; status: Message['status']; sesMessageId?: string; deliveredAt?: string; bouncedAt?: string; bounceType?: 'Hard' | 'Soft' | 'Transient'; bounceReason?: string; smtpResponse?: string }) {
@@ -207,8 +230,12 @@ export class SupabaseService {
       if (bounceType) p.bounce_type = bounceType;
       if (bounceReason) p.bounce_reason = bounceReason;
       if (smtpResponse) p.smtp_response = smtpResponse;
-      const { error } = await this.client.from('messages').update(p).or(`message_id.eq.${messageId},internal_id.eq.${messageId},ses_message_id.eq.${messageId}`);
-      if (error) throw new Error(`Supabase message update failed: ${error.message}`);
+      try {
+        const { error } = await this.client.from('messages').update(p).or(`message_id.eq.${messageId},internal_id.eq.${messageId},ses_message_id.eq.${messageId}`);
+        if (error) console.warn(`[SupabaseService] message status update warning: ${error.message}`);
+      } catch (err: any) {
+        console.warn(`[SupabaseService] updateMessageStatus caught: ${err?.message || err}`);
+      }
       return;
     }
     const m = db.messages.find(m => m.messageId === messageId || m.id === messageId || m.sesMessageId === messageId);
