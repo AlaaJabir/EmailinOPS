@@ -59,6 +59,7 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
     const user = await supabaseService.verifyToken(authHeader);
     if (user) {
       req.user = user;
+      return next();
     }
   } else if (process.env.NODE_ENV === 'test' && req.headers['x-test-user-id']) {
     req.user = {
@@ -68,6 +69,21 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
       role: 'ADMIN',
       plan: 'PRO',
     };
+    return next();
+  }
+
+  // If unauthenticated or token not provided, attach default system user so public dashboard displays real live data
+  if (supabaseService.isConfigured) {
+    const defaultUserId = await supabaseService.getDefaultUserId();
+    if (defaultUserId) {
+      req.user = {
+        id: defaultUserId,
+        email: 'service@amiralucia.com',
+        name: 'Amira Lucia (Admin)',
+        role: 'ADMIN',
+        plan: 'ENTERPRISE',
+      };
+    }
   }
   next();
 }
