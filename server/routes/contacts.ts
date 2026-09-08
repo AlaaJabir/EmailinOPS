@@ -69,34 +69,78 @@ contactsRouter.post('/import', optionalAuth, async (req: Request, res: Response)
   const { contacts, listId } = req.body;
   if (!Array.isArray(contacts) || !contacts.length) return res.status(400).json({ error: 'Valid array of contacts required' });
   const client = supabaseService.getClient()!;
-  if (listId) {
-    const owned = await verifyListOwnership(String(listId), req.user!.id);
+  const selectedListId = listId ? String(listId) : undefined;
+  if (selectedListId) {
+    const owned = await verifyListOwnership(selectedListId, req.user!.id);
     if (!owned) return res.status(404).json({ error: 'Contact list not found' });
   }
-  const { data: existingRows } = await client.from('contacts').select('email').eq('user_id', req.user!.id);
-  const existing = new Set((existingRows || []).map((r: any) => String(r.email).toLowerCase()));
-  const { data: suppressionRows } = await client.from('suppressions').select('email').eq('user_id', req.user!.id);
+
+  // Load existing contacts with ids so a re-import can still assign them to the selected list.
+  const { data: existingRows, error: existingError } = await client.from('contacts').select('id,email').eq('user_id', req.user!.id);
+  if (existingError) return res.status(400).json({ error: existingError.message });
+  const existingByEmail = new Map((existingRows || []).map((r: any) => [String(r.email).toLowerCase(), r.id]));
+
+  const { data: suppressionRows, error: suppressionError } = await client.from('suppressions').select('email').eq('user_id', req.user!.id);
+  if (suppressionError) return res.status(400).json({ error: suppressionError.message });
   const suppressed = new Set((suppressionRows || []).map((r: any) => String(r.email).toLowerCase()));
+
   const rows: any[] = [];
+  const importedEmails = new Set<string>();
+  const contactIdsForList = new Set<string>();
   let skippedSuppressed = 0, skippedDuplicates = 0;
+
   for (const item of contacts) {
     const email = String(item?.email || '').trim().toLowerCase();
     if (!email.includes('@')) continue;
     if (suppressed.has(email)) { skippedSuppressed++; continue; }
-    if (existing.has(email) || rows.some((r) => r.email === email)) { skippedDuplicates++; continue; }
-    rows.push({ user_id: req.user!.id, email, first_name: item.firstName || item.name?.split(' ')[0] || null, last_name: item.lastName || item.name?.split(' ').slice(1).join(' ') || null, company: item.company || null, tags: item.tags ? (Array.isArray(item.tags) ? item.tags : [item.tags]) : ['csv-import'], status: 'ACTIVE' });
+
+    const existingId = existingByEmail.get(email);
+    if (existingId) {
+      skippedDuplicates++;
+      if (selectedListId) contactIdsForList.add(existingId);
+      continue;
+    }
+
+    if (importedEmails.has(email)) continue;
+    importedEmails.add(email);
+    rows.push({
+      user_id: req.user!.id,
+      email,
+      first_name: item.firstName || item.name?.split(' ')[0] || null,
+      last_name: item.lastName || item.name?.split(' ').slice(1).join(' ') || null,
+      company: item.company || null,
+      tags: item.tags ? (Array.isArray(item.tags) ? item.tags : [item.tags]) : ['csv-import'],
+      status: 'ACTIVE',
+    });
   }
+
   let imported = 0;
   if (rows.length) {
     const { data, error } = await client.from('contacts').insert(rows).select('id,email');
     if (error) return res.status(400).json({ error: error.message });
     imported = data?.length || 0;
-    if (listId && data?.length) {
-      const { error: memberError } = await client.from('contact_list_members').insert(data.map((r: any) => ({ list_id: listId, contact_id: r.id })));
-      if (memberError) return res.status(400).json({ error: memberError.message });
-    }
+    if (selectedListId) for (const row of data || []) contactIdsForList.add(row.id);
   }
-  return res.json({ success: true, imported, skippedSuppressed, skippedDuplicates, totalReceived: contacts.length });
+
+  let assignedToList = 0;
+  if (selectedListId && contactIdsForList.size) {
+    const memberships = Array.from(contactIdsForList).map((contactId) => ({ list_id: selectedListId, contact_id: contactId }));
+    const { data: membershipRows, error: memberError } = await client
+      .from('contact_list_members')
+      .upsert(memberships, { onConflict: 'list_id,contact_id', ignoreDuplicates: true })
+      .select('contact_id');
+    if (memberError) return res.status(400).json({ error: memberError.message });
+    assignedToList = membershipRows?.length || contactIdsForList.size;
+  }
+
+  return res.json({
+    success: true,
+    imported,
+    assignedToList,
+    skippedSuppressed,
+    skippedDuplicates,
+    totalReceived: contacts.length,
+  });
 });
 
 contactsRouter.get('/lists', optionalAuth, async (req: Request, res: Response) => {
