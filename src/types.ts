@@ -20,11 +20,26 @@ export interface MessageAttachment { id:string; filename:string; fileSize:number
 export interface Message { id:string; messageId:string; sesMessageId?:string; campaignId?:string; campaignName?:string; senderId:string; fromName?:string; fromEmail:string; toEmail:string; replyTo?:string; cc?:string[]; bcc?:string[]; subject:string; htmlBody?:string; plainText?:string; customHeaders?:Record<string,string>; status:MessageStatus; provider:string; providerMessageId?:string; smtpResponse?:string; bounceType?:'Hard'|'Soft'|'Transient'; bounceReason?:string; queuedAt:string; sentAt?:string; deliveredAt?:string; bouncedAt?:string; createdAt:string; events?:MessageEvent[]; attachments?:MessageAttachment[]; }
 export interface TechnicalLog { id:string; timestamp:string; service:'KumoMTA'|'Amazon SES'|'Tracking'|'Webhook Processor'|'Application'; messageId?:string; event:string; severity:'INFO'|'WARN'|'ERROR'|'SUCCESS'; response:string; details?:Record<string,any>; }
 export type ServiceLog = TechnicalLog;
+export interface InboxPlacementEstimate {
+  inboxRate: number;
+  spamRate: number;
+  promotionsRate: number;
+  inboxCount: number;
+  spamCount: number;
+  promotionsCount: number;
+  gmailProxyOpens: number;
+  directOpens: number;
+  spamSignals: Array<{ rule: string; impact: 'HIGH' | 'MEDIUM' | 'LOW'; description: string; score: number }>;
+  healthScore: number;
+  status: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'AT_RISK';
+}
+
 export interface DashboardStats {
   totalSent:number; delivered:number; bounced:number; failed:number; complaints:number; rejected:number; deliveryDelayed:number; renderingFailed:number; queued:number;
   opens:number; clicks:number; rawOpenEvents?:number; rawClickEvents?:number; deliveryRate:number; bounceRate:number; openRate:number; clickRate:number; queueSize:number; sendingRatePerSec:number;
   kumoHealth:'healthy'|'degraded'|'offline'; sesHealth:'healthy'|'degraded'|'offline'; period?:'today'|'7d'|'30d'; sentDeltaPct?:number; openRateDeltaPt?:number; clickRateDeltaPt?:number;
-  timeseries:Array<{time:string;sent:number;delivered:number;bounced:number;failed:number;rejected?:number}>; hourlyActivity:Array<{hour:string;volume:number}>;
+  inboxPlacement?: InboxPlacementEstimate;
+  timeseries:Array<{time:string;sent:number;delivered:number;bounced:number;failed:number;rejected?:number;opens?:number;clicks?:number}>; hourlyActivity:Array<{hour:string;volume:number}>;
   topSenders:Array<{id:string;name:string;email:string;volume:number;deliveryRate:number;bounceRate:number}>;
   topCampaigns:Array<{id:string;name:string;sent:number;delivered:number;openRate:number;clickRate:number;status?:CampaignStatus;totalRecipients?:number;createdAt?:string}>;
 }
