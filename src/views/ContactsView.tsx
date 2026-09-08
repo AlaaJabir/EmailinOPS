@@ -1,421 +1,122 @@
-import React, { useState } from 'react';
-import {
-  Users,
-  UserPlus,
-  Upload,
-  Download,
-  Search,
-  ListFilter,
-  FileSpreadsheet,
-  CheckCircle2,
-  AlertTriangle,
-  FolderPlus,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Users, UserPlus, Upload, Search, ListFilter, FileSpreadsheet, FolderPlus } from 'lucide-react';
 import { Contact, ContactList } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 
-interface ContactsViewProps {
+interface Props {
   contacts: Contact[];
   lists: ContactList[];
   onAddContact: (contact: any) => Promise<void>;
   onCreateList: (list: any) => Promise<void>;
-  onImportCsv: (contacts: any[]) => Promise<void>;
+  onImportCsv: (contacts: any[], listId?: string) => Promise<void>;
 }
 
-export const ContactsView: React.FC<ContactsViewProps> = ({
-  contacts,
-  lists,
-  onAddContact,
-  onCreateList,
-  onImportCsv,
-}) => {
+export const ContactsView: React.FC<Props> = ({ contacts, lists, onAddContact, onCreateList, onImportCsv }) => {
   const [activeTab, setActiveTab] = useState<'contacts' | 'lists'>('contacts');
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
-
-  // New Contact Form
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [company, setCompany] = useState('');
-  const [targetListId, setTargetListId] = useState(lists[0]?.id || '');
-
-  // New List Form
+  const [targetListId, setTargetListId] = useState('');
+  const [importListId, setImportListId] = useState('');
   const [listName, setListName] = useState('');
   const [listDesc, setListDesc] = useState('');
-
-  // CSV Drag and Drop / Input
   const [csvRawText, setCsvRawText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!targetListId && lists[0]?.id) setTargetListId(lists[0].id);
+  }, [lists, targetListId]);
+
+  useEffect(() => {
+    if (!importListId && lists[0]?.id) setImportListId(lists[0].id);
+  }, [lists, importListId]);
 
   const submitContact = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onAddContact({
-      email,
-      firstName,
-      lastName,
-      company,
-      listId: targetListId || undefined,
-    });
-    setShowAddModal(false);
-    setEmail('');
-    setFirstName('');
-    setLastName('');
-    setCompany('');
+    setBusy(true);
+    try {
+      await onAddContact({ email, firstName, lastName, company, listId: targetListId || undefined });
+      setShowAddModal(false);
+      setEmail(''); setFirstName(''); setLastName(''); setCompany('');
+    } finally { setBusy(false); }
   };
 
   const submitList = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onCreateList({
-      name: listName,
-      description: listDesc,
-    });
-    setShowListModal(false);
-    setListName('');
-    setListDesc('');
+    setBusy(true);
+    try {
+      await onCreateList({ name: listName.trim(), description: listDesc.trim() });
+      setShowListModal(false);
+      setListName(''); setListDesc('');
+    } finally { setBusy(false); }
   };
 
   const handleProcessCsv = async () => {
-    const lines = csvRawText.trim().split('\n');
-    const parsedContacts = [];
-
+    const lines = csvRawText.trim().split(/\r?\n/).filter(Boolean);
+    if (!lines.length) return;
+    const parsedContacts: any[] = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
-      // check if header line
-      if (i === 0 && line.toLowerCase().includes('email')) continue;
-
+      if (i === 0 && /(^|,)\s*email\s*(,|$)/i.test(line)) continue;
       const cols = line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
-      if (cols[0] && cols[0].includes('@')) {
-        parsedContacts.push({
-          email: cols[0],
-          firstName: cols[1] || '',
-          lastName: cols[2] || '',
-          company: cols[3] || '',
-        });
-      }
+      const candidate = cols[0]?.toLowerCase();
+      if (candidate?.includes('@')) parsedContacts.push({ email: candidate, firstName: cols[1] || '', lastName: cols[2] || '', company: cols[3] || '' });
     }
-
-    if (parsedContacts.length > 0) {
-      await onImportCsv(parsedContacts);
+    if (!parsedContacts.length) return;
+    setBusy(true);
+    try {
+      await onImportCsv(parsedContacts, importListId || undefined);
       setShowCsvModal(false);
       setCsvRawText('');
-    }
+    } finally { setBusy(false); }
   };
 
-  const filteredContacts = contacts.filter(
-    (c) =>
-      !search ||
-      c.email.toLowerCase().includes(search.toLowerCase()) ||
-      (c.firstName && c.firstName.toLowerCase().includes(search.toLowerCase())) ||
-      (c.lastName && c.lastName.toLowerCase().includes(search.toLowerCase())) ||
-      (c.company && c.company.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredContacts = contacts.filter((c) => {
+    const q = search.toLowerCase().trim();
+    return !q || c.email.toLowerCase().includes(q) || c.firstName?.toLowerCase().includes(q) || c.lastName?.toLowerCase().includes(q) || c.company?.toLowerCase().includes(q);
+  });
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto font-sans">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            Audience Contacts & Lists
-          </h1>
-          <p className="text-xs text-[#888888] mt-1">
-            Manage subscriber directories with automated suppression synchronization and bulk CSV ingest
-          </p>
+    <div className="min-h-full bg-[#0a0d0c] text-[#d8e6df] p-4 md:p-6 font-mono">
+      <div className="max-w-[1500px] mx-auto space-y-4">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3"><h1 className="text-[20px] font-bold tracking-wide">// CONTACTS & AUDIENCES</h1><span className="text-[9px] px-2 py-1 rounded border border-[#1f8f5c] text-[#39ff9c]">LIVE DATA</span></div>
+            <p className="text-[10px] text-[#4a5a53] mt-1">Persistent contacts, reusable lists and deterministic audience assignment</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setShowCsvModal(true)} className="px-3 py-2 rounded-[4px] border border-[#2a3733] bg-[#131917] text-[10px] text-[#d8e6df]"><Upload className="w-3 h-3 inline mr-1.5"/>Import CSV</button>
+            <button onClick={() => activeTab === 'lists' ? setShowListModal(true) : setShowAddModal(true)} className="px-3 py-2 rounded-[4px] bg-[#39ff9c] text-[#03140b] text-[10px] font-bold">{activeTab === 'lists' ? <><FolderPlus className="w-3 h-3 inline mr-1.5"/>Create List</> : <><UserPlus className="w-3 h-3 inline mr-1.5"/>Add Contact</>}</button>
+          </div>
+        </header>
+
+        <div className="flex items-center justify-between border-b border-[#1e2825]">
+          <div className="flex gap-1">
+            <button onClick={() => setActiveTab('contacts')} className={`px-4 py-2 text-[10px] ${activeTab === 'contacts' ? 'text-[#39ff9c] border-b-2 border-[#39ff9c]' : 'text-[#4a5a53]'}`}><Users className="w-3 h-3 inline mr-1.5"/>Contacts ({contacts.length})</button>
+            <button onClick={() => setActiveTab('lists')} className={`px-4 py-2 text-[10px] ${activeTab === 'lists' ? 'text-[#39ff9c] border-b-2 border-[#39ff9c]' : 'text-[#4a5a53]'}`}><ListFilter className="w-3 h-3 inline mr-1.5"/>Lists ({lists.length})</button>
+          </div>
+          {activeTab === 'contacts' && <div className="text-[9px] text-[#4a5a53]">{filteredContacts.length} matching</div>}
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowCsvModal(true)}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-sm bg-[#0F0F0F] hover:bg-white/10 text-white text-xs font-medium border border-white-10 transition-colors"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Import CSV</span>
-          </button>
+        {activeTab === 'contacts' && <section className="bg-[#0f1412] border border-[#1e2825] rounded-[6px] overflow-hidden">
+          <div className="p-4 border-b border-[#1e2825] flex items-center justify-between gap-3"><div className="relative flex-1 max-w-lg"><Search className="w-3.5 h-3.5 text-[#4a5a53] absolute left-3 top-1/2 -translate-y-1/2"/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search email, name or company" className="w-full bg-[#080b0a] border border-[#25302c] rounded-[4px] pl-9 pr-3 py-2 text-[10px] text-[#d8e6df] outline-none"/></div><span className="text-[9px] text-[#4a5a53]">{filteredContacts.length} contacts</span></div>
+          <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b border-[#1e2825] text-[9px] uppercase tracking-[0.14em] text-[#4a5a53]"><th className="px-4 py-3">Email</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Company</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Added</th></tr></thead><tbody className="divide-y divide-[#18201d] text-[10px]">{filteredContacts.map(c => <tr key={c.id} className="hover:bg-white/[0.02]"><td className="px-4 py-3 text-[#d8e6df]">{c.email}</td><td className="px-4 py-3 text-[#7c9188]">{c.firstName || c.lastName ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : '-'}</td><td className="px-4 py-3 text-[#7c9188]">{c.company || '-'}</td><td className="px-4 py-3"><StatusBadge status={c.status}/></td><td className="px-4 py-3 text-[#4a5a53]">{new Date(c.createdAt).toLocaleDateString()}</td></tr>)}{!filteredContacts.length && <tr><td colSpan={5} className="px-4 py-12 text-center text-[10px] text-[#4a5a53]">No contacts imported yet.</td></tr>}</tbody></table></div>
+        </section>}
 
-          {activeTab === 'contacts' ? (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold shadow-sm transition-colors"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Add Contact</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowListModal(true)}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold shadow-sm transition-colors"
-            >
-              <FolderPlus className="w-3.5 h-3.5" />
-              <span>Create List</span>
-            </button>
-          )}
-        </div>
+        {activeTab === 'lists' && <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{lists.map(l => <section key={l.id} className="bg-[#0f1412] border border-[#1e2825] rounded-[6px] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[12px] font-bold text-[#d8e6df]">{l.name}</h3><p className="text-[9px] text-[#4a5a53] mt-1">{l.description || 'No description'}</p></div><ListFilter className="w-4 h-4 text-[#39ff9c]"/></div><div className="mt-5 flex items-end justify-between"><span className="text-[9px] uppercase tracking-wider text-[#4a5a53]">Members</span><b className="text-[18px] text-[#39ff9c]">{l.memberCount}</b></div></section>)}{!lists.length && <section className="md:col-span-3 bg-[#0f1412] border border-[#1e2825] rounded-[6px] p-10 text-center text-[10px] text-[#4a5a53]">No lists yet. Create one and assign contacts during import.</section>}</div>}
+
+        {showAddModal && <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"><div className="w-full max-w-md bg-[#0f1412] border border-[#2a3733] rounded-[6px] p-5 space-y-4"><h2 className="text-sm font-bold">Add Contact</h2><form onSubmit={submitContact} className="space-y-3"><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="subscriber@example.com" className="w-full bg-[#080b0a] border border-[#25302c] rounded p-2.5 text-[10px]"/><div className="grid grid-cols-2 gap-2"><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="First name" className="bg-[#080b0a] border border-[#25302c] rounded p-2.5 text-[10px]"/><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Last name" className="bg-[#080b0a] border border-[#25302c] rounded p-2.5 text-[10px]"/></div><input value={company} onChange={e=>setCompany(e.target.value)} placeholder="Company" className="w-full bg-[#080b0a] border border-[#25302c] rounded p-2.5 text-[10px]"/><label className="block text-[10px] text-[#7c9188]">Add to list<select value={targetListId} onChange={e=>setTargetListId(e.target.value)} className="mt-1 w-full bg-[#080b0a] border border-[#25302c] rounded p-2.5 text-[10px]"><option value="">No list</option>{lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label><div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowAddModal(false)} className="px-3 py-2 text-[10px] text-[#7c9188]">Cancel</button><button disabled={busy} className="px-3 py-2 rounded bg-[#39ff9c] text-[#03140b] text-[10px] font-bold">{busy?'Saving…':'Save Contact'}</button></div></form></div></div>}
+
+        {showListModal && <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"><div className="w-full max-w-md bg-[#0f1412] border border-[#2a3733] rounded-[6px] p-5 space-y-4"><h2 className="text-sm font-bold">Create Contact List</h2><form onSubmit={submitList} className="space-y-3"><input required value={listName} onChange={e=>setListName(e.target.value)} placeholder="List name" className="w-full bg-[#080b0a] border border-[#25302c] rounded p-2.5 text-[10px]"/><input value={listDesc} onChange={e=>setListDesc(e.target.value)} placeholder="Description" className="w-full bg-[#080b0a] border border-[#25302c] rounded p-2.5 text-[10px]"/><div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowListModal(false)} className="px-3 py-2 text-[10px] text-[#7c9188]">Cancel</button><button disabled={busy} className="px-3 py-2 rounded bg-[#39ff9c] text-[#03140b] text-[10px] font-bold">{busy?'Creating…':'Create List'}</button></div></form></div></div>}
+
+        {showCsvModal && <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"><div className="w-full max-w-xl bg-[#0f1412] border border-[#2a3733] rounded-[6px] p-5 space-y-4"><div className="flex items-center gap-3"><FileSpreadsheet className="w-5 h-5 text-[#39ff9c]"/><div><h2 className="text-sm font-bold">Import Contacts</h2><p className="text-[9px] text-[#4a5a53]">CSV: email, first_name, last_name, company</p></div></div><label className="block text-[10px] text-[#7c9188]">Target list<select value={importListId} onChange={e=>setImportListId(e.target.value)} className="mt-1 w-full bg-[#080b0a] border border-[#25302c] rounded p-2.5 text-[10px]"><option value="">Import to all contacts (no list)</option>{lists.map(l=><option key={l.id} value={l.id}>{l.name} · {l.memberCount} members</option>)}</select></label><textarea rows={10} value={csvRawText} onChange={e=>setCsvRawText(e.target.value)} placeholder={'email,first_name,last_name,company\nuser1@acme.com,John,Doe,Acme Corp\nuser2@tech.io,Jane,Smith,Tech Labs'} className="w-full bg-[#080b0a] border border-[#25302c] rounded p-3 text-[10px] font-mono outline-none"/><div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowCsvModal(false)} className="px-3 py-2 text-[10px] text-[#7c9188]">Cancel</button><button type="button" disabled={busy || !csvRawText.trim()} onClick={handleProcessCsv} className="px-3 py-2 rounded bg-[#39ff9c] text-[#03140b] text-[10px] font-bold">{busy?'Importing…':'Import & Assign'}</button></div></div></div>}
       </div>
-
-      {/* Tab Switcher */}
-      <div className="flex border-b border-white-10 gap-6 text-xs font-medium">
-        <button
-          onClick={() => setActiveTab('contacts')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'contacts'
-              ? 'border-white text-white font-semibold'
-              : 'border-transparent text-[#888888] hover:text-white'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>All Contacts ({contacts.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('lists')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'lists'
-              ? 'border-white text-white font-semibold'
-              : 'border-transparent text-[#888888] hover:text-white'
-          }`}
-        >
-          <ListFilter className="w-4 h-4" />
-          <span>Contact Lists ({lists.length})</span>
-        </button>
-      </div>
-
-      {/* TAB 1: Contacts List */}
-      {activeTab === 'contacts' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-sm bg-[#0F0F0F] border border-white-10 flex items-center justify-between">
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-[#888888] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search contacts by email, name, or company..."
-                className="w-full bg-[#050505] border border-white-10 rounded-sm pl-9 pr-4 py-1.5 text-xs text-white placeholder:text-[#888888] focus:border-white/30 focus:outline-none"
-              />
-            </div>
-            <div className="text-xs text-[#888888] font-mono">
-              {filteredContacts.length} contacts matching
-            </div>
-          </div>
-
-          <div className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-white-10 text-[10px] uppercase tracking-[0.15em] text-[#888888]">
-                    <th className="pb-3 font-semibold">Email Address</th>
-                    <th className="pb-3 font-semibold">Full Name</th>
-                    <th className="pb-3 font-semibold">Company</th>
-                    <th className="pb-3 font-semibold">Status</th>
-                    <th className="pb-3 font-semibold">Added On</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white-5 font-mono text-[11px]">
-                  {filteredContacts.map((c) => (
-                    <tr key={c.id} className="hover:bg-white/5 transition-colors">
-                      <td className="py-3 text-white font-medium">{c.email}</td>
-                      <td className="py-3 font-sans text-zinc-300">
-                        {c.firstName || c.lastName ? `${c.firstName || ''} ${c.lastName || ''}` : '-'}
-                      </td>
-                      <td className="py-3 font-sans text-[#888888]">{c.company || '-'}</td>
-                      <td className="py-3">
-                        <StatusBadge status={c.status} />
-                      </td>
-                      <td className="py-3 text-[#888888]">
-                        {new Date(c.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: Lists */}
-      {activeTab === 'lists' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {lists.map((l) => (
-            <div
-              key={l.id}
-              className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 flex flex-col justify-between space-y-4 hover:border-white/20 transition-colors"
-            >
-              <div>
-                <h3 className="text-sm font-semibold text-white">{l.name}</h3>
-                <p className="text-xs text-[#888888] mt-1">{l.description || 'No description provided.'}</p>
-              </div>
-
-              <div className="p-3 rounded-sm bg-[#050505] border border-white-10 flex items-center justify-between font-mono text-xs">
-                <span className="text-[#888888] uppercase tracking-wider text-[10px]">Members</span>
-                <span className="text-emerald-400 font-bold">{l.memberCount} subscribers</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Modal: Add Contact */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
-            <h2 className="text-sm font-semibold text-white">Add Individual Contact</h2>
-            <form onSubmit={submitContact} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="subscriber@domain.com"
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs font-mono text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-[#888888] mb-1">First Name</label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#888888] mb-1">Last Name</label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">Company / Organization</label>
-                <input
-                  type="text"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs text-white"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-3 py-1.5 rounded-sm bg-white/5 hover:bg-white/10 text-[#888888] hover:text-white border border-white-10 text-xs font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold"
-                >
-                  Save Contact
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Create List */}
-      {showListModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
-            <h2 className="text-sm font-semibold text-white">Create Contact List</h2>
-            <form onSubmit={submitList} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">List Name</label>
-                <input
-                  type="text"
-                  required
-                  value={listName}
-                  onChange={(e) => setListName(e.target.value)}
-                  placeholder="e.g. Enterprise Tier Leads"
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">Description</label>
-                <input
-                  type="text"
-                  value={listDesc}
-                  onChange={(e) => setListDesc(e.target.value)}
-                  placeholder="Brief audience scope..."
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs text-white"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowListModal(false)}
-                  className="px-3 py-1.5 rounded-sm bg-white/5 hover:bg-white/10 text-[#888888] hover:text-white border border-white-10 text-xs font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold"
-                >
-                  Create List
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: CSV Import */}
-      {showCsvModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-lg w-full p-6 space-y-4 shadow-2xl font-sans">
-            <div className="flex items-center gap-3">
-              <FileSpreadsheet className="w-6 h-6 text-white" />
-              <div>
-                <h2 className="text-sm font-semibold text-white">Import Contacts from CSV</h2>
-                <p className="text-xs text-[#888888]">
-                  Paste comma-separated rows or sample data (email, first_name, last_name, company).
-                </p>
-              </div>
-            </div>
-
-            <textarea
-              rows={8}
-              value={csvRawText}
-              onChange={(e) => setCsvRawText(e.target.value)}
-              placeholder="email,first_name,last_name,company&#10;user1@acme.com,John,Doe,Acme Corp&#10;user2@tech.io,Jane,Smith,Tech Labs"
-              className="w-full bg-[#050505] border border-white-10 rounded-sm p-3 text-xs font-mono text-white focus:border-white/30 focus:outline-none"
-            />
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowCsvModal(false)}
-                className="px-3 py-1.5 rounded-sm bg-white/5 hover:bg-white/10 text-[#888888] hover:text-white border border-white-10 text-xs font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleProcessCsv}
-                className="px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold"
-              >
-                Parse & Ingest
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
