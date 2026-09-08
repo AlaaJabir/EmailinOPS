@@ -7,6 +7,7 @@ import { suppressionService } from './SuppressionService.js';
 
 export interface SendEmailPayload {
   internalId?: string;
+  rfcMessageId?: string;
   contactId?: string;
   fromName?: string;
   fromEmail: string;
@@ -71,7 +72,7 @@ export class KumoMtaService {
     this.config = {
       host: newConfig?.host !== undefined ? newConfig.host : (process.env.KUMO_SMTP_HOST || process.env.KUMOMTA_HOST || '127.0.0.1'),
       port: newConfig?.port !== undefined ? newConfig.port : (Number(process.env.KUMO_SMTP_PORT || process.env.KUMOMTA_PORT) || 2525),
-      secure: newConfig?.secure !== undefined ? newConfig.secure : (process.env.KUMO_SMTP_SECURE === 'true' || Number(process.env.KUMO_SMTP_PORT || process.env.KUMOMTA_PORT) === 465),
+      secure: newConfig?.secure !== undefined ? newConfig.secure : (process.env.KUMO_TLS_SECURE === 'true' || Number(process.env.KUMO_SMTP_PORT || process.env.KUMOMTA_PORT) === 465),
       username: customConfigValue(process.env.KUMO_SMTP_USER, process.env.KUMOMTA_USERNAME),
       password: customConfigValue(process.env.KUMO_SMTP_PASSWORD, process.env.KUMOMTA_PASSWORD),
       apiUrl: newConfig?.apiUrl !== undefined ? newConfig.apiUrl : (process.env.KUMOMTA_API_URL || 'http://127.0.0.1:8000'),
@@ -148,7 +149,7 @@ export class KumoMtaService {
   async submitEmail(payload: SendEmailPayload): Promise<KumoSubmissionResult> {
     const start = Date.now();
     const domainPart = payload.fromEmail.includes('@') ? payload.fromEmail.split('@')[1] : 'transact.acme-corp.io';
-    const rfcMessageId = this.generateRfcMessageId(domainPart);
+    const rfcMessageId = payload.rfcMessageId || this.generateRfcMessageId(domainPart);
     const internalId = payload.internalId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const toEmail = Array.isArray(payload.to) ? payload.to.join(', ') : payload.to;
     const primaryTo = Array.isArray(payload.to) ? payload.to[0] : payload.to;
@@ -224,7 +225,9 @@ export class KumoMtaService {
       };
       const initialEvent: MessageEvent = { id: `evt_kumo_${Date.now()}`, messageId: rfcMessageId, eventType: 'QUEUED', eventData: { kumoHost: this.config.host, kumoPort: this.config.port, smtpResponse, latencyMs, accepted: info.accepted, rejected: info.rejected }, timestamp: nowIso };
       newMsg.events = [initialEvent];
-      db.messages.unshift(newMsg);
+      const existingIndex = db.messages.findIndex((m) => m.id === internalId);
+      if (existingIndex >= 0) db.messages[existingIndex] = newMsg;
+      else db.messages.unshift(newMsg);
       db.messageEvents.push(initialEvent);
       supabaseService.saveMessage(newMsg, payload.userId || 'usr_admin_01').catch(() => {});
       supabaseService.saveMessageEvent(initialEvent, payload.userId || 'usr_admin_01').catch(() => {});
@@ -242,7 +245,9 @@ export class KumoMtaService {
         status: 'FAILED', provider: 'KumoMTA', smtpResponse: errorMsg, bounceReason: errorMsg, queuedAt: nowIso, createdAt: nowIso,
         events: [{ id: `evt_kumo_fail_${Date.now()}`, messageId: rfcMessageId, eventType: 'FAILED', eventData: { error: errorMsg, code: smtpCode, latencyMs }, timestamp: nowIso }],
       };
-      db.messages.unshift(failedMsg);
+      const existingIndex = db.messages.findIndex((m) => m.id === internalId);
+      if (existingIndex >= 0) db.messages[existingIndex] = failedMsg;
+      else db.messages.unshift(failedMsg);
       db.messageEvents.push(failedMsg.events[0]);
       throw new Error(`KumoMTA SMTP submission failed: ${errorMsg}`);
     }
