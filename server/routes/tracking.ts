@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { createHash } from 'node:crypto';
 import { db } from '../store.js';
 import { eventProcessor } from '../services/EventProcessor.js';
 import { supabaseService } from '../services/SupabaseService.js';
@@ -18,16 +19,39 @@ function isValidRedirectUrl(target: string): boolean {
   } catch { return false; }
 }
 
+function trackingEventId(messageId: string, eventType: 'OPENED' | 'CLICKED'): string {
+  const hex = createHash('sha256').update(`${messageId}:${eventType}`).digest('hex').slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 async function recordTrackingEvent(params: { messageId: string; eventType: 'OPENED' | 'CLICKED'; eventData?: Record<string, any>; ipAddress?: string; userAgent?: string; }): Promise<void> {
   if (supabaseService.isConfigured && supabaseService.getClient()) {
     const client = supabaseService.getClient()!;
     const { data: message, error } = await client.from('messages').select('id,user_id,message_id,internal_id').or(`internal_id.eq.${params.messageId},message_id.eq.${params.messageId},ses_message_id.eq.${params.messageId}`).maybeSingle();
     if (error) throw new Error(`Tracking message lookup failed: ${error.message}`);
     if (!message) return;
-    const { data: existing } = await client.from('message_events').select('id').eq('message_id', message.message_id).eq('event_type', params.eventType).limit(1);
-    if (existing && existing.length > 0) return;
-    const { error: insertError } = await client.from('message_events').insert({ message_id: message.message_id, user_id: message.user_id, event_type: params.eventType, event_data: params.eventData || null, ip_address: params.ipAddress || null, user_agent: params.userAgent || null, timestamp: new Date().toISOString() });
-    if (insertError) throw new Error(`Tracking event save failed: ${insertError.message}`);
+
+    // One deterministic UUID per message/event pair prevents duplicate opens/clicks
+    // when mail clients, security scanners, or browsers hit the endpoint concurrently.
+    const eventId = trackingEventId(message.message_id, params.eventType);
+    const { data: existing } = await client.from('message_events').select('id').eq('id', eventId).maybeSingle();
+    if (existing) return;
+
+    const { error: insertError } = await client.from('message_events').insert({
+      id: eventId,
+      message_id: message.message_id,
+      user_id: message.user_id,
+      event_type: params.eventType,
+      event_data: params.eventData || null,
+      ip_address: params.ipAddress || null,
+      user_agent: params.userAgent || null,
+      timestamp: new Date().toISOString(),
+    });
+    if (insertError) {
+      // A concurrent request may have won the same deterministic-id insert.
+      if (/duplicate|unique/i.test(insertError.message)) return;
+      throw new Error(`Tracking event save failed: ${insertError.message}`);
+    }
     return;
   }
 
