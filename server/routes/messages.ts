@@ -20,10 +20,11 @@ async function isRecipientSuppressed(email: string, userId: string): Promise<any
 
 async function preRegisterMessage(params: { internalId: string; messageId: string; senderId: string; fromName?: string; fromEmail: string; toEmail: string; replyTo?: string; cc?: string[]; bcc?: string[]; subject: string; htmlBody?: string; headHtml?: string; plainText?: string; customHeaders?: Record<string,string>; campaignId?: string; userId?: string; isTest?: boolean; isMarketing?: boolean; openTrackingEnabled?: boolean; clickTrackingEnabled?: boolean; }): Promise<Message> {
   const now = new Date().toISOString();
-  const message: Message = { id: params.internalId, messageId: params.messageId, campaignId: params.campaignId, senderId: params.senderId, fromName: params.fromName, fromEmail: params.fromEmail, toEmail: params.toEmail, replyTo: params.replyTo, cc: params.cc, bcc: params.bcc, subject: params.subject, htmlBody: params.htmlBody, plainText: params.plainText, customHeaders: params.customHeaders, status: 'QUEUED', provider: 'KumoMTA', queuedAt: now, createdAt: now, events: [{ id: `evt_preregister_${Date.now()}_${Math.random().toString(36).slice(2,7)}`, messageId: params.messageId, eventType: 'QUEUED', eventData: { phase: 'pre_registered', isTest: Boolean(params.isTest) }, timestamp: now }] };
+  const message: Message = { id: params.internalId, messageId: params.messageId, campaignId: params.campaignId, senderId: params.senderId, fromName: params.fromName, fromEmail: params.fromEmail, toEmail: params.toEmail, replyTo: params.replyTo, cc: params.cc, bcc: params.bcc, subject: params.subject, htmlBody: params.htmlBody, plainText: params.plainText, customHeaders: params.customHeaders, status: 'QUEUED', provider: 'KumoMTA', queuedAt: now, createdAt: now, events: [] };
   if (params.userId && supabaseService.isConfigured) {
+    // Register only the canonical message row here. KumoMtaService owns the
+    // provider Message-ID and writes the first QUEUED event after SMTP accepts it.
     await supabaseService.saveMessage({ ...message, headHtml: params.headHtml, isMarketing: Boolean(params.isMarketing), openTrackingEnabled: params.openTrackingEnabled, clickTrackingEnabled: params.clickTrackingEnabled } as any, params.userId);
-    await supabaseService.saveMessageEvent(message.events![0], params.userId);
   } else {
     const existing = db.messages.findIndex(m => m.id === message.id || m.messageId === message.messageId);
     if (existing >= 0) db.messages[existing] = message; else db.messages.unshift(message);
