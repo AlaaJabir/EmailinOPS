@@ -191,8 +191,8 @@ export class PersonalizationService {
     // 4. Handle {{email}}
     result = result.replace(/\{\{\s*email\s*\}\}/gi, email);
 
-    // 5. Handle {{unsubscribe_url}}
-    result = result.replace(/\{\{\s*unsubscribe_url\s*\}\}/gi, unsubscribeUrl);
+    // 5. Handle {{unsubscribe_url}} and {{unsubscribe_link}}
+    result = result.replace(/\{\{\s*(unsubscribe_url|unsubscribe_link|unsubscribeUrl|unsubscribeLink)\s*\}\}/gi, unsubscribeUrl);
 
     // 6. Handle {{privacy_url}}
     result = result.replace(/\{\{\s*privacy_url\s*\}\}/gi, privacyUrl);

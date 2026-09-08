@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Eye, Mail, Megaphone, MousePointerClick, RefreshCw, ShieldAlert, Users, Zap } from 'lucide-react';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { AlertTriangle, CheckCircle2, Eye, Mail, Megaphone, MousePointerClick, RefreshCw, ShieldAlert, Users, Zap, TrendingUp } from 'lucide-react';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
 import { DashboardStats, Domain, Message } from '../types';
 
 interface Props {
@@ -145,8 +145,70 @@ export const PowerDashboardView: React.FC<Props> = ({ stats, domains = [], recen
         </div>
 
         <div className="grid xl:grid-cols-[1.65fr_1fr] gap-4">
-          <Panel title="Sending Volume — selected period" tag="SENT / DELIVERED / BOUNCED">
-            <div className="h-[230px]">{chart.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={chart}><CartesianGrid stroke="#1e2825" /><XAxis dataKey="time" stroke="#4a5a53" tick={{ fontSize: 9 }} /><YAxis stroke="#4a5a53" tick={{ fontSize: 9 }} /><Tooltip contentStyle={{ background: '#0b0e0d', border: '1px solid #2a3733', fontSize: 10 }} /><Area type="monotone" dataKey="sent" stroke="#39ff9c" fill="#39ff9c" fillOpacity={0.06} /><Area type="monotone" dataKey="delivered" stroke="#5cc8ff" fill="#5cc8ff" fillOpacity={0.04} /><Area type="monotone" dataKey="bounced" stroke="#ffb454" fill="#ffb454" fillOpacity={0.04} /></AreaChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[10px] text-[#4a5a53]">No sending data in this period.</div>}</div>
+          <Panel title="Sending Volume Telemetry" tag="SMOOTH STREAM · SENT / DELIVERED / BOUNCED">
+            <div className="h-[250px]">
+              {chart.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chart} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradSent" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#39ff9c" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#39ff9c" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradDelivered" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#5cc8ff" stopOpacity={0.20} />
+                        <stop offset="95%" stopColor="#5cc8ff" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradBounced" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ff5c5c" stopOpacity={0.20} />
+                        <stop offset="95%" stopColor="#ff5c5c" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#1e2825" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="time" stroke="#4a5a53" tick={{ fontSize: 9 }} tickLine={false} />
+                    <YAxis stroke="#4a5a53" tick={{ fontSize: 9 }} tickLine={false} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{ background: '#0b0e0d', border: '1px solid #2a3733', borderRadius: '4px', fontSize: 10 }}
+                      formatter={(val: any, name: any) => [val, String(name).toUpperCase()]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="sent"
+                      name="Sent"
+                      stroke="#39ff9c"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, fill: '#39ff9c', stroke: '#0a0d0c', strokeWidth: 2 }}
+                      fill="url(#gradSent)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="delivered"
+                      name="Delivered"
+                      stroke="#5cc8ff"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, fill: '#5cc8ff', stroke: '#0a0d0c', strokeWidth: 2 }}
+                      fill="url(#gradDelivered)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="bounced"
+                      name="Bounced"
+                      stroke="#ff5c5c"
+                      strokeWidth={1.5}
+                      dot={false}
+                      activeDot={{ r: 3, fill: '#ff5c5c' }}
+                      fill="url(#gradBounced)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-[10px] text-[#4a5a53]">
+                  No sending telemetry recorded for this timeline.
+                </div>
+              )}
+            </div>
           </Panel>
           <Panel title="Status Breakdown">
             <div className="flex items-center gap-7 h-[230px]"><div className="relative w-[145px] h-[145px] shrink-0 rounded-full" style={{ background: `conic-gradient(#39ff9c ${Math.min(100, deliveryRate)}%, #1e2825 0)` }}><div className="absolute inset-[16px] rounded-full bg-[#0f1412] flex flex-col items-center justify-center"><span className="text-lg font-bold">{deliveryRate.toFixed(0)}%</span><span className="text-[8px] text-[#4a5a53]">DELIVERED</span></div></div><div className="space-y-3 text-[10px] w-full"><div className="flex justify-between"><span><i className="inline-block w-2 h-2 rounded-sm bg-[#39ff9c] mr-2" />Delivered</span><span>{fmt(delivered)}</span></div><div className="flex justify-between"><span><i className="inline-block w-2 h-2 rounded-sm bg-[#ffb454] mr-2" />Bounced</span><span>{fmt(bounced)}</span></div><div className="flex justify-between"><span><i className="inline-block w-2 h-2 rounded-sm bg-[#ff5c5c] mr-2" />Failed</span><span>{fmt(failed)}</span></div><div className="flex justify-between"><span><i className="inline-block w-2 h-2 rounded-sm bg-[#5cc8ff] mr-2" />Pending</span><span>{fmt(num(data?.queued))}</span></div></div></div>

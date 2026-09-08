@@ -17,7 +17,7 @@ const replaceVars = (v: string, c?: Contact | null, email = '') =>
     .replace(/\{\{\s*last_name\s*\}\}/gi, c?.lastName || '')
     .replace(/\{\{\s*company\s*\}\}/gi, c?.company || 'your organization')
     .replace(/\{\{\s*email\s*\}\}/gi, email || c?.email || 'recipient@example.com')
-    .replace(/\{\{\s*unsubscribe_url\s*\}\}/gi, `${window.location.origin}/unsubscribe/preview`);
+    .replace(/\{\{\s*(unsubscribe_url|unsubscribe_link)\s*\}\}/gi, `${window.location.origin}/unsubscribe/preview`);
 
 export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = [], onSendEmail, onSendTest, authFetch }) => {
   const [senderId, setSenderId] = useState('');

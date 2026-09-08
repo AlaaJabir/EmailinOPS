@@ -70,8 +70,47 @@ async function dashboardStats(userId: string, period: Period = '30d') {
   const previousClickIds = new Set(previousEvents.filter((e:any)=>e.event_type==='CLICKED').map((e:any)=>e.message_id));
   const deltaPct = (current:number, previous:number) => previous > 0 ? Number((((current-previous)/previous)*100).toFixed(1)) : current > 0 ? 100 : 0;
   const deltaPt = (current:number, previous:number) => Number((current - previous).toFixed(1));
-  const byDay = new Map<string, any>();
-  for (const m of messages) { const day=String(m.created_at).slice(0,10); const x=byDay.get(day)||{time:day,sent:0,delivered:0,bounced:0,failed:0,rejected:0}; if(['QUEUED','SENDING','SENT','DELIVERED'].includes(m.status))x.sent++; if(m.status==='DELIVERED')x.delivered++; if(m.status==='BOUNCED')x.bounced++; if(m.status==='FAILED')x.failed++; if(m.status==='REJECTED')x.rejected++; byDay.set(day,x); }
+
+  let timeseries: any[] = [];
+  if (period === 'today') {
+    const hourMap = new Map<string, any>();
+    for (let h = 0; h < 24; h++) {
+      const key = `${String(h).padStart(2, '0')}:00`;
+      hourMap.set(key, { time: key, sent: 0, delivered: 0, bounced: 0, failed: 0, rejected: 0 });
+    }
+    for (const m of messages) {
+      const d = new Date(m.created_at);
+      const key = `${String(d.getHours()).padStart(2, '0')}:00`;
+      const x = hourMap.get(key) || { time: key, sent: 0, delivered: 0, bounced: 0, failed: 0, rejected: 0 };
+      if (['QUEUED', 'SENDING', 'SENT', 'DELIVERED'].includes(m.status)) x.sent++;
+      if (m.status === 'DELIVERED') x.delivered++;
+      if (m.status === 'BOUNCED') x.bounced++;
+      if (m.status === 'FAILED') x.failed++;
+      if (m.status === 'REJECTED') x.rejected++;
+      hourMap.set(key, x);
+    }
+    timeseries = Array.from(hourMap.values());
+  } else {
+    const dayMap = new Map<string, any>();
+    const numDays = periodDays(period);
+    for (let i = numDays - 1; i >= 0; i--) {
+      const d = new Date(now - i * 86400000);
+      const key = d.toISOString().slice(0, 10);
+      dayMap.set(key, { time: key.slice(5), sent: 0, delivered: 0, bounced: 0, failed: 0, rejected: 0 });
+    }
+    for (const m of messages) {
+      const day = String(m.created_at).slice(5, 10);
+      const x = dayMap.get(day) || { time: day, sent: 0, delivered: 0, bounced: 0, failed: 0, rejected: 0 };
+      if (['QUEUED', 'SENDING', 'SENT', 'DELIVERED'].includes(m.status)) x.sent++;
+      if (m.status === 'DELIVERED') x.delivered++;
+      if (m.status === 'BOUNCED') x.bounced++;
+      if (m.status === 'FAILED') x.failed++;
+      if (m.status === 'REJECTED') x.rejected++;
+      dayMap.set(day, x);
+    }
+    timeseries = Array.from(dayMap.values());
+  }
+
   const byHour = new Map<string,number>();
   for(const m of messages){const d=new Date(m.created_at);const h=String(d.getHours()).padStart(2,'0');byHour.set(h,(byHour.get(h)||0)+1);}
   const senderRows=sendersResult.data||[];
@@ -79,7 +118,7 @@ async function dashboardStats(userId: string, period: Period = '30d') {
   const campaignRows=campaignsResult.data||[];
   const topCampaigns=campaignRows.map((c:any)=>({id:c.id,name:c.name,sent:c.sent_count||0,delivered:c.delivered_count||0,openRate:c.sent_count?Number(((c.open_count||0)/c.sent_count*100).toFixed(2)):0,clickRate:c.sent_count?Number(((c.click_count||0)/c.sent_count*100).toFixed(2)):0,status:c.status,totalRecipients:c.total_recipients||0,createdAt:c.created_at})).sort((a,b)=>b.sent-a.sent).slice(0,10);
   const [kumo, ses] = await Promise.all([kumoMtaService.checkHealth(), sesProvider.checkHealth()]);
-  return {totalSent:sent,delivered,bounced,failed,complaints,rejected,deliveryDelayed:delayed,renderingFailed,queued,opens,clicks,rawOpenEvents,rawClickEvents,deliveryRate:rate(delivered),bounceRate:rate(bounced),openRate:engagementRate(opens),clickRate:engagementRate(clicks),queueSize:queued,sendingRatePerSec:0,kumoHealth:kumo.status,sesHealth:ses.status,timeseries:Array.from(byDay.values()).sort((a,b)=>a.time.localeCompare(b.time)).slice(-30),hourlyActivity:Array.from(byHour.entries()).sort().map(([hour,volume])=>({hour,volume})),topSenders,topCampaigns,period,sentDeltaPct:deltaPct(sent,previousSent),openRateDeltaPt:deltaPt(engagementRate(opens),previousDelivered?previousOpenIds.size/previousDelivered*100:0),clickRateDeltaPt:deltaPt(engagementRate(clicks),previousDelivered?previousClickIds.size/previousDelivered*100:0)};
+  return {totalSent:sent,delivered,bounced,failed,complaints,rejected,deliveryDelayed:delayed,renderingFailed,queued,opens,clicks,rawOpenEvents,rawClickEvents,deliveryRate:rate(delivered),bounceRate:rate(bounced),openRate:engagementRate(opens),clickRate:engagementRate(clicks),queueSize:queued,sendingRatePerSec:0,kumoHealth:kumo.status,sesHealth:ses.status,timeseries,hourlyActivity:Array.from(byHour.entries()).sort().map(([hour,volume])=>({hour,volume})),topSenders,topCampaigns,period,sentDeltaPct:deltaPct(sent,previousSent),openRateDeltaPt:deltaPt(engagementRate(opens),previousDelivered?previousOpenIds.size/previousDelivered*100:0),clickRateDeltaPt:deltaPt(engagementRate(clicks),previousDelivered?previousClickIds.size/previousDelivered*100:0)};
 }
 
 async function startServer() {
