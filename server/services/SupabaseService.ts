@@ -440,21 +440,31 @@ export class SupabaseService {
 
   async saveUnsubscribeToken(record: UnsubscribeToken) {
     if (!this.isConfigured || !this.client) return;
-    const resolvedUser = record.userId ? await this.resolveUserId(record.userId) : null;
-    const { error } = await this.client.from('unsubscribe_tokens').upsert({
-      token: record.token, email: record.email, contact_id: record.contactId || null,
-      message_id: record.messageId || null, campaign_id: record.campaignId || null,
-      user_id: resolvedUser, created_at: record.createdAt || new Date().toISOString(),
-      unsubscribed_at: record.unsubscribedAt || null,
-    }, { onConflict: 'token' });
-    if (error) throw new Error(`Supabase unsubscribe token save failed: ${error.message}`);
+    try {
+      const resolvedUser = record.userId ? await this.resolveUserId(record.userId) : null;
+      const { error } = await this.client.from('unsubscribe_tokens').upsert({
+        token: record.token, email: record.email, contact_id: record.contactId || null,
+        message_id: record.messageId || null, campaign_id: record.campaignId || null,
+        user_id: resolvedUser, created_at: record.createdAt || new Date().toISOString(),
+        unsubscribed_at: record.unsubscribedAt || null,
+      }, { onConflict: 'token' });
+      if (error) {
+        console.warn(`[SupabaseService] saveUnsubscribeToken warning: ${error.message}`);
+      }
+    } catch (err: any) {
+      console.warn(`[SupabaseService] saveUnsubscribeToken caught: ${err?.message || err}`);
+    }
   }
 
   async getUnsubscribeToken(token: string): Promise<UnsubscribeToken | null> {
     if (!this.isConfigured || !this.client) return null;
-    const { data, error } = await this.client.from('unsubscribe_tokens').select('*').eq('token', token).maybeSingle();
-    if (error || !data) return null;
-    return { token: data.token, email: data.email, contactId: data.contact_id || undefined, messageId: data.message_id || undefined, campaignId: data.campaign_id || undefined, userId: data.user_id || undefined, createdAt: data.created_at, unsubscribedAt: data.unsubscribed_at || undefined };
+    try {
+      const { data, error } = await this.client.from('unsubscribe_tokens').select('*').eq('token', token).maybeSingle();
+      if (error || !data) return null;
+      return { token: data.token, email: data.email, contactId: data.contact_id || undefined, messageId: data.message_id || undefined, campaignId: data.campaign_id || undefined, userId: data.user_id || undefined, createdAt: data.created_at, unsubscribedAt: data.unsubscribed_at || undefined };
+    } catch {
+      return null;
+    }
   }
 
   async markContactUnsubscribed(email: string, userId?: string) {

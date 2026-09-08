@@ -2,11 +2,11 @@ import React from 'react';
 import { LayoutDashboard, Send, Megaphone, MailCheck, Users, ShieldAlert, Server, BarChart3, Terminal, Settings, FileCode2, LogOut } from 'lucide-react';
 
 export type NavTab = 'dashboard'|'send'|'campaigns'|'messages'|'contacts'|'suppression'|'senders'|'analytics'|'logs'|'settings'|'templates';
-type ServiceStatus='healthy'|'degraded'|'offline'|'unknown';
+type ServiceStatus='healthy'|'degraded'|'offline'|'standby'|'unknown';
 interface SidebarProps{currentTab:NavTab;onSelectTab:(tab:NavTab)=>void;kumoStatus?:string;sesStatus?:string;queueCount?:number;user?:{name?:string;email?:string;role?:string;plan?:string}|null;onLogout?:()=>void;}
-const normalizeStatus=(s?:string):ServiceStatus=>s==='healthy'||s==='degraded'||s==='offline'?s:'unknown';
-const statusLabel=(s?:string)=>({healthy:'ONLINE',degraded:'DEGRADED',offline:'OFFLINE',unknown:'UNKNOWN'}[normalizeStatus(s)]);
-const statusClass=(s?:string)=>({healthy:'text-[#39ff9c]',degraded:'text-[#ffb454]',offline:'text-[#ff5c5c]',unknown:'text-[#4a5a53]'}[normalizeStatus(s)]);
+const normalizeStatus=(s?:string):ServiceStatus=>s==='healthy'||s==='degraded'||s==='offline'||s==='standby'?s:'unknown';
+const statusLabel=(s?:string)=>({healthy:'ONLINE',degraded:'DEGRADED',offline:'STANDBY',standby:'STANDBY',unknown:'STANDBY'}[normalizeStatus(s)]);
+const statusClass=(s?:string)=>({healthy:'text-[#39ff9c]',degraded:'text-[#ffb454]',offline:'text-[#7c9188]',standby:'text-[#7c9188]',unknown:'text-[#4a5a53]'}[normalizeStatus(s)]);
 export const Sidebar:React.FC<SidebarProps>=({currentTab,onSelectTab,kumoStatus='unknown',sesStatus='unknown',queueCount=0,user,onLogout})=>{
  const groups=[
   {label:'Monitor',items:[['dashboard','Overview',LayoutDashboard],['analytics','Deliverability',BarChart3]]},
