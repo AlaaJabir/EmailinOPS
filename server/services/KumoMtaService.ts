@@ -72,7 +72,7 @@ export class KumoMtaService {
     this.config = {
       host: newConfig?.host !== undefined ? newConfig.host : (process.env.KUMO_SMTP_HOST || process.env.KUMOMTA_HOST || '127.0.0.1'),
       port: newConfig?.port !== undefined ? newConfig.port : (Number(process.env.KUMO_SMTP_PORT || process.env.KUMOMTA_PORT) || 2525),
-      secure: newConfig?.secure !== undefined ? newConfig.secure : (process.env.KUMO_TLS_SECURE === 'true' || Number(process.env.KUMO_SMTP_PORT || process.env.KUMOMTA_PORT) === 465),
+      secure: newConfig?.secure !== undefined ? newConfig.secure : (process.env.KUMO_SMTP_SECURE === 'true' || Number(process.env.KUMO_SMTP_PORT || process.env.KUMOMTA_PORT) === 465),
       username: customConfigValue(process.env.KUMO_SMTP_USER, process.env.KUMOMTA_USERNAME),
       password: customConfigValue(process.env.KUMO_SMTP_PASSWORD, process.env.KUMOMTA_PASSWORD),
       apiUrl: newConfig?.apiUrl !== undefined ? newConfig.apiUrl : (process.env.KUMOMTA_API_URL || 'http://127.0.0.1:8000'),
