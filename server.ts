@@ -49,7 +49,9 @@ async function dashboardStats(userId: string, period: Period = '30d') {
   const events = allEvents.filter((e:any) => String(e.timestamp) >= start);
   const previousEvents = allEvents.filter((e:any) => String(e.timestamp) >= previousStart && String(e.timestamp) < start);
   const count = (rows:any[], s:string) => rows.filter((m:any)=>m.status===s).length;
-  const sent = messages.filter((m:any)=>['SENT','DELIVERED'].includes(m.status)).length;
+  // A message accepted by KumoMTA is a sent/accepted message even while it is still QUEUED or SENDING.
+  // This keeps the dashboard truthful immediately after dispatch instead of showing zero until a later webhook.
+  const sent = messages.filter((m:any)=>['QUEUED','SENDING','SENT','DELIVERED'].includes(m.status)).length;
   const delivered = count(messages,'DELIVERED'), bounced = count(messages,'BOUNCED'), failed = count(messages,'FAILED'), rejected = count(messages,'REJECTED');
   const openMessageIds = new Set(events.filter((e:any)=>e.event_type==='OPENED').map((e:any)=>e.message_id));
   const clickMessageIds = new Set(events.filter((e:any)=>e.event_type==='CLICKED').map((e:any)=>e.message_id));
@@ -62,18 +64,18 @@ async function dashboardStats(userId: string, period: Period = '30d') {
   const queued = messages.filter((m:any)=>['QUEUED','SENDING'].includes(m.status)).length;
   const rate = (n:number, d:number = sent) => d ? Number(((n/d)*100).toFixed(2)) : 0;
   const engagementRate = (n:number) => delivered ? Number(((n/delivered)*100).toFixed(2)) : 0;
-  const previousSent = previousMessages.filter((m:any)=>['SENT','DELIVERED'].includes(m.status)).length;
+  const previousSent = previousMessages.filter((m:any)=>['QUEUED','SENDING','SENT','DELIVERED'].includes(m.status)).length;
   const previousDelivered = count(previousMessages,'DELIVERED');
   const previousOpenIds = new Set(previousEvents.filter((e:any)=>e.event_type==='OPENED').map((e:any)=>e.message_id));
   const previousClickIds = new Set(previousEvents.filter((e:any)=>e.event_type==='CLICKED').map((e:any)=>e.message_id));
   const deltaPct = (current:number, previous:number) => previous > 0 ? Number((((current-previous)/previous)*100).toFixed(1)) : current > 0 ? 100 : 0;
   const deltaPt = (current:number, previous:number) => Number((current - previous).toFixed(1));
   const byDay = new Map<string, any>();
-  for (const m of messages) { const day=String(m.created_at).slice(0,10); const x=byDay.get(day)||{time:day,sent:0,delivered:0,bounced:0,failed:0,rejected:0}; if(['SENT','DELIVERED'].includes(m.status))x.sent++; if(m.status==='DELIVERED')x.delivered++; if(m.status==='BOUNCED')x.bounced++; if(m.status==='FAILED')x.failed++; if(m.status==='REJECTED')x.rejected++; byDay.set(day,x); }
+  for (const m of messages) { const day=String(m.created_at).slice(0,10); const x=byDay.get(day)||{time:day,sent:0,delivered:0,bounced:0,failed:0,rejected:0}; if(['QUEUED','SENDING','SENT','DELIVERED'].includes(m.status))x.sent++; if(m.status==='DELIVERED')x.delivered++; if(m.status==='BOUNCED')x.bounced++; if(m.status==='FAILED')x.failed++; if(m.status==='REJECTED')x.rejected++; byDay.set(day,x); }
   const byHour = new Map<string,number>();
   for(const m of messages){const d=new Date(m.created_at);const h=String(d.getHours()).padStart(2,'0');byHour.set(h,(byHour.get(h)||0)+1);}
   const senderRows=sendersResult.data||[];
-  const topSenders=senderRows.map((s:any)=>{const ms=messages.filter((m:any)=>m.sender_id===s.id);const sv=ms.filter((m:any)=>['SENT','DELIVERED'].includes(m.status)).length;return{id:s.id,name:s.name,email:s.from_email,volume:sv,deliveryRate:sv?Number((ms.filter((m:any)=>m.status==='DELIVERED').length/sv*100).toFixed(2)):0,bounceRate:sv?Number((ms.filter((m:any)=>m.status==='BOUNCED').length/sv*100).toFixed(2)):0};}).sort((a,b)=>b.volume-a.volume).slice(0,10);
+  const topSenders=senderRows.map((s:any)=>{const ms=messages.filter((m:any)=>m.sender_id===s.id);const sv=ms.filter((m:any)=>['QUEUED','SENDING','SENT','DELIVERED'].includes(m.status)).length;return{id:s.id,name:s.name,email:s.from_email,volume:sv,deliveryRate:sv?Number((ms.filter((m:any)=>m.status==='DELIVERED').length/sv*100).toFixed(2)):0,bounceRate:sv?Number((ms.filter((m:any)=>m.status==='BOUNCED').length/sv*100).toFixed(2)):0};}).sort((a,b)=>b.volume-a.volume).slice(0,10);
   const campaignRows=campaignsResult.data||[];
   const topCampaigns=campaignRows.map((c:any)=>({id:c.id,name:c.name,sent:c.sent_count||0,delivered:c.delivered_count||0,openRate:c.sent_count?Number(((c.open_count||0)/c.sent_count*100).toFixed(2)):0,clickRate:c.sent_count?Number(((c.click_count||0)/c.sent_count*100).toFixed(2)):0,status:c.status,totalRecipients:c.total_recipients||0,createdAt:c.created_at})).sort((a,b)=>b.sent-a.sent).slice(0,10);
   const [kumo, ses] = await Promise.all([kumoMtaService.checkHealth(), sesProvider.checkHealth()]);
