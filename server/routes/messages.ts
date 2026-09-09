@@ -77,7 +77,13 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
     const record = await isRecipientSuppressed(email, req.user!.id);
     if (record) suppressed.push({ email, suppression: record });
   }
-  if (suppressed.length) return res.status(422).json({ error: 'Dispatch blocked because one or more recipients are suppressed.', suppressed });
+  if (suppressed.length) {
+    const suppressedEmails = suppressed.map(s => s.email).join(', ');
+    return res.status(422).json({
+      error: `Dispatch blocked: The following recipient(s) are on your suppression list: ${suppressedEmails}. Remove them from your list or delete them from the Suppressions tab to send.`,
+      suppressed
+    });
+  }
   try {
     const baseUrl = personalizationService.getBaseUrl(req.get('host'));
     const senders = await supabaseService.getSenders(req.user!.id);
