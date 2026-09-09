@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Code2, Eye, Mail, Monitor, MousePointerClick, Plus, Send, Smartphone, Trash2, UserCheck, Users, Zap } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ClipboardList, Code2, Copy, Eye, FileText, Globe, HelpCircle, Mail, Monitor, MousePointerClick, Plus, Send, Smartphone, Sparkles, Trash2, UserCheck, Users, Zap } from 'lucide-react';
 import { Contact, ContactList, Domain, Sender, Template } from '../types';
 
 interface Props {
@@ -47,6 +47,12 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
   const [templateName, setTemplateName] = useState('');
   const [templateBusy, setTemplateBusy] = useState(false);
 
+  // Modal / drawer states for rapid batch importing
+  const [showBatchRecipients, setShowBatchRecipients] = useState(false);
+  const [batchRecipientsText, setBatchRecipientsText] = useState('');
+  const [showBatchHeaders, setShowBatchHeaders] = useState(false);
+  const [batchHeadersText, setBatchHeadersText] = useState('');
+
   // Audience/list state. A list can be selected and its members are loaded automatically.
   const [lists, setLists] = useState<ContactList[]>([]);
   const [audienceListId, setAudienceListId] = useState('');
@@ -54,25 +60,34 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
   const [audienceLoading, setAudienceLoading] = useState(false);
   const [audienceError, setAudienceError] = useState('');
 
+  // Track if sender fields have been initially seeded to prevent overwriting user edits
+  const initialSenderInitialized = useRef(false);
+
   const selectedContact = audienceContacts.find(c => c.id === contactId) || contacts.find(c => c.id === contactId) || null;
   const previewBody = useMemo(() => replaceVars(htmlBody, selectedContact, selectedContact?.email || to.split(',')[0]?.trim()), [htmlBody, selectedContact, to]);
   const previewSubject = useMemo(() => replaceVars(subject, selectedContact, selectedContact?.email || to.split(',')[0]?.trim()), [subject, selectedContact, to]);
   const request = async (url: string, options: RequestInit = {}) => authFetch ? authFetch(url, options) : fetch((import.meta.env.VITE_API_BASE_URL || '') + url, options);
 
-  // Keep sender fields automatically synchronized with the first verified sender loaded by App.
+  // Automatically pre-populate sender fields ONLY once on initial mount or when senders list first becomes available.
+  // Never overwrite user changes when component re-renders!
   useEffect(() => {
     if (!senders.length) {
-      setSenderId('');
-      setFromName('');
-      setFromEmail('');
-      setReplyTo('');
+      if (!initialSenderInitialized.current) {
+        setSenderId('');
+        setFromName('');
+        setFromEmail('');
+        setReplyTo('');
+      }
       return;
     }
-    const current = senders.find(s => s.id === senderId) || senders[0];
-    setSenderId(current.id);
-    setFromName(current.name || '');
-    setFromEmail(current.fromEmail || '');
-    setReplyTo(current.replyTo || '');
+    if (!initialSenderInitialized.current) {
+      const first = senders[0];
+      setSenderId(first.id);
+      setFromName(first.name || '');
+      setFromEmail(first.fromEmail || '');
+      setReplyTo(first.replyTo || '');
+      initialSenderInitialized.current = true;
+    }
   }, [senders]);
 
   const loadTemplates = async () => {
@@ -215,6 +230,51 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
 
   const addHeader = () => setHeaders(v => [...v, { key: '', value: '' }]);
   const updateHeader = (i: number, key: 'key' | 'value', value: string) => setHeaders(v => v.map((h, n) => n === i ? { ...h, [key]: value } : h));
+
+  // Parse raw pasted headers (RFC 822 format or Key: Value per line) into the headers array
+  const applyBatchHeaders = (rawText: string) => {
+    if (!rawText.trim()) return;
+    const lines = rawText.split(/\r?\n/);
+    const newHeaders: Array<{ key: string; value: string }> = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx > 0) {
+        const key = trimmed.slice(0, colonIdx).trim();
+        const value = trimmed.slice(colonIdx + 1).trim();
+        if (key) newHeaders.push({ key, value });
+      }
+    }
+    if (newHeaders.length) {
+      setHeaders(prev => {
+        // Merge without duplicating same header key
+        const existingKeys = new Set(newHeaders.map(h => h.key.toLowerCase()));
+        return [...prev.filter(h => !existingKeys.has(h.key.toLowerCase())), ...newHeaders];
+      });
+    }
+    setShowBatchHeaders(false);
+    setBatchHeadersText('');
+  };
+
+  // Parse raw pasted recipients (lines, tabs, commas, semicolons) into the comma-separated `to` input
+  const applyBatchRecipients = (rawText: string) => {
+    if (!rawText.trim()) return;
+    // Extract all valid emails from pasted content
+    const emailMatches = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+    if (emailMatches.length) {
+      const uniqueEmails = Array.from(new Set(emailMatches));
+      setTo(prev => {
+        const existing = prev.split(',').map(x => x.trim()).filter(Boolean);
+        const merged = Array.from(new Set([...existing, ...uniqueEmails]));
+        return merged.join(', ');
+      });
+      setAudienceListId('');
+    }
+    setShowBatchRecipients(false);
+    setBatchRecipientsText('');
+  };
+
   const vars = ['first_name', 'last_name', 'company', 'email', 'unsubscribe_url'];
   const insert = (v: string) => setHtmlBody(x => `${x}${x ? '\n' : ''}{{${v}}}`);
 
@@ -272,43 +332,281 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
           <section className="bg-[#101216] border border-[#242832] rounded-lg p-5 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold flex items-center gap-2"><UserCheck className="w-4 h-4" />Sender & recipients</h2>
-              <span className="text-[10px] text-zinc-600">Sender identity is filled automatically</span>
+              <span className="text-[10px] text-zinc-500">Auto-filled from verified domain, fully customizable</span>
             </div>
 
             <div className="grid md:grid-cols-2 gap-3">
-              <label className="text-[11px] text-zinc-500">Verified sender<select value={senderId} onChange={e => selectSender(e.target.value)} className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs"><option value="">Select sender</option>{senders.map(s => <option key={s.id} value={s.id}>{s.name || s.fromEmail} · {s.fromEmail}</option>)}</select></label>
-              <label className="text-[11px] text-zinc-500">From name<input value={fromName} onChange={e => setFromName(e.target.value)} className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></label>
-              <label className="text-[11px] text-zinc-500">From email<input value={fromEmail} onChange={e => setFromEmail(e.target.value)} className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></label>
-              <label className="text-[11px] text-zinc-500">Reply-To<input value={replyTo} onChange={e => setReplyTo(e.target.value)} placeholder="optional" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></label>
+              <label className="text-[11px] text-zinc-500">
+                <span>Verified sender profile</span>
+                <select value={senderId} onChange={e => selectSender(e.target.value)} className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-200 focus:border-zinc-500 outline-none">
+                  <option value="">Custom identity / None</option>
+                  {senders.map(s => <option key={s.id} value={s.id}>{s.name || s.fromEmail} · {s.fromEmail}</option>)}
+                </select>
+              </label>
+              <label className="text-[11px] text-zinc-500">
+                <span className="flex items-center justify-between">
+                  <span>From name (editable)</span>
+                  <span className="text-[10px] text-emerald-400 font-mono">Dynamic</span>
+                </span>
+                <input
+                  value={fromName}
+                  onChange={e => setFromName(e.target.value)}
+                  placeholder="e.g. Acme Notifications or John Doe"
+                  className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100 focus:border-zinc-400 outline-none transition-colors"
+                />
+              </label>
+              <label className="text-[11px] text-zinc-500">
+                <span className="flex items-center justify-between">
+                  <span>From email address (editable)</span>
+                  <span className="text-[10px] text-emerald-400 font-mono">Dynamic</span>
+                </span>
+                <input
+                  type="email"
+                  required
+                  value={fromEmail}
+                  onChange={e => setFromEmail(e.target.value)}
+                  placeholder="hello@yourdomain.com"
+                  className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100 font-mono focus:border-zinc-400 outline-none transition-colors"
+                />
+              </label>
+              <label className="text-[11px] text-zinc-500">
+                <span>Reply-To address (optional)</span>
+                <input
+                  type="email"
+                  value={replyTo}
+                  onChange={e => setReplyTo(e.target.value)}
+                  placeholder="support@yourdomain.com"
+                  className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100 font-mono focus:border-zinc-400 outline-none"
+                />
+              </label>
             </div>
 
             <div className="rounded-md border border-[#252a33] bg-[#0b0d10] p-3 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />Audience</div>
-                  <p className="text-[10px] text-zinc-700 mt-1">Select a contact list and recipients are populated automatically.</p>
+                  <div className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />Audience & Contacts</div>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">Select a contact list or paste an email list directly.</p>
                 </div>
-                {audienceListId && <span className="text-[10px] font-mono text-zinc-500">{audienceContacts.length} contacts loaded</span>}
+                {audienceListId && <span className="text-[10px] font-mono text-zinc-400">{audienceContacts.length} contacts loaded</span>}
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
-                <select value={audienceListId} onChange={e => loadAudience(e.target.value)} disabled={audienceLoading} className="flex-1 bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs">
-                  <option value="">Manual recipients / all loaded contacts</option>
+                <select value={audienceListId} onChange={e => loadAudience(e.target.value)} disabled={audienceLoading} className="flex-1 bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-300">
+                  <option value="">Manual recipients / custom paste</option>
                   {lists.map(l => <option key={l.id} value={l.id}>{l.name} · {l.memberCount} contacts</option>)}
                 </select>
                 <button type="button" onClick={loadLists} className="px-3 py-2 rounded-md border border-[#292e37] bg-[#111419] text-[10px] text-zinc-400 hover:text-white">Refresh lists</button>
               </div>
-              {audienceLoading && <p className="text-[10px] text-zinc-600">Loading selected audience…</p>}
+              {audienceLoading && <p className="text-[10px] text-zinc-500">Loading selected audience…</p>}
               {audienceError && <p className="text-[10px] text-red-300">{audienceError}</p>}
-              {audienceListId && !audienceLoading && !audienceError && <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500"><span className="px-2 py-1 rounded bg-[#15181e] border border-[#252a33]">{audienceContacts.length} recipients</span><span className="px-2 py-1 rounded bg-[#15181e] border border-[#252a33]">Names & companies available for personalization</span></div>}
+              {audienceListId && !audienceLoading && !audienceError && (
+                <div className="flex flex-wrap gap-2 text-[10px] text-zinc-400">
+                  <span className="px-2 py-1 rounded bg-[#15181e] border border-[#252a33]">{audienceContacts.length} recipients</span>
+                  <span className="px-2 py-1 rounded bg-[#15181e] border border-[#252a33]">Variables available for personalization</span>
+                </div>
+              )}
             </div>
 
-            <label className="block text-[11px] text-zinc-500">Recipients <span className="text-zinc-700">comma separated · auto-filled from selected list</span><input required value={to} onChange={e => { setAudienceListId(''); setAudienceContacts(contacts); setTo(e.target.value); }} placeholder="recipient@example.com, another@example.com" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></label>
-            <div className="grid md:grid-cols-2 gap-3"><label className="text-[11px] text-zinc-500">CC<input value={cc} onChange={e => setCc(e.target.value)} className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></label><label className="text-[11px] text-zinc-500">BCC<input value={bcc} onChange={e => setBcc(e.target.value)} className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></label></div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-zinc-400 font-medium">Recipients (To)</span>
+                <button
+                  type="button"
+                  onClick={() => setShowBatchRecipients(true)}
+                  className="text-[10px] text-zinc-300 hover:text-white flex items-center gap-1 bg-[#181c24] hover:bg-[#222834] px-2 py-0.5 rounded border border-[#2c3240] transition-colors"
+                >
+                  <ClipboardList className="w-3 h-3" />
+                  <span>Paste / Copy-Paste bulk emails</span>
+                </button>
+              </div>
+              <input
+                required
+                value={to}
+                onChange={e => { setAudienceListId(''); setAudienceContacts(contacts); setTo(e.target.value); }}
+                placeholder="recipient1@example.com, recipient2@example.com, user@domain.com"
+                className="w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100 font-mono placeholder:text-zinc-600 focus:border-zinc-400 outline-none"
+              />
+              <p className="text-[10px] text-zinc-600 mt-1">Comma-separated emails. You can paste thousands of addresses at once using the bulk paste button.</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-3">
+              <label className="text-[11px] text-zinc-500">
+                <span>CC (Optional)</span>
+                <input value={cc} onChange={e => setCc(e.target.value)} placeholder="cc@example.com" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs font-mono" />
+              </label>
+              <label className="text-[11px] text-zinc-500">
+                <span>BCC (Optional)</span>
+                <input value={bcc} onChange={e => setBcc(e.target.value)} placeholder="bcc@example.com" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs font-mono" />
+              </label>
+            </div>
           </section>
 
-          <section className="bg-[#101216] border border-[#242832] rounded-lg p-5 space-y-3"><h2 className="text-sm font-semibold flex items-center gap-2"><Mail className="w-4 h-4" />Envelope metadata</h2><label className="block text-[11px] text-zinc-500">Subject<input required value={subject} onChange={e => setSubject(e.target.value)} placeholder="Your email subject" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></label><label className="block text-[11px] text-zinc-500">Preheader<input value={preheader} onChange={e => setPreheader(e.target.value)} placeholder="Inbox preview text" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></label><div><div className="flex items-center justify-between mb-2"><span className="text-[11px] text-zinc-500">Custom headers</span><button type="button" onClick={addHeader} className="text-[10px] text-zinc-300"><Plus className="w-3 h-3 inline mr-1" />Add header</button></div>{headers.map((h, i) => <div key={i} className="flex gap-2 mb-2"><input value={h.key} onChange={e => updateHeader(i, 'key', e.target.value)} placeholder="Header-Name" className="flex-1 bg-[#080a0d] border border-[#292e37] rounded-md p-2 text-xs" /><input value={h.value} onChange={e => updateHeader(i, 'value', e.target.value)} placeholder="Value" className="flex-[1.5] bg-[#080a0d] border border-[#292e37] rounded-md p-2 text-xs" /><button type="button" onClick={() => setHeaders(v => v.filter((_, n) => n !== i))} className="p-2 text-zinc-600 hover:text-red-300"><Trash2 className="w-3.5 h-3.5" /></button></div>)}</div></section>
+          <section className="bg-[#101216] border border-[#242832] rounded-lg p-5 space-y-3">
+            <h2 className="text-sm font-semibold flex items-center gap-2"><Mail className="w-4 h-4" />Envelope metadata & Headers</h2>
+            <label className="block text-[11px] text-zinc-500">
+              <span>Subject</span>
+              <input required value={subject} onChange={e => setSubject(e.target.value)} placeholder="Your email subject" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100" />
+            </label>
+            <label className="block text-[11px] text-zinc-500">
+              <span>Preheader (Inbox preview text)</span>
+              <input value={preheader} onChange={e => setPreheader(e.target.value)} placeholder="Summary preview shown before opening email" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100" />
+            </label>
 
-          <section className="bg-[#101216] border border-[#242832] rounded-lg p-5"><div className="flex items-center justify-between mb-3"><h2 className="text-sm font-semibold flex items-center gap-2"><Code2 className="w-4 h-4" />HTML source editor</h2><div className="flex gap-1">{([['head', 'HEAD'], ['body', 'BODY'], ['text', 'PLAIN TEXT']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setEditor(key)} className={`px-2.5 py-1.5 rounded text-[10px] ${editor === key ? 'bg-white text-black' : 'bg-[#171a20] text-zinc-500'}`}>{label}</button>)}</div></div>{editor === 'head' && <><p className="text-[10px] text-zinc-600 mb-2">Meta tags, CSS and document-level HTML only.</p><textarea value={headHtml} onChange={e => setHeadHtml(e.target.value)} spellCheck={false} className="w-full min-h-[300px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5" /></>}{editor === 'body' && <><p className="text-[10px] text-zinc-600 mb-2">BODY source. The server wraps it with the HEAD above when needed.</p><textarea value={htmlBody} onChange={e => setHtmlBody(e.target.value)} spellCheck={false} className="w-full min-h-[430px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5" placeholder="<table>…</table>" /></>}{editor === 'text' && <textarea value={plainText} onChange={e => setPlainText(e.target.value)} spellCheck={false} className="w-full min-h-[430px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5" placeholder="Plain-text fallback…" />}<div className="flex flex-wrap gap-1.5 mt-3">{vars.map(v => <button type="button" key={v} onClick={() => insert(v)} className="px-2 py-1 rounded bg-[#171a20] border border-[#292e37] text-[10px] text-zinc-400">{'{{' + v + '}}'}</button>)}</div></section>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <span className="text-[11px] text-zinc-400 font-medium">Custom SMTP / MIME Headers</span>
+                  <p className="text-[10px] text-zinc-600">Extra headers injected into RFC 822 email transmission (e.g. X-Entity-Ref-ID, Reply-To, Priority)</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowBatchHeaders(true)}
+                    className="text-[10px] text-zinc-300 hover:text-white flex items-center gap-1 bg-[#181c24] hover:bg-[#222834] px-2 py-1 rounded border border-[#2c3240] transition-colors"
+                  >
+                    <ClipboardList className="w-3 h-3" />
+                    <span>Paste Raw Headers</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addHeader}
+                    className="text-[10px] text-zinc-300 hover:text-white flex items-center gap-1 bg-[#181c24] hover:bg-[#222834] px-2 py-1 rounded border border-[#2c3240] transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Header</span>
+                  </button>
+                </div>
+              </div>
+
+              {headers.length === 0 ? (
+                <div className="rounded-md border border-dashed border-[#262a33] p-3 text-center text-[11px] text-zinc-600">
+                  No custom headers configured. Click "Add Header" or "Paste Raw Headers" to inject custom headers.
+                </div>
+              ) : (
+                headers.map((h, i) => (
+                  <div key={i} className="flex gap-2 mb-2">
+                    <input
+                      value={h.key}
+                      onChange={e => updateHeader(i, 'key', e.target.value)}
+                      placeholder="Header-Name (e.g. X-Campaign-ID)"
+                      className="flex-1 bg-[#080a0d] border border-[#292e37] rounded-md p-2 text-xs font-mono text-zinc-200"
+                    />
+                    <input
+                      value={h.value}
+                      onChange={e => updateHeader(i, 'value', e.target.value)}
+                      placeholder="Header Value"
+                      className="flex-[1.5] bg-[#080a0d] border border-[#292e37] rounded-md p-2 text-xs font-mono text-zinc-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setHeaders(v => v.filter((_, n) => n !== i))}
+                      className="p-2 text-zinc-600 hover:text-red-300 rounded hover:bg-red-950/30 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="bg-[#101216] border border-[#242832] rounded-lg p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold flex items-center gap-2">
+                <Code2 className="w-4 h-4" />
+                <span>HTML source editor</span>
+              </h2>
+              <div className="flex gap-1">
+                {([['head', 'HTML HEAD / META'], ['body', 'HTML BODY'], ['text', 'PLAIN TEXT']] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setEditor(key)}
+                    className={`px-3 py-1.5 rounded text-[10px] font-medium transition-colors ${editor === key ? 'bg-white text-black font-semibold shadow-xs' : 'bg-[#171a20] text-zinc-400 hover:text-zinc-200'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {editor === 'head' && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0d0f13] border border-[#222731] rounded-md px-3 py-2">
+                  <div className="text-[11px] text-zinc-400">
+                    <span className="font-semibold text-zinc-300">HTML &lt;head&gt; / Terminal Header:</span> Meta tags, styling, font declarations, and document definitions.
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setHeadHtml('<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<meta http-equiv="X-UA-Compatible" content="IE=edge">\n<title></title>\n<style>\n  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }\n  table { border-collapse: collapse; }\n  img { border: 0; outline: none; text-decoration: none; }\n</style>')}
+                      className="text-[10px] text-zinc-300 hover:text-white px-2 py-1 rounded bg-[#1c212a] border border-[#2c3240] transition-colors"
+                    >
+                      Reset Standard &lt;head&gt;
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text) setHeadHtml(text);
+                        } catch {
+                          /* clipboard api fallback */
+                        }
+                      }}
+                      className="text-[10px] text-zinc-300 hover:text-white flex items-center gap-1 px-2 py-1 rounded bg-[#1c212a] border border-[#2c3240] transition-colors"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Paste Clipboard</span>
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  value={headHtml}
+                  onChange={e => setHeadHtml(e.target.value)}
+                  spellCheck={false}
+                  placeholder={`<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>body { font-family: sans-serif; }</style>`}
+                  className="w-full min-h-[300px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5 text-zinc-200 outline-none focus:border-zinc-500"
+                />
+              </div>
+            )}
+
+            {editor === 'body' && (
+              <>
+                <p className="text-[10px] text-zinc-500 mb-2">HTML Body markup. You can use standard tables, inline styles, or personalizing tags below.</p>
+                <textarea
+                  value={htmlBody}
+                  onChange={e => setHtmlBody(e.target.value)}
+                  spellCheck={false}
+                  className="w-full min-h-[430px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5 text-zinc-200 outline-none focus:border-zinc-500"
+                  placeholder="<table>…</table>"
+                />
+              </>
+            )}
+
+            {editor === 'text' && (
+              <textarea
+                value={plainText}
+                onChange={e => setPlainText(e.target.value)}
+                spellCheck={false}
+                className="w-full min-h-[430px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5 text-zinc-200 outline-none focus:border-zinc-500"
+                placeholder="Plain-text fallback for non-HTML email readers…"
+              />
+            )}
+
+            <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-[#1e222b]">
+              <span className="text-[10px] text-zinc-500 mr-1">Insert variable:</span>
+              {vars.map(v => (
+                <button
+                  type="button"
+                  key={v}
+                  onClick={() => insert(v)}
+                  className="px-2 py-1 rounded bg-[#171a20] border border-[#292e37] text-[10px] font-mono text-zinc-300 hover:text-white hover:border-zinc-400 transition-colors"
+                >
+                  {'{{' + v + '}}'}
+                </button>
+              ))}
+            </div>
+          </section>
 
           <section className="bg-[#101216] border border-[#242832] rounded-lg p-5"><h2 className="text-sm font-semibold mb-3 flex items-center gap-2"><MousePointerClick className="w-4 h-4" />Delivery & tracking</h2><div className="grid md:grid-cols-3 gap-3">{[[marketing, 'Marketing / bulk message', setMarketing], [openTracking, 'Open tracking', setOpenTracking], [clickTracking, 'Click tracking', setClickTracking]].map(([checked, label, setter]: any) => <label key={String(label)} className="flex items-center justify-between p-3 rounded-md bg-[#0a0c0f] border border-[#22262e] text-xs text-zinc-400"><span>{label}</span><input type="checkbox" checked={checked} onChange={e => setter(e.target.checked)} className="w-4 h-4" /></label>)}</div><p className="text-[10px] text-zinc-600 mt-3">Marketing mode triggers server-side unsubscribe/List-Unsubscribe handling and compliance validation.</p></section>
         </div>
@@ -317,6 +615,98 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
       </form>
 
       {showTest && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="w-full max-w-md bg-[#111318] border border-[#2a2f39] rounded-lg p-5 space-y-4"><h3 className="font-semibold">Send test email</h3><p className="text-xs text-zinc-500">Uses the current subject, HEAD, BODY and tracking settings.</p><input autoFocus value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="qa@example.com" className="w-full bg-[#080a0d] border border-[#292e37] rounded-md p-3 text-xs" /><div className="flex justify-end gap-2"><button type="button" onClick={() => setShowTest(false)} className="px-3 py-2 text-xs text-zinc-400">Cancel</button><button type="button" onClick={dispatchTest} disabled={!testEmail.trim()} className="px-3 py-2 rounded bg-white text-black text-xs font-bold disabled:opacity-40">Dispatch test</button></div></div></div>}
+
+      {/* Batch Recipients Paste Modal */}
+      {showBatchRecipients && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#111318] border border-[#2a2f39] rounded-lg p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-white">
+                <ClipboardList className="w-4 h-4 text-emerald-400" />
+                <span>Paste / Bulk Import Recipients</span>
+              </h3>
+              <button type="button" onClick={() => setShowBatchRecipients(false)} className="text-zinc-500 hover:text-white text-xs">✕</button>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Paste email addresses in any format (one per line, comma-separated, semicolon-separated, or mixed with text).
+              Our parser will extract all valid addresses automatically without requiring manual typing.
+            </p>
+            <textarea
+              autoFocus
+              rows={8}
+              value={batchRecipientsText}
+              onChange={e => setBatchRecipientsText(e.target.value)}
+              placeholder={`user1@domain.com\nuser2@example.org\n"John Doe" <john@company.com>\nalice@test.com, bob@test.com`}
+              className="w-full bg-[#080a0d] border border-[#292e37] rounded-md p-3 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 outline-none focus:border-zinc-500"
+            />
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] text-zinc-500 font-mono">
+                Detected: {((batchRecipientsText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [])).length} emails
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBatchRecipients(false)}
+                  className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyBatchRecipients(batchRecipientsText)}
+                  disabled={!batchRecipientsText.trim()}
+                  className="px-4 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-semibold disabled:opacity-40 transition-colors"
+                >
+                  Apply Recipients
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Raw Headers Modal */}
+      {showBatchHeaders && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#111318] border border-[#2a2f39] rounded-lg p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-white">
+                <ClipboardList className="w-4 h-4 text-sky-400" />
+                <span>Paste Raw Headers (RFC 822 / Key: Value)</span>
+              </h3>
+              <button type="button" onClick={() => setShowBatchHeaders(false)} className="text-zinc-500 hover:text-white text-xs">✕</button>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Paste email headers directly (e.g. from an exported draft or terminal template). One header per line formatted as <code className="text-zinc-200 bg-zinc-900 px-1 py-0.5 rounded">Key: Value</code>.
+            </p>
+            <textarea
+              autoFocus
+              rows={8}
+              value={batchHeadersText}
+              onChange={e => setBatchHeadersText(e.target.value)}
+              placeholder={`X-Campaign-ID: BlackFriday-2026\nX-Entity-Ref-ID: promo_october\nX-Priority: 1\nReply-To: support@yourdomain.com`}
+              className="w-full bg-[#080a0d] border border-[#292e37] rounded-md p-3 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 outline-none focus:border-zinc-500"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowBatchHeaders(false)}
+                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => applyBatchHeaders(batchHeadersText)}
+                disabled={!batchHeadersText.trim()}
+                className="px-4 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black text-xs font-semibold disabled:opacity-40 transition-colors"
+              >
+                Parse & Inject Headers
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

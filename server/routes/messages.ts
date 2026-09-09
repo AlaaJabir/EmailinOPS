@@ -81,9 +81,18 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
   try {
     const baseUrl = personalizationService.getBaseUrl(req.get('host'));
     const senders = await supabaseService.getSenders(req.user!.id);
-    const sender = senders.find(s => s.fromEmail.toLowerCase() === String(fromEmail).toLowerCase());
-    if (!sender) return res.status(422).json({ error: 'Sender identity is not configured for the authenticated user' });
-    if (sender.status !== 'active' || sender.verification !== 'VERIFIED') return res.status(422).json({ error: 'Sender must be active and verified before sending' });
+    const normalizedFrom = String(fromEmail || '').trim().toLowerCase();
+    const fromDomain = normalizedFrom.includes('@') ? normalizedFrom.split('@')[1] : '';
+    let sender = senders.find(s => s.fromEmail.toLowerCase() === normalizedFrom);
+    if (!sender && fromDomain) {
+      // Allow sending from any address under a verified sender domain
+      sender = senders.find(s => {
+        const sDomain = s.fromEmail.includes('@') ? s.fromEmail.split('@')[1].toLowerCase() : '';
+        return sDomain === fromDomain && (s.status === 'active' || !s.status) && (s.verification === 'VERIFIED' || !s.verification);
+      });
+    }
+    if (!sender) return res.status(422).json({ error: `Sender identity or domain for "${fromEmail}" is not configured for the authenticated user` });
+    if (sender.status && sender.status !== 'active') return res.status(422).json({ error: 'Sender must be active before sending' });
     if ((recipients.length > 1) && (ccRecipients.length || bccRecipients.length)) return res.status(400).json({ error: 'CC/BCC cannot be combined with multiple primary recipients. Send each primary recipient separately to keep tracking and analytics accurate.' });
 
     const clickTrackingEnabled = enableClickTracking ?? true;
@@ -135,9 +144,17 @@ messagesRouter.post('/test', requireAuth, async (req: Request, res: Response) =>
   if (!testEmail || !fromEmail) return res.status(400).json({ error: 'testEmail and fromEmail are required' });
   try {
     const senders = await supabaseService.getSenders(req.user!.id);
-    const sender = senders.find(s => s.fromEmail.toLowerCase() === String(fromEmail).toLowerCase());
-    if (!sender) return res.status(422).json({ error: 'Sender identity is not configured for the authenticated user' });
-    if (sender.status !== 'active' || sender.verification !== 'VERIFIED') return res.status(422).json({ error: 'Sender must be active and verified before sending' });
+    const normalizedFrom = String(fromEmail || '').trim().toLowerCase();
+    const fromDomain = normalizedFrom.includes('@') ? normalizedFrom.split('@')[1] : '';
+    let sender = senders.find(s => s.fromEmail.toLowerCase() === normalizedFrom);
+    if (!sender && fromDomain) {
+      sender = senders.find(s => {
+        const sDomain = s.fromEmail.includes('@') ? s.fromEmail.split('@')[1].toLowerCase() : '';
+        return sDomain === fromDomain && (s.status === 'active' || !s.status) && (s.verification === 'VERIFIED' || !s.verification);
+      });
+    }
+    if (!sender) return res.status(422).json({ error: `Sender identity or domain for "${fromEmail}" is not configured for the authenticated user` });
+    if (sender.status && sender.status !== 'active') return res.status(422).json({ error: 'Sender must be active before sending' });
     const internalId = `msg_test_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const senderDomain = fromEmail.includes('@') ? fromEmail.split('@')[1] : 'kumo.internal';
     const rfcMessageId = kumoMtaService.generateRfcMessageId(senderDomain);
