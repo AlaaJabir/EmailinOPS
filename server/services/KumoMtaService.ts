@@ -157,26 +157,26 @@ export class KumoMtaService {
     const rfcMessageId = payload.rfcMessageId || this.generateRfcMessageId(fromDomain);
     const toEmail = primaryTo.trim().toLowerCase();
 
-    const suppression = suppressionService.checkSuppression(toEmail);
-    if (suppression.isSuppressed) {
+    const sender = db.senders.find((s) => s.fromEmail.toLowerCase() === payload.fromEmail.toLowerCase());
+    const senderId = sender?.id || 'snd_default';
+    const senderDisplayName = payload.fromName || sender?.name;
+
+    const suppression = suppressionService.isSuppressed(toEmail);
+    if (suppression.suppressed && suppression.record) {
       const latencyMs = Date.now() - start;
-      const rejectReason = `Suppressed recipient (${suppression.reason}): ${toEmail}`;
-      this.logEvent('SUBMISSION_REJECTED', 'WARN', rejectReason, { internalId, rfcMessageId, to: toEmail, reason: suppression.reason, details: suppression.details }, rfcMessageId);
+      const rejectReason = `Suppressed recipient (${suppression.record.reason}): ${toEmail}`;
+      this.logEvent('SUBMISSION_REJECTED', 'WARN', rejectReason, { internalId, rfcMessageId, to: toEmail, reason: suppression.record.reason, details: suppression.record }, rfcMessageId);
       const rejectedMsg: Message = {
-        id: internalId, messageId: rfcMessageId, campaignId: payload.campaignId, fromEmail: payload.fromEmail, fromName: payload.fromName,
+        id: internalId, messageId: rfcMessageId, senderId, campaignId: payload.campaignId, fromEmail: payload.fromEmail, fromName: payload.fromName,
         toEmail: primaryTo, replyTo: payload.replyTo, subject: payload.subject, htmlBody: payload.htmlBody, plainText: payload.plainText,
         customHeaders: payload.customHeaders, status: 'REJECTED', provider: 'KumoMTA', bounceReason: rejectReason, smtpResponse: `554 5.7.1 ${rejectReason}`,
         queuedAt: new Date().toISOString(), createdAt: new Date().toISOString(),
-        events: [{ id: `evt_supp_${Date.now()}`, messageId: rfcMessageId, eventType: 'REJECTED', eventData: { reason: suppression.reason, details: suppression.details }, timestamp: new Date().toISOString() }],
+        events: [{ id: `evt_supp_${Date.now()}`, messageId: rfcMessageId, eventType: 'REJECTED', eventData: { reason: suppression.record.reason, details: suppression.record }, timestamp: new Date().toISOString() }],
       };
       db.messages.unshift(rejectedMsg);
       db.messageEvents.push(rejectedMsg.events[0]);
       return { success: false, messageId: internalId, rfcMessageId, kumoResponse: rejectReason, provider: 'KumoMTA', status: 'REJECTED', bounceReason: rejectReason, accepted: [], rejected: [primaryTo], latencyMs };
     }
-
-    const sender = db.senders.find((s) => s.fromEmail.toLowerCase() === payload.fromEmail.toLowerCase());
-    const senderId = sender?.id;
-    const senderDisplayName = payload.fromName || sender?.name;
     const customHeaders: Record<string, string> = {
       'X-KumoMTA-Message-ID': rfcMessageId,
       'X-KumoMTA-Queue': payload.campaignId ? `campaign_${payload.campaignId}` : 'transactional',
@@ -185,13 +185,80 @@ export class KumoMtaService {
       ...(payload.customHeaders || {}),
     };
 
-    if (payload.campaignId && !customHeaders['List-Unsubscribe']) {
+    if (!customHeaders['List-Unsubscribe']) {
       const unsubUrl = `https://${fromDomain}/unsubscribe?id=${internalId}`;
       customHeaders['List-Unsubscribe'] = `<${unsubUrl}>, <mailto:unsubscribe@${fromDomain}?subject=unsubscribe_${internalId}>`;
       customHeaders['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
     }
 
     const nowIso = new Date().toISOString();
+
+    // Check SES credentials for primary or direct dispatch
+    const sesHost = process.env.SES_SMTP_HOST || 'g6emxdm74cqj.fips.wmjb.mail-manager-smtp.amazonaws.com';
+    const sesUser = process.env.SES_SMTP_USERNAME || 'inp-nuchbsqgvk3qqaht5u7c5duz';
+    const sesPass = process.env.SES_SMTP_PASSWORD || 'alaa.JABIR06';
+    const sesPort = Number(process.env.SES_SMTP_PORT) || 587;
+    const hasDirectSes = Boolean(!this.customTransporter && sesUser && sesPass && sesHost);
+
+    // If direct Amazon SES is available, dispatch directly through SES Relay for 100% reliable inbox delivery
+    if (hasDirectSes) {
+      this.logEvent('SUBMISSION_INITIATED', 'INFO', `Dispatching email directly via Amazon SES Relay (${sesHost}:${sesPort}) for recipient: ${toEmail}`, { messageId: rfcMessageId, internalId, from: payload.fromEmail, to: toEmail, subject: payload.subject, campaignId: payload.campaignId, isTest: payload.isTest }, rfcMessageId);
+      try {
+        const directTransporter = nodemailer.createTransport({
+          host: sesHost,
+          port: sesPort,
+          secure: sesPort === 465,
+          auth: { user: sesUser, pass: sesPass },
+          connectionTimeout: 10000,
+          tls: { rejectUnauthorized: false }
+        });
+
+        const formattedFrom = senderDisplayName ? `"${senderDisplayName.replace(/"/g, '')}" <${payload.fromEmail}>` : payload.fromEmail;
+        const sesInfo = await directTransporter.sendMail({
+          from: formattedFrom,
+          to: payload.to,
+          cc: payload.cc,
+          bcc: payload.bcc,
+          replyTo: payload.replyTo || sender?.replyTo,
+          subject: payload.subject,
+          text: payload.plainText,
+          html: payload.htmlBody,
+          messageId: rfcMessageId,
+          headers: customHeaders,
+          attachments: payload.attachments?.map((a) => ({ filename: a.filename, content: a.content || Buffer.from(''), contentType: a.mimeType })),
+        });
+
+        const latencyMs = Date.now() - start;
+        const smtpResponse = sesInfo.response || '250 OK: Message accepted by Amazon SES Relay';
+        const messageStatus: MessageStatus = 'SENT';
+        const newMsg: Message = {
+          id: internalId, messageId: rfcMessageId, campaignId: payload.campaignId,
+          campaignName: payload.campaignId ? db.campaigns.find((c) => c.id === payload.campaignId)?.name : undefined,
+          senderId, fromName: senderDisplayName, fromEmail: payload.fromEmail, toEmail: primaryTo, replyTo: payload.replyTo || sender?.replyTo,
+          cc: payload.cc, bcc: payload.bcc, subject: payload.subject, htmlBody: payload.htmlBody, plainText: payload.plainText, customHeaders,
+          status: messageStatus, provider: 'Amazon SES', providerMessageId: sesInfo.messageId || rfcMessageId, smtpResponse, queuedAt: nowIso, sentAt: nowIso, createdAt: nowIso,
+          attachments: payload.attachments?.map((a, i) => ({ id: `att_${Date.now()}_${i}`, filename: a.filename, fileSize: a.fileSize, mimeType: a.mimeType })),
+        };
+        const sesEvent: MessageEvent = { id: `evt_ses_${Date.now()}`, messageId: rfcMessageId, eventType: 'SENT', eventData: { sesHost, sesPort, smtpResponse, latencyMs, accepted: sesInfo.accepted, rejected: sesInfo.rejected }, timestamp: nowIso };
+        newMsg.events = [sesEvent];
+        const existingIndex = db.messages.findIndex((m) => m.id === internalId);
+        if (existingIndex >= 0) db.messages[existingIndex] = newMsg;
+        else db.messages.unshift(newMsg);
+        db.messageEvents.push(sesEvent);
+        supabaseService.saveMessage(newMsg, payload.userId || 'usr_admin_01').catch(() => {});
+        supabaseService.saveMessageEvent(sesEvent, payload.userId || 'usr_admin_01').catch(() => {});
+        if (sender && 'sentCount' in sender) {
+          sender.sentCount += 1;
+          sender.deliveredCount = (sender.deliveredCount || 0) + 1;
+        }
+        this.logEvent('SES_DELIVERY_SUCCESS', 'SUCCESS', `Dispatched directly via Amazon SES in ${latencyMs}ms: ${smtpResponse}`, { internalId, rfcMessageId, sesHost, sesPort, latencyMs, accepted: sesInfo.accepted }, rfcMessageId);
+        return { success: true, messageId: internalId, rfcMessageId, kumoResponse: smtpResponse, provider: 'Amazon SES', status: messageStatus, smtpResponse, accepted: (sesInfo.accepted as string[]) || [primaryTo], rejected: (sesInfo.rejected as string[]) || [], latencyMs };
+      } catch (sesErr: any) {
+        this.logEvent('SES_DISPATCH_FAILED', 'ERROR', `Amazon SES direct dispatch failed: ${sesErr.message}`, { internalId, rfcMessageId, error: sesErr.message }, rfcMessageId);
+        throw new Error(`Amazon SES submission failed: ${sesErr.message}`);
+      }
+    }
+
     this.logEvent('SUBMISSION_INITIATED', 'INFO', `Submitting email to KumoMTA (${this.config.host}:${this.config.port}) for recipient: ${toEmail}`, { messageId: rfcMessageId, internalId, from: payload.fromEmail, to: toEmail, subject: payload.subject, campaignId: payload.campaignId, isTest: payload.isTest }, rfcMessageId);
 
     try {
@@ -239,11 +306,6 @@ export class KumoMtaService {
       // If local KumoMTA is offline or connection refused (and NOT a test customTransporter or permanent 5xx rejection), fallback seamlessly to Amazon SES Relay
       const is5xxRejection = err.responseCode >= 500 && err.responseCode < 600;
       const shouldFallback = !this.customTransporter && !is5xxRejection;
-
-      const sesHost = process.env.SES_SMTP_HOST || 'g6emxdm74cqj.fips.wmjb.mail-manager-smtp.amazonaws.com';
-      const sesUser = process.env.SES_SMTP_USERNAME || 'inp-nuchbsqgvk3qqaht5u7c5duz';
-      const sesPass = process.env.SES_SMTP_PASSWORD || 'alaa.JABIR06';
-      const sesPort = Number(process.env.SES_SMTP_PORT) || 587;
 
       if (shouldFallback && sesUser && sesPass && sesHost) {
         try {

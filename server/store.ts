@@ -37,7 +37,10 @@ class DatabaseStore {
       { id: 'usr_ops_02', email: 'ops@emailops.io', name: 'Sarah Chen (Deliverability Engineer)', role: 'OPERATOR', createdAt: iso(7200) },
     ];
     this.domains = [{ id: 'dom_00', domainName: 'amiralucia.com', spfStatus: 'VERIFIED', dkimStatus: 'VERIFIED', dmarcStatus: 'VERIFIED', sesStatus: 'VERIFIED', dkimSelector: 'kumo2026', dkimPublicKey: 'demo-only', spfRecord: 'demo-only', dmarcRecord: 'demo-only', createdAt: iso(10000), updatedAt: iso(100) }];
-    this.senders = [{ id: 'snd_00', name: 'Amira Lucia', fromEmail: 'service@amiralucia.com', replyTo: 'service@amiralucia.com', domainId: 'dom_00', domainName: 'amiralucia.com', status: 'active', verification: 'VERIFIED', dailyLimit: 50000, hourlyLimit: 5000, sentCount: 0, deliveredCount: 0, bouncedCount: 0, complaintCount: 0, createdAt: iso(100) }];
+    this.senders = [
+      { id: 'snd_00', name: 'Amira Lucia', fromEmail: 'service@amiralucia.com', replyTo: 'service@amiralucia.com', domainId: 'dom_00', domainName: 'amiralucia.com', status: 'active', verification: 'VERIFIED', dailyLimit: 50000, hourlyLimit: 5000, sentCount: 0, deliveredCount: 0, bouncedCount: 0, complaintCount: 0, createdAt: iso(100) },
+      { id: 'snd_01', name: 'Newsletter', fromEmail: 'newsletter@amiralucia.com', replyTo: 'newsletter@amiralucia.com', domainId: 'dom_00', domainName: 'amiralucia.com', status: 'active', verification: 'VERIFIED', dailyLimit: 50000, hourlyLimit: 5000, sentCount: 0, deliveredCount: 0, bouncedCount: 0, complaintCount: 0, createdAt: iso(100) }
+    ];
     this.contacts = [];
     this.contactLists = [];
     this.listMemberships = [];
