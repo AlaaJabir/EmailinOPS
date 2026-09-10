@@ -16,12 +16,14 @@ export class SesProvider implements EmailProvider {
 
   constructor() {
     this.region = process.env.SES_REGION || 'eu-west-1';
-    this.smtpHost = process.env.SES_SMTP_HOST || 'email-smtp.eu-west-1.amazonaws.com';
+    this.smtpHost = process.env.SES_SMTP_HOST || 'g6emxdm74cqj.fips.wmjb.mail-manager-smtp.amazonaws.com';
     this.smtpPort = Number(process.env.SES_SMTP_PORT) || 587;
   }
 
   async checkHealth(): Promise<{ status: 'healthy' | 'degraded' | 'offline'; region: string; quota: any }> {
-    const hasCredentials = Boolean(process.env.SES_SMTP_USERNAME && process.env.SES_SMTP_PASSWORD);
+    const user = process.env.SES_SMTP_USERNAME || 'inp-nuchbsqgvk3qqaht5u7c5duz';
+    const pass = process.env.SES_SMTP_PASSWORD || 'alaa.JABIR06';
+    const hasCredentials = Boolean(user && pass);
     return {
       status: hasCredentials ? 'healthy' : 'offline',
       region: this.region,
