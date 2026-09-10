@@ -143,50 +143,51 @@ export class KumoMtaService {
   }
 
   public generateRfcMessageId(domain: string): string {
-    return `<kumo.${Date.now()}.${Math.random().toString(36).substring(2, 10)}@${domain ? domain.replace(/^@/, '') : 'kumo.internal'}>`;
+    const cleanDomain = domain ? domain.replace(/^@/, '').trim() : 'kumo.internal';
+    const timestamp = Date.now();
+    const randomPart = Math.random().toString(36).substring(2, 10);
+    return `<kumo.${timestamp}.${randomPart}@${cleanDomain}>`;
   }
 
   async submitEmail(payload: SendEmailPayload): Promise<KumoSubmissionResult> {
     const start = Date.now();
-    const domainPart = payload.fromEmail.includes('@') ? payload.fromEmail.split('@')[1] : 'transact.acme-corp.io';
-    const rfcMessageId = payload.rfcMessageId || this.generateRfcMessageId(domainPart);
-    const internalId = payload.internalId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const toEmail = Array.isArray(payload.to) ? payload.to.join(', ') : payload.to;
     const primaryTo = Array.isArray(payload.to) ? payload.to[0] : payload.to;
+    const internalId = payload.internalId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const fromDomain = payload.fromEmail.includes('@') ? payload.fromEmail.split('@')[1] : 'kumo.internal';
+    const rfcMessageId = payload.rfcMessageId || this.generateRfcMessageId(fromDomain);
+    const toEmail = primaryTo.trim().toLowerCase();
 
-    const suppressionCheck = suppressionService.isSuppressed(primaryTo);
-    if (suppressionCheck.suppressed) {
-      const errorText = `Cannot send email: recipient "${primaryTo}" is suppressed (${suppressionCheck.record?.type}: ${suppressionCheck.record?.reason})`;
-      this.logEvent('SUBMISSION_BLOCKED_SUPPRESSED', 'WARN', errorText, { recipient: primaryTo, suppression: suppressionCheck.record });
-      throw new Error(errorText);
-    }
-    const validation = this.validateConfig();
-    if (!validation.valid) {
-      const errorText = `Cannot send email: KumoMTA is not configured properly (${validation.errors.join(', ')})`;
-      this.logEvent('SUBMISSION_CONFIG_ERROR', 'ERROR', errorText, { from: payload.fromEmail, to: toEmail });
-      throw new Error(errorText);
+    const suppression = suppressionService.checkSuppression(toEmail);
+    if (suppression.isSuppressed) {
+      const latencyMs = Date.now() - start;
+      const rejectReason = `Suppressed recipient (${suppression.reason}): ${toEmail}`;
+      this.logEvent('SUBMISSION_REJECTED', 'WARN', rejectReason, { internalId, rfcMessageId, to: toEmail, reason: suppression.reason, details: suppression.details }, rfcMessageId);
+      const rejectedMsg: Message = {
+        id: internalId, messageId: rfcMessageId, campaignId: payload.campaignId, fromEmail: payload.fromEmail, fromName: payload.fromName,
+        toEmail: primaryTo, replyTo: payload.replyTo, subject: payload.subject, htmlBody: payload.htmlBody, plainText: payload.plainText,
+        customHeaders: payload.customHeaders, status: 'REJECTED', provider: 'KumoMTA', bounceReason: rejectReason, smtpResponse: `554 5.7.1 ${rejectReason}`,
+        queuedAt: new Date().toISOString(), createdAt: new Date().toISOString(),
+        events: [{ id: `evt_supp_${Date.now()}`, messageId: rfcMessageId, eventType: 'REJECTED', eventData: { reason: suppression.reason, details: suppression.details }, timestamp: new Date().toISOString() }],
+      };
+      db.messages.unshift(rejectedMsg);
+      db.messageEvents.push(rejectedMsg.events[0]);
+      return { success: false, messageId: internalId, rfcMessageId, kumoResponse: rejectReason, provider: 'KumoMTA', status: 'REJECTED', bounceReason: rejectReason, accepted: [], rejected: [primaryTo], latencyMs };
     }
 
-    let sender = db.senders.find((s) => s.fromEmail.toLowerCase() === payload.fromEmail.toLowerCase());
-    if (payload.userId && supabaseService.isConfigured && supabaseService.getClient()) {
-      const supabaseSenders = await supabaseService.getSenders(payload.userId);
-      sender = supabaseSenders.find((s) => s.fromEmail.toLowerCase() === payload.fromEmail.toLowerCase());
-    }
-    const senderId = sender?.id || 'snd_01';
-    const senderDisplayName = payload.fromName || sender?.name || this.config.fromName;
-    const sesConfigurationSet = process.env.SES_CONFIGURATION_SET || db.settings?.ses?.configurationSet;
+    const sender = db.senders.find((s) => s.fromEmail.toLowerCase() === payload.fromEmail.toLowerCase());
+    const senderId = sender?.id;
+    const senderDisplayName = payload.fromName || sender?.name;
     const customHeaders: Record<string, string> = {
-      'X-KumoMTA-Queue': 'tier1-high-throughput',
-      'X-KumoMTA-Spool-ID': `spool-${Date.now().toString(36)}`,
-      'X-Entity-ID': 'emailops-kumo-cluster',
-      'X-Internal-Message-ID': internalId,
-      'X-EmailOps-ID': internalId,
-      ...(payload.campaignId ? { 'X-Campaign-ID': payload.campaignId } : {}),
-      ...(sesConfigurationSet ? { 'X-SES-CONFIGURATION-SET': sesConfigurationSet } : {}),
+      'X-KumoMTA-Message-ID': rfcMessageId,
+      'X-KumoMTA-Queue': payload.campaignId ? `campaign_${payload.campaignId}` : 'transactional',
+      'X-Mailer': 'EmailOps-KumoMTA/2.0',
+      'X-Entity-Ref-ID': internalId,
       ...(payload.customHeaders || {}),
     };
-    if (!customHeaders['List-Unsubscribe']) {
-      customHeaders['List-Unsubscribe'] = `<mailto:unsub@${domainPart}?subject=unsub-${internalId}>, <https://${domainPart}/u/${internalId}>`;
+
+    if (payload.campaignId && !customHeaders['List-Unsubscribe']) {
+      const unsubUrl = `https://${fromDomain}/unsubscribe?id=${internalId}`;
+      customHeaders['List-Unsubscribe'] = `<${unsubUrl}>, <mailto:unsubscribe@${fromDomain}?subject=unsubscribe_${internalId}>`;
       customHeaders['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
     }
 
@@ -225,7 +226,16 @@ export class KumoMtaService {
       };
       const initialEvent: MessageEvent = { id: `evt_kumo_${Date.now()}`, messageId: rfcMessageId, eventType: 'QUEUED', eventData: { kumoHost: this.config.host, kumoPort: this.config.port, smtpResponse, latencyMs, accepted: info.accepted, rejected: info.rejected }, timestamp: nowIso };
       newMsg.events = [initialEvent];
-      } catch (err: any) {
+      const existingIndex = db.messages.findIndex((m) => m.id === internalId);
+      if (existingIndex >= 0) db.messages[existingIndex] = newMsg;
+      else db.messages.unshift(newMsg);
+      db.messageEvents.push(initialEvent);
+      supabaseService.saveMessage(newMsg, payload.userId || 'usr_admin_01').catch(() => {});
+      supabaseService.saveMessageEvent(initialEvent, payload.userId || 'usr_admin_01').catch(() => {});
+      if (sender && 'sentCount' in sender) sender.sentCount += 1;
+      this.logEvent('SUBMISSION_ACCEPTED', 'SUCCESS', `KumoMTA accepted email for spooling in ${latencyMs}ms: ${smtpResponse}`, { internalId, rfcMessageId, kumoHost: this.config.host, kumoPort: this.config.port, latencyMs, accepted: info.accepted, rejected: info.rejected, response: smtpResponse }, rfcMessageId);
+      return { success: true, messageId: internalId, rfcMessageId, kumoResponse: smtpResponse, provider: 'KumoMTA', status: messageStatus, smtpResponse, accepted: (info.accepted as string[]) || [primaryTo], rejected: (info.rejected as string[]) || [], latencyMs };
+    } catch (err: any) {
       // If local KumoMTA is offline or connection refused (and NOT a test customTransporter or permanent 5xx rejection), fallback seamlessly to Amazon SES Relay
       const is5xxRejection = err.responseCode >= 500 && err.responseCode < 600;
       const shouldFallback = !this.customTransporter && !is5xxRejection;
@@ -236,22 +246,6 @@ export class KumoMtaService {
       const sesPort = Number(process.env.SES_SMTP_PORT) || 587;
 
       if (shouldFallback && sesUser && sesPass && sesHost) {
-      if (existingIndex >= 0) db.messages[existingIndex] = newMsg;
-      else db.messages.unshift(newMsg);
-      db.messageEvents.push(initialEvent);
-      supabaseService.saveMessage(newMsg, payload.userId || 'usr_admin_01').catch(() => {});
-      supabaseService.saveMessageEvent(initialEvent, payload.userId || 'usr_admin_01').catch(() => {});
-      if (sender && 'sentCount' in sender) sender.sentCount += 1;
-      this.logEvent('SUBMISSION_ACCEPTED', 'SUCCESS', `KumoMTA accepted email for spooling in ${latencyMs}ms: ${smtpResponse}`, { internalId, rfcMessageId, kumoHost: this.config.host, kumoPort: this.config.port, latencyMs, accepted: info.accepted, rejected: info.rejected, response: smtpResponse }, rfcMessageId);
-      return { success: true, messageId: internalId, rfcMessageId, kumoResponse: smtpResponse, provider: 'KumoMTA', status: messageStatus, smtpResponse, accepted: (info.accepted as string[]) || [primaryTo], rejected: (info.rejected as string[]) || [], latencyMs };
-    } catch (err: any) {
-      // If local KumoMTA is offline or refused connection, fallback seamlessly to Amazon SES Relay
-      const sesHost = process.env.SES_SMTP_HOST || 'g6emxdm74cqj.fips.wmjb.mail-manager-smtp.amazonaws.com';
-      const sesUser = process.env.SES_SMTP_USERNAME || 'inp-nuchbsqgvk3qqaht5u7c5duz';
-      const sesPass = process.env.SES_SMTP_PASSWORD || 'alaa.JABIR06';
-      const sesPort = Number(process.env.SES_SMTP_PORT) || 587;
-
-      if (sesUser && sesPass && sesHost) {
         try {
           this.logEvent('FALLBACK_INITIATED', 'INFO', `Local submission failed (${err.message}), attempting direct Amazon SES dispatch via ${sesHost}:${sesPort}`, { internalId, rfcMessageId, to: toEmail }, rfcMessageId);
           const directTransporter = nodemailer.createTransport({
