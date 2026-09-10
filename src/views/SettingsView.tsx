@@ -45,14 +45,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // SES form state
   const [sesRegion, setSesRegion] = useState(settings?.ses?.region || 'eu-west-1');
   const [sesSmtpHost, setSesSmtpHost] = useState(settings?.ses?.smtpHost || 'email-smtp.eu-west-1.amazonaws.com');
+  const [sesSmtpUser, setSesSmtpUser] = useState(settings?.ses?.smtpUser || '');
+  const [sesSmtpPass, setSesSmtpPass] = useState(settings?.ses?.smtpPass || '');
   const [sesConfigSet, setSesConfigSet] = useState(settings?.ses?.configurationSet || 'EmailOps-Production-ConfigSet');
   const [sesWebhookUrl, setSesWebhookUrl] = useState(settings?.ses?.webhookEndpoint || 'https://emailops.internal/api/webhooks/ses');
+  const [sesTesting, setSesTesting] = useState(false);
+  const [sesTestResult, setSesTestResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
 
   // Prometheus state
   const [promScrapeInterval, setPromScrapeInterval] = useState(settings?.prometheus?.scrapeInterval || '15s');
 
   // Compliance state
-  const [trackDomain, setTrackDomain] = useState(settings?.compliance?.trackingDomain || 'click.transact.acme-corp.io');
+  const [trackDomain, setTrackDomain] = useState(settings?.compliance?.trackingDomain || 'amiralucia.com');
   const [openPixel, setOpenPixel] = useState(settings?.compliance?.openPixelTracking ?? true);
   const [clickTracking, setClickTracking] = useState(settings?.compliance?.clickTracking ?? true);
   const [postalAddress, setPostalAddress] = useState(
@@ -257,6 +261,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 value={sesRegion}
                 onChange={(e) => setSesRegion(e.target.value)}
                 className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
+                placeholder="eu-west-1"
               />
             </div>
             <div>
@@ -266,6 +271,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 value={sesSmtpHost}
                 onChange={(e) => setSesSmtpHost(e.target.value)}
                 className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
+                placeholder="email-smtp.eu-west-1.amazonaws.com"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#888888] mb-1">SES SMTP Username (Access Key)</label>
+              <input
+                type="text"
+                value={sesSmtpUser}
+                onChange={(e) => setSesSmtpUser(e.target.value)}
+                className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
+                placeholder="AKIA..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#888888] mb-1">SES SMTP Password (Generated for SES)</label>
+              <input
+                type="password"
+                value={sesSmtpPass}
+                onChange={(e) => setSesSmtpPass(e.target.value)}
+                className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
+                placeholder="Enter SES SMTP Password"
               />
             </div>
             <div>
@@ -288,12 +314,57 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-end pt-3 border-t border-white-10">
+          {sesTestResult && (
+            <div
+              className={`p-3 rounded-sm text-xs font-mono border ${
+                sesTestResult.success
+                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+              }`}
+            >
+              {sesTestResult.success ? `✓ ${sesTestResult.message}` : `✕ ${sesTestResult.error}`}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-3 border-t border-white-10">
+            <button
+              type="button"
+              disabled={sesTesting}
+              onClick={async () => {
+                setSesTesting(true);
+                setSesTestResult(null);
+                try {
+                  const res = await fetch('/api/settings/verify-ses', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      smtpUser: sesSmtpUser,
+                      smtpPass: sesSmtpPass,
+                      region: sesRegion,
+                      smtpHost: sesSmtpHost,
+                    }),
+                  });
+                  const d = await res.json();
+                  setSesTestResult(d);
+                } catch (e: any) {
+                  setSesTestResult({ success: false, error: e.message });
+                } finally {
+                  setSesTesting(false);
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-sm bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium transition-colors"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+              <span>{sesTesting ? 'Testing Connection...' : 'Test SES Credentials'}</span>
+            </button>
+
             <button
               onClick={() =>
                 handleSaveCategory('ses', {
                   region: sesRegion,
                   smtpHost: sesSmtpHost,
+                  smtpUser: sesSmtpUser,
+                  smtpPass: sesSmtpPass,
                   configurationSet: sesConfigSet,
                   webhookEndpoint: sesWebhookUrl,
                 })

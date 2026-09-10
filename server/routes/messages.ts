@@ -120,7 +120,10 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
       const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({ email: recipient, contactId: contact?.id, messageId: internalId, campaignId, userId: req.user?.id, baseUrl });
       let personalizedHtml = personalizationService.personalizeContent(buildHtml(headHtml, htmlBody), { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
       const personalizedSubject = personalizationService.personalizeContent(subject || '', { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
-      const personalizedPlainText = plainText ? personalizationService.personalizeContent(plainText, { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables }) : undefined;
+      const effectivePlainText = plainText && plainText.trim().length > 0
+        ? plainText
+        : personalizationService.htmlToPlainText(personalizedHtml);
+      const personalizedPlainText = personalizationService.personalizeContent(effectivePlainText, { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
       if (clickTrackingEnabled && personalizedHtml) personalizedHtml = personalizationService.rewriteLinksForClickTracking(personalizedHtml, internalId, baseUrl);
       if (openTrackingEnabled && personalizedHtml) personalizedHtml = personalizationService.injectOpenTrackingPixel(personalizedHtml, internalId, baseUrl);
 
@@ -169,9 +172,10 @@ messagesRouter.post('/test', requireAuth, async (req: Request, res: Response) =>
     let personalizedHtml = personalizationService.personalizeContent(buildHtml(headHtml, htmlBody || '<p>This is a test message from EmailOps Dashboard via KumoMTA.</p>'), { email: testEmail, unsubscribeUrl });
     if (enableClickTracking ?? true) personalizedHtml = personalizationService.rewriteLinksForClickTracking(personalizedHtml, internalId, baseUrl);
     if (enableOpenTracking ?? true) personalizedHtml = personalizationService.injectOpenTrackingPixel(personalizedHtml, internalId, baseUrl);
+    const testPlainText = personalizationService.htmlToPlainText(personalizedHtml);
     const unsubHeaders = personalizationService.generateUnsubscribeHeaders(unsubscribeUrl, senderDomain);
-    await preRegisterMessage({ internalId, messageId: rfcMessageId, senderId: sender.id, fromEmail, toEmail: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), customHeaders: unsubHeaders, userId: req.user?.id, isTest: true, isMarketing: false, openTrackingEnabled: enableOpenTracking ?? true, clickTrackingEnabled: enableClickTracking ?? true });
-    const result = await kumoMtaService.submitEmail({ rfcMessageId, fromEmail, to: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, customHeaders: unsubHeaders, internalId, isTest: true, userId: req.user?.id });
+    await preRegisterMessage({ internalId, messageId: rfcMessageId, senderId: sender.id, fromEmail, toEmail: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), plainText: testPlainText, customHeaders: unsubHeaders, userId: req.user?.id, isTest: true, isMarketing: false, openTrackingEnabled: enableOpenTracking ?? true, clickTrackingEnabled: enableClickTracking ?? true });
+    const result = await kumoMtaService.submitEmail({ rfcMessageId, fromEmail, to: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, plainText: testPlainText, customHeaders: unsubHeaders, internalId, isTest: true, userId: req.user?.id });
     return res.json({ success: true, result, message: `Test email dispatched to ${testEmail} through KumoMTA spool.` });
   } catch (err: any) { return res.status(500).json({ error: err.message || 'Failed to send test email via KumoMTA' }); }
 });

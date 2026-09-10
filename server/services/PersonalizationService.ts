@@ -126,7 +126,7 @@ export class PersonalizationService {
    * Build RFC 8058 compliant unsubscribe headers
    */
   generateUnsubscribeHeaders(unsubscribeUrl: string, abuseDomain?: string): Record<string, string> {
-    const domain = abuseDomain || 'transact.acme-corp.io';
+    const domain = abuseDomain || process.env.KUMO_FROM_EMAIL?.split('@')[1] || 'amiralucia.com';
     return {
       'List-Unsubscribe': `<${unsubscribeUrl}>, <mailto:unsubscribe@${domain}?subject=unsubscribe>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
@@ -276,6 +276,54 @@ export class PersonalizationService {
     }
 
     return `${html}\n${pixelTag}`;
+  }
+
+  /**
+   * Automatically generate clean text/plain content from HTML to ensure multipart/alternative MIME structure.
+   * This eliminates the severe SpamAssassin MIME_HTML_ONLY penalty and guarantees high deliverability.
+   */
+  htmlToPlainText(html: string): string {
+    if (!html) return '';
+    let text = html;
+
+    // Remove head, style, and script tags with their inner contents
+    text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    text = text.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+
+    // Format headers and block elements with newlines
+    text = text.replace(/<\/h[1-6]>/gi, '\n\n');
+    text = text.replace(/<br\s*[\/]?>/gi, '\n');
+    text = text.replace(/<\/p>/gi, '\n\n');
+    text = text.replace(/<\/div>/gi, '\n');
+    text = text.replace(/<\/tr>/gi, '\n');
+    text = text.replace(/<\/li>/gi, '\n');
+
+    // Replace hyperlinks with readable text: "Label (URL)" or plain Label if anchor is internal
+    text = text.replace(/<a\b[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (match, url, label) => {
+      const cleanLabel = label.replace(/<[^>]+>/g, '').trim();
+      const cleanUrl = url.trim();
+      if (!cleanLabel) return cleanUrl;
+      if (cleanUrl.startsWith('#') || cleanUrl.startsWith('javascript:')) return cleanLabel;
+      return `${cleanLabel} (${cleanUrl})`;
+    });
+
+    // Strip remaining HTML tags
+    text = text.replace(/<[^>]+>/g, '');
+
+    // Decode standard HTML entities
+    text = text.replace(/&nbsp;/gi, ' ');
+    text = text.replace(/&amp;/gi, '&');
+    text = text.replace(/&lt;/gi, '<');
+    text = text.replace(/&gt;/gi, '>');
+    text = text.replace(/&quot;/gi, '"');
+    text = text.replace(/&#39;/gi, "'");
+
+    // Collapse multiple blank lines into max 2 newlines
+    text = text.replace(/[ \t]+/g, ' ');
+    text = text.replace(/\n\s*\n\s*\n+/g, '\n\n');
+
+    return text.trim();
   }
 }
 

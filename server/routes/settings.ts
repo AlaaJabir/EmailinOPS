@@ -37,6 +37,34 @@ settingsRouter.post('/', async (req: Request, res: Response) => {
   }
 });
 
+settingsRouter.post('/verify-ses', async (req: Request, res: Response) => {
+  const { smtpUser, smtpPass, region, smtpHost, smtpPort } = req.body;
+  const user = smtpUser || process.env.SES_SMTP_USERNAME;
+  const pass = smtpPass || process.env.SES_SMTP_PASSWORD;
+  const host = smtpHost || (region ? `email-smtp.${region}.amazonaws.com` : 'email-smtp.eu-west-1.amazonaws.com');
+  const port = Number(smtpPort) || 587;
+
+  if (!user || !pass) {
+    return res.status(400).json({ success: false, error: 'SMTP Username and Password are required.' });
+  }
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.default.createTransport({
+      host,
+      port,
+      secure: false,
+      auth: { user, pass },
+      connectionTimeout: 8000,
+    });
+
+    await transporter.verify();
+    return res.json({ success: true, message: `Successfully authenticated with Amazon SES at ${host}:${port}!` });
+  } catch (err: any) {
+    return res.status(422).json({ success: false, error: err.message || 'SES Authentication failed' });
+  }
+});
+
 settingsRouter.post('/api-keys', async (req: Request, res: Response) => {
   const name = String(req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
