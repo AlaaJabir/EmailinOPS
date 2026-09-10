@@ -225,7 +225,17 @@ export class KumoMtaService {
       };
       const initialEvent: MessageEvent = { id: `evt_kumo_${Date.now()}`, messageId: rfcMessageId, eventType: 'QUEUED', eventData: { kumoHost: this.config.host, kumoPort: this.config.port, smtpResponse, latencyMs, accepted: info.accepted, rejected: info.rejected }, timestamp: nowIso };
       newMsg.events = [initialEvent];
-      const existingIndex = db.messages.findIndex((m) => m.id === internalId);
+      } catch (err: any) {
+      // If local KumoMTA is offline or connection refused (and NOT a test customTransporter or permanent 5xx rejection), fallback seamlessly to Amazon SES Relay
+      const is5xxRejection = err.responseCode >= 500 && err.responseCode < 600;
+      const shouldFallback = !this.customTransporter && !is5xxRejection;
+
+      const sesHost = process.env.SES_SMTP_HOST || 'g6emxdm74cqj.fips.wmjb.mail-manager-smtp.amazonaws.com';
+      const sesUser = process.env.SES_SMTP_USERNAME || 'inp-nuchbsqgvk3qqaht5u7c5duz';
+      const sesPass = process.env.SES_SMTP_PASSWORD || 'alaa.JABIR06';
+      const sesPort = Number(process.env.SES_SMTP_PORT) || 587;
+
+      if (shouldFallback && sesUser && sesPass && sesHost) {
       if (existingIndex >= 0) db.messages[existingIndex] = newMsg;
       else db.messages.unshift(newMsg);
       db.messageEvents.push(initialEvent);
