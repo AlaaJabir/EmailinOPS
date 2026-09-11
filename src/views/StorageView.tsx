@@ -229,7 +229,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-[#7c9188] mt-1">
-                تخزين سحابي مباشر للملفات، الصور، والمرفقات بدون استهلاك باندويث Supabase
+                Direct cloud object storage for images, assets, and attachments with zero egress fees
               </p>
             </div>
           </div>
@@ -264,7 +264,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
               )}
             </h2>
             <p className="text-xs text-[#7c9188] mt-0.5">
-              Account ID و S3 Endpoint تم إعدادهم تلقائياً، أدخل الـ Access Key و Secret من Cloudflare
+              Account ID and S3 Endpoint are pre-configured. Enter your Cloudflare Access Key and Secret.
             </p>
           </div>
         </div>
@@ -273,7 +273,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-[#7c9188] mb-1">
-              Cloudflare Account ID (معرف الحساب)
+              Cloudflare Account ID
             </label>
             <input
               type="text"
@@ -286,7 +286,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-[#7c9188] mb-1">
-              S3 Endpoint URL (رابط S3 API)
+              S3 Endpoint URL
             </label>
             <input
               type="text"
@@ -299,7 +299,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-[#7c9188] mb-1">
-              Target Bucket Name (اسم الـ Bucket)
+              Target Bucket Name
             </label>
             <input
               type="text"
@@ -312,7 +312,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-[#7c9188] mb-1">
-              Public Custom Domain / R2.dev URL <span className="text-[#4a5a53]">(اختياري)</span>
+              Public Custom Domain / R2.dev URL <span className="text-[#4a5a53]">(Optional)</span>
             </label>
             <input
               type="text"
@@ -326,7 +326,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
           <div>
             <label className="block text-xs font-medium text-orange-300 mb-1 flex items-center justify-between">
               <span>R2 Access Key ID *</span>
-              <span className="text-[10px] text-[#7c9188] font-normal">من Cloudflare R2 Token</span>
+              <span className="text-[10px] text-[#7c9188] font-normal">From Cloudflare R2 Token</span>
             </label>
             <input
               type="text"
@@ -340,7 +340,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
           <div>
             <label className="block text-xs font-medium text-orange-300 mb-1 flex items-center justify-between">
               <span>R2 Secret Access Key *</span>
-              <span className="text-[10px] text-[#7c9188] font-normal">من Cloudflare R2 Token</span>
+              <span className="text-[10px] text-[#7c9188] font-normal">From Cloudflare R2 Token</span>
             </label>
             <div className="relative">
               <input
@@ -365,12 +365,12 @@ export const StorageView: React.FC<StorageViewProps> = ({
         <div className="p-4 rounded bg-[#070a09] border border-[#1e2825] text-xs space-y-2">
           <div className="flex items-center gap-2 text-orange-300 font-semibold">
             <HelpCircle className="w-4 h-4" />
-            <span>كيفاش تجيب الـ R2 Token من Cloudflare (في 3 خطوات):</span>
+            <span>How to generate your R2 Token in Cloudflare (3 steps):</span>
           </div>
           <ol className="list-decimal list-inside space-y-1 text-[11.5px] text-[#7c9188] leading-relaxed">
-            <li>دخل لـ <strong className="text-[#d8e6df]">Cloudflare Dashboard</strong> ثم كليكي على <strong className="text-[#d8e6df]">R2</strong> في القائمة الجانبية.</li>
-            <li>كليكي على <strong className="text-orange-400 font-mono">Manage R2 API Tokens</strong> على اليمين ثم <strong className="text-[#d8e6df]">Create API Token</strong>.</li>
-            <li>اختار الصلاحية: <strong className="text-[#39ff9c]">Object Read &amp; Write</strong>، ثم كليكي <strong className="text-[#d8e6df]">Create API Token</strong> وانسخ <strong className="text-white">Access Key ID</strong> و <strong className="text-white">Secret Access Key</strong> وحطهم هنا.</li>
+            <li>Log in to <strong className="text-[#d8e6df]">Cloudflare Dashboard</strong> and select <strong className="text-[#d8e6df]">R2</strong> in the sidebar.</li>
+            <li>Click <strong className="text-orange-400 font-mono">Manage R2 API Tokens</strong> on the right, then <strong className="text-[#d8e6df]">Create API Token</strong>.</li>
+            <li>Set permissions to <strong className="text-[#39ff9c]">Object Read &amp; Write</strong>, click <strong className="text-[#d8e6df]">Create API Token</strong>, and paste your <strong className="text-white">Access Key ID</strong> and <strong className="text-white">Secret Access Key</strong> here.</li>
           </ol>
         </div>
 
@@ -396,7 +396,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
             className="flex items-center gap-2 px-4 py-2 rounded bg-[#161f1c] hover:bg-[#1d2925] text-[#d8e6df] text-xs font-medium border border-[#1e2825] transition-colors"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-orange-400" />
-            <span>{isTesting ? 'Testing Cloudflare R2...' : 'Test Connection (اختبار الاتصال)'}</span>
+            <span>{isTesting ? 'Testing Cloudflare R2...' : 'Test Connection'}</span>
           </button>
 
           <button
@@ -406,7 +406,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
             className="flex items-center gap-2 px-5 py-2 rounded bg-white hover:bg-zinc-200 text-black text-xs font-semibold transition-colors"
           >
             <Save className="w-3.5 h-3.5" />
-            <span>{saveSuccess ? 'Saved! ✓' : isSaving ? 'Saving...' : 'Save Configuration (حفظ الإعدادات)'}</span>
+            <span>{saveSuccess ? 'Saved! ✓' : isSaving ? 'Saving...' : 'Save Configuration'}</span>
           </button>
         </div>
       </div>
@@ -422,7 +422,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
               </span>
             </h2>
             <p className="text-xs text-[#7c9188] mt-0.5">
-              رفع وتصفح صور الإيميلات والشعارات والملفات المرفقة بروابط مباشرة
+              Upload and explore campaign images, brand logos, and attachments with direct public URLs
             </p>
           </div>
 
@@ -466,7 +466,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
         >
           <UploadCloud className="w-7 h-7 text-orange-400 mx-auto mb-2 opacity-80" />
           <p className="text-xs text-[#d8e6df] font-medium">
-            اسحب أي صورة أو ملف هنا أو اضغط <span className="text-orange-400 underline">Browse</span> لرفعه مباشرة لـ Cloudflare R2
+            Drag and drop any image or file here or click <span className="text-orange-400 underline">Browse</span> to upload directly to Cloudflare R2
           </p>
           <p className="text-[10px] text-[#4a5a53] mt-1 font-mono">
             PNG, JPG, SVG, GIF, CSV, PDF, HTML (Zero egress bandwidth)
@@ -490,11 +490,11 @@ export const StorageView: React.FC<StorageViewProps> = ({
         {/* Files Table */}
         {files.length === 0 ? (
           <div className="text-center py-8 text-xs text-[#4a5a53]">
-            مازال ما رفعتيش حتى ملف فـ Cloudflare R2. رفع صورة باش تجرب الرابط ديالها فـ الإيميلات.
+            No assets uploaded to Cloudflare R2 yet. Upload an image to test direct links in your emails.
           </div>
         ) : filteredFiles.length === 0 ? (
           <div className="text-center py-6 text-xs text-[#4a5a53]">
-            لا توجد ملفات تطابق بحثك "{searchQuery}".
+            No assets match your search query "{searchQuery}".
           </div>
         ) : (
           <div className="overflow-x-auto border border-[#1e2825] rounded">
