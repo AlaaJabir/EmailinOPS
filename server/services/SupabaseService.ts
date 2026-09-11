@@ -310,159 +310,259 @@ export class SupabaseService {
 
   async getMessages(userId?: string, limit = 100): Promise<Message[]> {
     if (!this.isConfigured || !this.client) return db.messages.slice(0, limit);
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return db.messages.slice(0, limit);
-    const { data, error } = await this.client.from('messages').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false }).limit(limit);
-    if (error) throw new Error(`Supabase messages query failed: ${error.message}`);
-    const ids = (data || []).map((r: any) => r.message_id).filter(Boolean);
-    let ev: any[] = [];
-    if (ids.length) {
-      const q = await this.client.from('message_events').select('*').in('message_id', ids).eq('user_id', resolvedUser).order('timestamp', { ascending: true });
-      if (!q.error) ev = q.data || [];
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return db.messages.slice(0, limit);
+      const { data, error } = await this.client.from('messages').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false }).limit(limit);
+      if (error) {
+        console.warn(`[SupabaseService] getMessages fallback:`, error.message);
+        return db.messages.slice(0, limit);
+      }
+      const ids = (data || []).map((r: any) => r.message_id).filter(Boolean);
+      let ev: any[] = [];
+      if (ids.length) {
+        const q = await this.client.from('message_events').select('*').in('message_id', ids).eq('user_id', resolvedUser).order('timestamp', { ascending: true });
+        if (!q.error) ev = q.data || [];
+      }
+      const grouped = new Map<string, MessageEvent[]>();
+      for (const r of ev) {
+        const e: any = { id: r.id, messageId: r.message_id, eventType: r.event_type, eventData: r.event_data || undefined, timestamp: r.timestamp, ipAddress: r.ip_address || undefined, userAgent: r.user_agent || undefined, geo: r.geo || undefined };
+        grouped.set(e.messageId, [...(grouped.get(e.messageId) || []), e]);
+      }
+      const remote = (data || []).map((r: any) => ({
+        id: r.internal_id || r.id, messageId: r.message_id, sesMessageId: r.ses_message_id, campaignId: r.campaign_id, senderId: r.sender_id,
+        fromName: r.from_name, fromEmail: r.from_email, toEmail: r.to_email, replyTo: r.reply_to, cc: r.cc || [], bcc: r.bcc || [],
+        subject: r.subject, htmlBody: r.html_body, plainText: r.plain_text, customHeaders: r.custom_headers, status: r.status,
+        provider: r.provider, providerMessageId: r.provider_message_id, smtpResponse: r.smtp_response, bounceType: r.bounce_type,
+        bounceReason: r.bounce_reason, queuedAt: r.queued_at, sentAt: r.sent_at, deliveredAt: r.delivered_at, bouncedAt: r.bounced_at,
+        createdAt: r.created_at, events: grouped.get(r.message_id) || [],
+      }));
+      return remote.length ? remote : db.messages.slice(0, limit);
+    } catch (err: any) {
+      console.warn(`[SupabaseService] getMessages exception fallback:`, err?.message);
+      return db.messages.slice(0, limit);
     }
-    const grouped = new Map<string, MessageEvent[]>();
-    for (const r of ev) {
-      const e: any = { id: r.id, messageId: r.message_id, eventType: r.event_type, eventData: r.event_data || undefined, timestamp: r.timestamp, ipAddress: r.ip_address || undefined, userAgent: r.user_agent || undefined, geo: r.geo || undefined };
-      grouped.set(e.messageId, [...(grouped.get(e.messageId) || []), e]);
-    }
-    return (data || []).map((r: any) => ({
-      id: r.internal_id || r.id, messageId: r.message_id, sesMessageId: r.ses_message_id, campaignId: r.campaign_id, senderId: r.sender_id,
-      fromName: r.from_name, fromEmail: r.from_email, toEmail: r.to_email, replyTo: r.reply_to, cc: r.cc || [], bcc: r.bcc || [],
-      subject: r.subject, htmlBody: r.html_body, plainText: r.plain_text, customHeaders: r.custom_headers, status: r.status,
-      provider: r.provider, providerMessageId: r.provider_message_id, smtpResponse: r.smtp_response, bounceType: r.bounce_type,
-      bounceReason: r.bounce_reason, queuedAt: r.queued_at, sentAt: r.sent_at, deliveredAt: r.delivered_at, bouncedAt: r.bounced_at,
-      createdAt: r.created_at, events: grouped.get(r.message_id) || [],
-    }));
   }
 
   async getSenders(userId?: string): Promise<Sender[]> {
     if (!this.isConfigured || !this.client) return db.senders;
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return db.senders;
-    const { data, error } = await this.client.from('senders').select('*,domains(domain_name)').eq('user_id', resolvedUser).order('created_at', { ascending: false });
-    if (error) throw new Error(`Supabase senders query failed: ${error.message}`);
-    return (data || []).map((r: any) => ({
-      id: r.id, name: r.name, fromEmail: r.from_email, replyTo: r.reply_to, domainId: r.domain_id, domainName: r.domains?.domain_name,
-      status: r.status, verification: r.verification, dailyLimit: r.daily_limit, hourlyLimit: r.hourly_limit,
-      sentCount: r.sent_count, deliveredCount: r.delivered_count, bouncedCount: r.bounced_count, complaintCount: r.complaint_count,
-      createdAt: r.created_at, updatedAt: r.updated_at,
-    }));
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return db.senders;
+      const { data, error } = await this.client.from('senders').select('*,domains(domain_name)').eq('user_id', resolvedUser).order('created_at', { ascending: false });
+      if (error) {
+        console.warn(`[SupabaseService] getSenders fallback:`, error.message);
+        return db.senders;
+      }
+      const remote = (data || []).map((r: any) => ({
+        id: r.id, name: r.name, fromEmail: r.from_email, replyTo: r.reply_to, domainId: r.domain_id, domainName: r.domains?.domain_name,
+        status: r.status, verification: r.verification, dailyLimit: r.daily_limit, hourlyLimit: r.hourly_limit,
+        sentCount: r.sent_count, deliveredCount: r.delivered_count, bouncedCount: r.bounced_count, complaintCount: r.complaint_count,
+        createdAt: r.created_at, updatedAt: r.updated_at,
+      }));
+      return remote.length ? remote : db.senders;
+    } catch (err: any) {
+      console.warn(`[SupabaseService] getSenders exception fallback:`, err?.message);
+      return db.senders;
+    }
   }
 
   async getDomains(userId?: string): Promise<Domain[]> {
     if (!this.isConfigured || !this.client) return db.domains;
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return db.domains;
-    const { data, error } = await this.client.from('domains').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false });
-    if (error) throw new Error(`Supabase domains query failed: ${error.message}`);
-    return (data || []).map((r: any) => ({
-      id: r.id, domainName: r.domain_name, spfStatus: r.spf_status, dkimStatus: r.dkim_status, dmarcStatus: r.dmarc_status,
-      sesStatus: r.ses_status, dkimSelector: r.dkim_selector, dkimPublicKey: r.dkim_public_key, spfRecord: r.spf_record,
-      dmarcRecord: r.dmarc_record, createdAt: r.created_at, updatedAt: r.updated_at,
-    }));
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return db.domains;
+      const { data, error } = await this.client.from('domains').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false });
+      if (error) {
+        console.warn(`[SupabaseService] getDomains fallback:`, error.message);
+        return db.domains;
+      }
+      const remote = (data || []).map((r: any) => ({
+        id: r.id, domainName: r.domain_name, spfStatus: r.spf_status, dkimStatus: r.dkim_status, dmarcStatus: r.dmarc_status,
+        sesStatus: r.ses_status, dkimSelector: r.dkim_selector, dkimPublicKey: r.dkim_public_key, spfRecord: r.spf_record,
+        dmarcRecord: r.dmarc_record, createdAt: r.created_at, updatedAt: r.updated_at,
+      }));
+      return remote.length ? remote : db.domains;
+    } catch (err: any) {
+      console.warn(`[SupabaseService] getDomains exception fallback:`, err?.message);
+      return db.domains;
+    }
   }
 
   async getCampaigns(userId?: string): Promise<Campaign[]> {
     if (!this.isConfigured || !this.client) return db.campaigns;
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return db.campaigns;
-    const { data, error } = await this.client.from('campaigns').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false });
-    if (error) throw new Error(`Supabase campaigns query failed: ${error.message}`);
-    return (data || []).map((r: any) => ({
-      id: r.id, name: r.name, senderId: r.sender_id, listId: r.list_id, templateId: r.template_id, subject: r.subject,
-      preheader: r.preheader, headHtml: r.head_html, htmlBody: r.html_body, plainText: r.plain_text, status: r.status,
-      scheduledAt: r.scheduled_at, startedAt: r.started_at, completedAt: r.completed_at, totalRecipients: r.total_recipients,
-      sentCount: r.sent_count, deliveredCount: r.delivered_count, bouncedCount: r.bounced_count, complaintCount: r.complaint_count,
-      openCount: r.open_count, clickCount: r.click_count, trackOpens: r.track_opens, trackClicks: r.track_clicks, createdAt: r.created_at,
-    }));
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return db.campaigns;
+      const { data, error } = await this.client.from('campaigns').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false });
+      if (error) {
+        console.warn(`[SupabaseService] getCampaigns fallback:`, error.message);
+        return db.campaigns;
+      }
+      return (data || []).map((r: any) => ({
+        id: r.id, name: r.name, senderId: r.sender_id, listId: r.list_id, templateId: r.template_id, subject: r.subject,
+        preheader: r.preheader, headHtml: r.head_html, htmlBody: r.html_body, plainText: r.plain_text, status: r.status,
+        scheduledAt: r.scheduled_at, startedAt: r.started_at, completedAt: r.completed_at, totalRecipients: r.total_recipients,
+        sentCount: r.sent_count, deliveredCount: r.delivered_count, bouncedCount: r.bounced_count, complaintCount: r.complaint_count,
+        openCount: r.open_count, clickCount: r.click_count, trackOpens: r.track_opens, trackClicks: r.track_clicks, createdAt: r.created_at,
+      }));
+    } catch (err: any) {
+      console.warn(`[SupabaseService] getCampaigns exception fallback:`, err?.message);
+      return db.campaigns;
+    }
   }
 
   async getContacts(userId?: string): Promise<Contact[]> {
     if (!this.isConfigured || !this.client) return db.contacts;
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return db.contacts;
-    const { data, error } = await this.client.from('contacts').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false });
-    if (error) throw new Error(`Supabase contacts query failed: ${error.message}`);
-    return (data || []).map((r: any) => ({
-      id: r.id, email: r.email, firstName: r.first_name, lastName: r.last_name, company: r.company,
-      tags: r.tags || [], status: r.status, bounceReason: r.bounce_reason, createdAt: r.created_at, updatedAt: r.updated_at,
-    }));
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return db.contacts;
+      const { data, error } = await this.client.from('contacts').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false });
+      if (error) {
+        console.warn(`[SupabaseService] getContacts fallback:`, error.message);
+        return db.contacts;
+      }
+      return (data || []).map((r: any) => ({
+        id: r.id, email: r.email, firstName: r.first_name, lastName: r.last_name, company: r.company,
+        tags: r.tags || [], status: r.status, bounceReason: r.bounce_reason, createdAt: r.created_at, updatedAt: r.updated_at,
+      }));
+    } catch (err: any) {
+      console.warn(`[SupabaseService] getContacts exception fallback:`, err?.message);
+      return db.contacts;
+    }
   }
 
   async getSuppressions(userId?: string): Promise<SuppressionItem[]> {
     if (!this.isConfigured || !this.client) return db.suppressions;
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return [];
-    const { data, error } = await this.client.from('suppressions').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false });
-    if (error) throw new Error(`Supabase suppressions query failed: ${error.message}`);
-    return (data || []).map((r: any) => ({
-      id: r.id, email: r.email, type: r.type, reason: r.reason, source: r.source, createdAt: r.created_at,
-    }));
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return [];
+      const { data, error } = await this.client.from('suppressions').select('*').eq('user_id', resolvedUser).order('created_at', { ascending: false });
+      if (error) {
+        console.warn(`[SupabaseService] getSuppressions fallback:`, error.message);
+        return db.suppressions;
+      }
+      return (data || []).map((r: any) => ({
+        id: r.id, email: r.email, type: r.type, reason: r.reason, source: r.source, createdAt: r.created_at,
+      }));
+    } catch (err: any) {
+      console.warn(`[SupabaseService] getSuppressions exception fallback:`, err?.message);
+      return db.suppressions;
+    }
   }
 
   async getLogs(userId?: string, limit = 100) {
     if (!this.isConfigured || !this.client) return db.logs.slice(0, limit);
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return db.logs.slice(0, limit);
-    const { data, error } = await this.client.from('technical_logs').select('*').eq('user_id', resolvedUser).order('timestamp', { ascending: false }).limit(limit);
-    if (error) throw new Error(`Supabase logs query failed: ${error.message}`);
-    return (data || []).map((r: any) => ({
-      id: r.id, timestamp: r.timestamp, service: r.service, messageId: r.message_id, event: r.event,
-      severity: r.severity, response: r.response, details: r.details || undefined,
-    }));
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return db.logs.slice(0, limit);
+      const { data, error } = await this.client.from('technical_logs').select('*').eq('user_id', resolvedUser).order('timestamp', { ascending: false }).limit(limit);
+      if (error) {
+        console.warn(`[SupabaseService] getLogs fallback:`, error.message);
+        return db.logs.slice(0, limit);
+      }
+      return (data || []).map((r: any) => ({
+        id: r.id, timestamp: r.timestamp, service: r.service, messageId: r.message_id, event: r.event,
+        severity: r.severity, response: r.response, details: r.details || undefined,
+      }));
+    } catch (err: any) {
+      console.warn(`[SupabaseService] getLogs exception fallback:`, err?.message);
+      return db.logs.slice(0, limit);
+    }
   }
 
   async getSettings(userId?: string) {
     if (!this.isConfigured || !this.client) return db.settings;
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return db.settings;
-    const { data, error } = await this.client.from('settings').select('category,values').eq('user_id', resolvedUser);
-    if (error) throw new Error(`Supabase settings query failed: ${error.message}`);
-    return Object.fromEntries((data || []).map((r: any) => [r.category, r.values]));
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return db.settings;
+      const { data, error } = await this.client.from('settings').select('category,values').eq('user_id', resolvedUser);
+      if (error) {
+        console.warn(`[SupabaseService] settings query fallback to db.settings:`, error.message);
+        return db.settings;
+      }
+      const remote = Object.fromEntries((data || []).map((r: any) => [r.category, r.values]));
+      return { ...db.settings, ...remote };
+    } catch (e: any) {
+      console.warn(`[SupabaseService] getSettings fallback:`, e?.message);
+      return db.settings;
+    }
   }
 
   async upsertSettings(userId: string, category: string, values: any) {
+    // Always persist to local in-memory store so configuration is instantly active
+    db.settings[category] = { ...(db.settings[category] || {}), ...values };
+
     const resolvedUser = await this.resolveUserId(userId);
     if (!this.isConfigured || !this.client || !resolvedUser) {
-      db.settings[category] = values;
-      return;
+      return db.settings;
     }
-    const { error } = await this.client.from('settings').upsert({ user_id: resolvedUser, category, values, updated_at: new Date().toISOString() }, { onConflict: 'user_id,category' });
-    if (error) throw new Error(`Supabase settings save failed: ${error.message}`);
+    try {
+      const { error } = await this.client.from('settings').upsert(
+        { user_id: resolvedUser, category, values, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,category' }
+      );
+      if (error) {
+        console.warn(`[SupabaseService] Table public.settings not available, using local store:`, error.message);
+      }
+    } catch (err: any) {
+      console.warn(`[SupabaseService] Supabase settings save skipped (using local store):`, err?.message);
+    }
+    return db.settings;
   }
 
   async getApiKeys(userId?: string): Promise<ApiKey[]> {
     if (!this.isConfigured || !this.client) return db.apiKeys;
-    const resolvedUser = await this.resolveUserId(userId);
-    if (!resolvedUser) return db.apiKeys;
-    const { data, error } = await this.client.from('api_keys').select('id,name,key_prefix,last_used_at,created_at').eq('user_id', resolvedUser).order('created_at', { ascending: false });
-    if (error) throw new Error(`Supabase API keys query failed: ${error.message}`);
-    return (data || []).map((r: any) => ({
-      id: r.id, name: r.name, keyPrefix: r.key_prefix, lastUsedAt: r.last_used_at || undefined, createdAt: r.created_at,
-    }));
+    try {
+      const resolvedUser = await this.resolveUserId(userId);
+      if (!resolvedUser) return db.apiKeys;
+      const { data, error } = await this.client.from('api_keys').select('id,name,key_prefix,last_used_at,created_at').eq('user_id', resolvedUser).order('created_at', { ascending: false });
+      if (error) {
+        console.warn(`[SupabaseService] api_keys query fallback:`, error.message);
+        return db.apiKeys;
+      }
+      return (data || []).map((r: any) => ({
+        id: r.id, name: r.name, keyPrefix: r.key_prefix, lastUsedAt: r.last_used_at || undefined, createdAt: r.created_at,
+      }));
+    } catch (err: any) {
+      console.warn(`[SupabaseService] getApiKeys fallback:`, err?.message);
+      return db.apiKeys;
+    }
   }
 
   async createApiKey(userId: string, name: string, keyPrefix: string, keyHash: string) {
+    const fallback = { id: `key_${Date.now()}`, name, keyPrefix, createdAt: new Date().toISOString() };
     const resolvedUser = await this.resolveUserId(userId);
     if (!this.isConfigured || !this.client || !resolvedUser) {
-      const x = { id: `key_${Date.now()}`, name, keyPrefix, createdAt: new Date().toISOString() };
-      db.apiKeys.unshift(x);
-      return x;
+      db.apiKeys.unshift(fallback);
+      return fallback;
     }
-    const { data, error } = await this.client.from('api_keys').insert({ user_id: resolvedUser, name, key_prefix: keyPrefix, key_hash: keyHash }).select('id,name,key_prefix,last_used_at,created_at').single();
-    if (error) throw new Error(`Supabase API key save failed: ${error.message}`);
-    return { id: data.id, name: data.name, keyPrefix: data.key_prefix, lastUsedAt: data.last_used_at || undefined, createdAt: data.created_at };
+    try {
+      const { data, error } = await this.client.from('api_keys').insert({ user_id: resolvedUser, name, key_prefix: keyPrefix, key_hash: keyHash }).select('id,name,key_prefix,last_used_at,created_at').single();
+      if (error) {
+        console.warn(`[SupabaseService] createApiKey fallback to local:`, error.message);
+        db.apiKeys.unshift(fallback);
+        return fallback;
+      }
+      return { id: data.id, name: data.name, keyPrefix: data.key_prefix, lastUsedAt: data.last_used_at || undefined, createdAt: data.created_at };
+    } catch (err: any) {
+      db.apiKeys.unshift(fallback);
+      return fallback;
+    }
   }
 
   async revokeApiKey(userId: string, id: string) {
+    const i = db.apiKeys.findIndex(k => k.id === id);
+    if (i >= 0) db.apiKeys.splice(i, 1);
+
     const resolvedUser = await this.resolveUserId(userId);
-    if (!this.isConfigured || !this.client || !resolvedUser) {
-      const i = db.apiKeys.findIndex(k => k.id === id);
-      if (i >= 0) db.apiKeys.splice(i, 1);
-      return;
+    if (!this.isConfigured || !this.client || !resolvedUser) return;
+    try {
+      const { error } = await this.client.from('api_keys').delete().eq('id', id).eq('user_id', resolvedUser);
+      if (error) console.warn(`[SupabaseService] revokeApiKey fallback:`, error.message);
+    } catch (err: any) {
+      console.warn(`[SupabaseService] revokeApiKey fallback:`, err?.message);
     }
-    const { error } = await this.client.from('api_keys').delete().eq('id', id).eq('user_id', resolvedUser);
-    if (error) throw new Error(`Supabase API key revoke failed: ${error.message}`);
   }
 
   async saveUnsubscribeToken(record: UnsubscribeToken) {

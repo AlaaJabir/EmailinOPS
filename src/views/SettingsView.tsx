@@ -44,8 +44,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // SES form state
   const [sesRegion, setSesRegion] = useState(settings?.ses?.region || 'eu-west-1');
-  const [sesSmtpHost, setSesSmtpHost] = useState(settings?.ses?.smtpHost || 'g6emxdm74cqj.fips.wmjb.mail-manager-smtp.amazonaws.com');
-  const [sesSmtpUser, setSesSmtpUser] = useState(settings?.ses?.smtpUser || 'inp-nuchbsqgvk3qqaht5u7c5duz');
+  const [sesSmtpHost, setSesSmtpHost] = useState(settings?.ses?.smtpHost || '6wxef9y9cm3r.fips.wmjb.mail-manager-smtp.amazonaws.com');
+  const [sesSmtpUser, setSesSmtpUser] = useState(settings?.ses?.smtpUser || 'inp-trqycfx2ios4ywikwlcwnqod');
   const [sesSmtpPass, setSesSmtpPass] = useState(settings?.ses?.smtpPass || 'alaa.JABIR06');
   const [sesConfigSet, setSesConfigSet] = useState(settings?.ses?.configurationSet || 'EmailOps-Production-ConfigSet');
   const [sesWebhookUrl, setSesWebhookUrl] = useState(settings?.ses?.webhookEndpoint || 'https://emailops.internal/api/webhooks/ses');

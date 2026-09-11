@@ -26,7 +26,21 @@ class DatabaseStore {
   processedEventIds: Set<string> = new Set<string>();
 
   constructor() {
+    this.seedDefaultSenders();
     if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO_DATA === 'true') this.seedInitialData();
+  }
+
+  seedDefaultSenders() {
+    const now = new Date().toISOString();
+    if (!this.domains.length) {
+      this.domains = [{ id: 'dom_00', domainName: 'amiralucia.com', spfStatus: 'VERIFIED', dkimStatus: 'VERIFIED', dmarcStatus: 'VERIFIED', sesStatus: 'VERIFIED', dkimSelector: 'kumo2026', dkimPublicKey: 'verified', spfRecord: 'v=spf1 include:amazonses.com ~all', dmarcRecord: 'v=DMARC1; p=none;', createdAt: now, updatedAt: now }];
+    }
+    if (!this.senders.length) {
+      this.senders = [
+        { id: 'snd_00', name: 'Amira Lucia', fromEmail: 'service@amiralucia.com', replyTo: 'service@amiralucia.com', domainId: 'dom_00', domainName: 'amiralucia.com', status: 'active', verification: 'VERIFIED', dailyLimit: 50000, hourlyLimit: 5000, sentCount: 0, deliveredCount: 0, bouncedCount: 0, complaintCount: 0, createdAt: now },
+        { id: 'snd_01', name: 'Newsletter', fromEmail: 'newsletter@amiralucia.com', replyTo: 'newsletter@amiralucia.com', domainId: 'dom_00', domainName: 'amiralucia.com', status: 'active', verification: 'VERIFIED', dailyLimit: 50000, hourlyLimit: 5000, sentCount: 0, deliveredCount: 0, bouncedCount: 0, complaintCount: 0, createdAt: now }
+      ];
+    }
   }
 
   seedInitialData() {

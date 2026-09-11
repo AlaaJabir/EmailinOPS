@@ -211,10 +211,11 @@ export class KumoMtaService {
     const nowIso = new Date().toISOString();
 
     // Check SES credentials for primary or direct dispatch
-    const sesHost = process.env.SES_SMTP_HOST || 'g6emxdm74cqj.fips.wmjb.mail-manager-smtp.amazonaws.com';
-    const sesUser = process.env.SES_SMTP_USERNAME || 'inp-nuchbsqgvk3qqaht5u7c5duz';
-    const sesPass = process.env.SES_SMTP_PASSWORD || 'alaa.JABIR06';
-    const sesPort = Number(process.env.SES_SMTP_PORT) || 587;
+    const sesSettings = (db as any).settings?.ses || {};
+    const sesHost = sesSettings.smtpHost || process.env.SES_SMTP_HOST || '6wxef9y9cm3r.fips.wmjb.mail-manager-smtp.amazonaws.com';
+    const sesUser = sesSettings.smtpUsername || process.env.SES_SMTP_USERNAME || 'inp-trqycfx2ios4ywikwlcwnqod';
+    const sesPass = sesSettings.smtpPassword || process.env.SES_SMTP_PASSWORD || 'alaa.JABIR06';
+    const sesPort = Number(sesSettings.smtpPort || process.env.SES_SMTP_PORT) || 587;
     const hasDirectSes = Boolean(!this.customTransporter && sesUser && sesPass && sesHost);
 
     // If direct Amazon SES is available, dispatch directly through SES Relay for 100% reliable inbox delivery
