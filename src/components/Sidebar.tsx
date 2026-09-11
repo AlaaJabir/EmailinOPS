@@ -1,7 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, Send, Megaphone, MailCheck, Users, ShieldAlert, Server, BarChart3, Terminal, Settings, FileCode2, LogOut } from 'lucide-react';
+import { LayoutDashboard, Send, Megaphone, MailCheck, Users, ShieldAlert, Server, BarChart3, Terminal, Settings, FileCode2, LogOut, HardDrive } from 'lucide-react';
 
-export type NavTab = 'dashboard'|'send'|'campaigns'|'messages'|'contacts'|'suppression'|'senders'|'analytics'|'logs'|'settings'|'templates';
+export type NavTab = 'dashboard'|'send'|'campaigns'|'messages'|'contacts'|'suppression'|'senders'|'analytics'|'logs'|'settings'|'templates'|'storage';
 type ServiceStatus='healthy'|'degraded'|'offline'|'standby'|'unknown';
 interface SidebarProps{currentTab:NavTab;onSelectTab:(tab:NavTab)=>void;kumoStatus?:string;sesStatus?:string;queueCount?:number;user?:{name?:string;email?:string;role?:string;plan?:string}|null;onLogout?:()=>void;}
 const normalizeStatus=(s?:string):ServiceStatus=>s==='healthy'||s==='degraded'||s==='offline'||s==='standby'?s:'unknown';
@@ -12,7 +12,7 @@ export const Sidebar:React.FC<SidebarProps>=({currentTab,onSelectTab,kumoStatus=
   {label:'Monitor',items:[['dashboard','Overview',LayoutDashboard],['analytics','Deliverability',BarChart3]]},
   {label:'Send',items:[['campaigns','Campaigns',Megaphone],['templates','Templates',FileCode2],['send','Compose',Send],['messages','Messages',MailCheck]]},
   {label:'Data',items:[['contacts','Contacts',Users],['suppression','Suppression',ShieldAlert]]},
-  {label:'System',items:[['senders','Infrastructure',Server],['settings','API & Settings',Settings],['logs','Technical Logs',Terminal]]}
+  {label:'System',items:[['senders','Infrastructure',Server],['storage','Cloudflare R2',HardDrive],['settings','API & Settings',Settings],['logs','Technical Logs',Terminal]]}
  ] as const;
  return <aside className="w-[228px] bg-[#0b0e0d] border-r border-[#1e2825] flex flex-col shrink-0 h-screen sticky top-0 overflow-y-auto font-mono">
   <div className="px-5 pt-6 pb-5 border-b border-[#1e2825]"><div className="flex items-center gap-2.5"><span className="w-2 h-2 rounded-[2px] bg-[#39ff9c] shadow-[0_0_12px_#39ff9c]"/><span className="font-mono font-bold text-[15px] tracking-wide text-[#d8e6df]">EmailinOPS</span></div><div className="text-[9px] uppercase tracking-[0.18em] text-[#4a5a53] mt-1.5 pl-[18px]">mail delivery engine</div></div>
