@@ -185,11 +185,28 @@ export class KumoMtaService {
       ...(payload.customHeaders || {}),
     };
 
+    if (!customHeaders['Feedback-ID']) {
+      customHeaders['Feedback-ID'] = `${payload.campaignId || 'direct'}:${internalId}:${fromDomain}:KumoMTA`;
+    }
+
     if (!customHeaders['List-Unsubscribe']) {
       const unsubUrl = `https://${fromDomain}/unsubscribe?id=${internalId}`;
       customHeaders['List-Unsubscribe'] = `<${unsubUrl}>, <mailto:unsubscribe@${fromDomain}?subject=unsubscribe_${internalId}>`;
       customHeaders['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
     }
+
+    const effectivePlainText = (payload.plainText && payload.plainText.trim().length > 0)
+      ? payload.plainText
+      : (payload.htmlBody
+          ? payload.htmlBody
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<br\s*[\/]?>/gi, '\n')
+              .replace(/<\/p>/gi, '\n\n')
+              .replace(/<[^>]+>/g, '')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim()
+          : '');
 
     const nowIso = new Date().toISOString();
 
@@ -221,7 +238,7 @@ export class KumoMtaService {
           bcc: payload.bcc,
           replyTo: payload.replyTo || sender?.replyTo,
           subject: payload.subject,
-          text: payload.plainText,
+          text: effectivePlainText,
           html: payload.htmlBody,
           messageId: rfcMessageId,
           headers: customHeaders,
@@ -235,7 +252,7 @@ export class KumoMtaService {
           id: internalId, messageId: rfcMessageId, campaignId: payload.campaignId,
           campaignName: payload.campaignId ? db.campaigns.find((c) => c.id === payload.campaignId)?.name : undefined,
           senderId, fromName: senderDisplayName, fromEmail: payload.fromEmail, toEmail: primaryTo, replyTo: payload.replyTo || sender?.replyTo,
-          cc: payload.cc, bcc: payload.bcc, subject: payload.subject, htmlBody: payload.htmlBody, plainText: payload.plainText, customHeaders,
+          cc: payload.cc, bcc: payload.bcc, subject: payload.subject, htmlBody: payload.htmlBody, plainText: effectivePlainText, customHeaders,
           status: messageStatus, provider: 'Amazon SES', providerMessageId: sesInfo.messageId || rfcMessageId, smtpResponse, queuedAt: nowIso, sentAt: nowIso, createdAt: nowIso,
           attachments: payload.attachments?.map((a, i) => ({ id: `att_${Date.now()}_${i}`, filename: a.filename, fileSize: a.fileSize, mimeType: a.mimeType })),
         };
@@ -271,7 +288,7 @@ export class KumoMtaService {
         bcc: payload.bcc,
         replyTo: payload.replyTo || sender?.replyTo,
         subject: payload.subject,
-        text: payload.plainText,
+        text: effectivePlainText,
         html: payload.htmlBody,
         messageId: rfcMessageId,
         headers: customHeaders,
@@ -287,7 +304,7 @@ export class KumoMtaService {
         id: internalId, messageId: rfcMessageId, sesMessageId: parsedSesMessageId, campaignId: payload.campaignId,
         campaignName: payload.campaignId ? db.campaigns.find((c) => c.id === payload.campaignId)?.name : undefined,
         senderId, fromName: senderDisplayName, fromEmail: payload.fromEmail, toEmail: primaryTo, replyTo: payload.replyTo || sender?.replyTo,
-        cc: payload.cc, bcc: payload.bcc, subject: payload.subject, htmlBody: payload.htmlBody, plainText: payload.plainText, customHeaders,
+        cc: payload.cc, bcc: payload.bcc, subject: payload.subject, htmlBody: payload.htmlBody, plainText: effectivePlainText, customHeaders,
         status: messageStatus, provider: 'KumoMTA', providerMessageId: info.messageId || rfcMessageId, smtpResponse, queuedAt: nowIso, sentAt: nowIso, createdAt: nowIso,
         attachments: payload.attachments?.map((a, i) => ({ id: `att_${Date.now()}_${i}`, filename: a.filename, fileSize: a.fileSize, mimeType: a.mimeType })),
       };

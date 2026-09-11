@@ -62,10 +62,27 @@ messagesRouter.get('/:id', requireAuth, async (req: Request, res: Response) => {
 });
 
 function asRecipients(value: unknown): string[] { return (Array.isArray(value) ? value.flatMap(v => String(v || '').split(',')) : String(value || '').split(',')).map(v => v.trim().toLowerCase()).filter(Boolean); }
-function buildHtml(headHtml: unknown, bodyHtml: unknown): string { const body = String(bodyHtml || ''); const head = String(headHtml || ''); if (!head.trim()) return body; if (/<html[\s>]/i.test(body)) return body.replace(/<head([^>]*)>/i, `<head$1>${head}`); return `<!doctype html><html><head><meta charset="utf-8">${head}</head><body>${body}</body></html>`; }
+function buildHtml(headHtml: unknown, bodyHtml: unknown, preheader?: unknown): string {
+  let body = String(bodyHtml || '');
+  const head = String(headHtml || '');
+  const pre = String(preheader || '').trim();
+  const preheaderHtml = pre ? `<!--[if !mso]><!--><div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;mso-hide:all;">${pre.replace(/</g, '&lt;').replace(/>/g, '&gt;')}&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div><!--<![endif]-->\n` : '';
+
+  if (preheaderHtml) {
+    if (/<body[^>]*>/i.test(body)) {
+      body = body.replace(/(<body[^>]*>)/i, `$1\n${preheaderHtml}`);
+    } else {
+      body = `${preheaderHtml}${body}`;
+    }
+  }
+
+  if (!head.trim()) return body;
+  if (/<html[\s>]/i.test(body)) return body.replace(/<head([^>]*)>/i, `<head$1>${head}`);
+  return `<!doctype html><html><head><meta charset="utf-8">${head}</head><body>${body}</body></html>`;
+}
 
 messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) => {
-  const { fromName, fromEmail, replyTo, to, cc, bcc, subject, htmlBody, headHtml, plainText, customHeaders, campaignId, attachments, isMarketing, enableOpenTracking, enableClickTracking } = req.body;
+  const { fromName, fromEmail, replyTo, to, cc, bcc, subject, preheader, htmlBody, headHtml, plainText, customHeaders, campaignId, attachments, isMarketing, enableOpenTracking, enableClickTracking } = req.body;
   const recipients = [...new Set(asRecipients(to))];
   const ccRecipients = [...new Set(asRecipients(cc))];
   const bccRecipients = [...new Set(asRecipients(bcc))];
@@ -118,7 +135,7 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
       if (!contact && process.env.NODE_ENV !== 'production') contact = db.findContactByEmail(recipient);
 
       const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({ email: recipient, contactId: contact?.id, messageId: internalId, campaignId, userId: req.user?.id, baseUrl });
-      let personalizedHtml = personalizationService.personalizeContent(buildHtml(headHtml, htmlBody), { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
+      let personalizedHtml = personalizationService.personalizeContent(buildHtml(headHtml, htmlBody, preheader), { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
       const personalizedSubject = personalizationService.personalizeContent(subject || '', { contact, email: recipient, unsubscribeUrl, privacyUrl: req.body.privacyUrl, termsUrl: req.body.termsUrl, customVariables: req.body.variables });
       const effectivePlainText = plainText && plainText.trim().length > 0
         ? plainText
@@ -149,7 +166,7 @@ messagesRouter.post('/send', requireAuth, async (req: Request, res: Response) =>
 });
 
 messagesRouter.post('/test', requireAuth, async (req: Request, res: Response) => {
-  const { testEmail, fromEmail, subject, htmlBody, headHtml, enableOpenTracking, enableClickTracking } = req.body;
+  const { testEmail, fromName, fromEmail, subject, preheader, htmlBody, headHtml, plainText, enableOpenTracking, enableClickTracking } = req.body;
   if (!testEmail || !fromEmail) return res.status(400).json({ error: 'testEmail and fromEmail are required' });
   try {
     const senders = await supabaseService.getSenders(req.user!.id);
@@ -169,13 +186,13 @@ messagesRouter.post('/test', requireAuth, async (req: Request, res: Response) =>
     const rfcMessageId = kumoMtaService.generateRfcMessageId(senderDomain);
     const baseUrl = personalizationService.getBaseUrl(req.get('host'));
     const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({ email: testEmail, messageId: internalId, userId: req.user?.id, baseUrl });
-    let personalizedHtml = personalizationService.personalizeContent(buildHtml(headHtml, htmlBody || '<p>This is a test message from EmailOps Dashboard via KumoMTA.</p>'), { email: testEmail, unsubscribeUrl });
+    let personalizedHtml = personalizationService.personalizeContent(buildHtml(headHtml, htmlBody || '<p>This is a test message from EmailOps Dashboard via KumoMTA.</p>', preheader), { email: testEmail, unsubscribeUrl });
     if (enableClickTracking ?? true) personalizedHtml = personalizationService.rewriteLinksForClickTracking(personalizedHtml, internalId, baseUrl);
     if (enableOpenTracking ?? true) personalizedHtml = personalizationService.injectOpenTrackingPixel(personalizedHtml, internalId, baseUrl);
-    const testPlainText = personalizationService.htmlToPlainText(personalizedHtml);
+    const testPlainText = plainText && plainText.trim().length > 0 ? plainText : personalizationService.htmlToPlainText(personalizedHtml);
     const unsubHeaders = personalizationService.generateUnsubscribeHeaders(unsubscribeUrl, senderDomain);
-    await preRegisterMessage({ internalId, messageId: rfcMessageId, senderId: sender.id, fromEmail, toEmail: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), plainText: testPlainText, customHeaders: unsubHeaders, userId: req.user?.id, isTest: true, isMarketing: false, openTrackingEnabled: enableOpenTracking ?? true, clickTrackingEnabled: enableClickTracking ?? true });
-    const result = await kumoMtaService.submitEmail({ rfcMessageId, fromEmail, to: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, plainText: testPlainText, customHeaders: unsubHeaders, internalId, isTest: true, userId: req.user?.id });
+    await preRegisterMessage({ internalId, messageId: rfcMessageId, senderId: sender.id, fromName: fromName || sender.name, fromEmail, toEmail: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, headHtml: String(headHtml || ''), plainText: testPlainText, customHeaders: unsubHeaders, userId: req.user?.id, isTest: true, isMarketing: false, openTrackingEnabled: enableOpenTracking ?? true, clickTrackingEnabled: enableClickTracking ?? true });
+    const result = await kumoMtaService.submitEmail({ rfcMessageId, fromName: fromName || sender.name, fromEmail, to: testEmail, subject: `[TEST EMAIL] ${subject || 'KumoMTA Test Verification'}`, htmlBody: personalizedHtml, plainText: testPlainText, customHeaders: unsubHeaders, internalId, isTest: true, userId: req.user?.id });
     return res.json({ success: true, result, message: `Test email dispatched to ${testEmail} through KumoMTA spool.` });
   } catch (err: any) { return res.status(500).json({ error: err.message || 'Failed to send test email via KumoMTA' }); }
 });
