@@ -4,7 +4,7 @@ import { db } from '../store.js';
 
 import { eventProcessor, SesEventPayload } from '../services/EventProcessor.js';
 
-import { supabaseService } from '../services/SupabaseService.js';
+import { convexService } from '../services/ConvexService.js';
 
 export const webhooksRouter = Router();
 
@@ -311,7 +311,7 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
     const topicArn = body.TopicArn;
 
     // Idempotency: skip already processed SNS message IDs
-    if (snsMessageId && (db.hasProcessedEvent(snsMessageId) || (await supabaseService.isEventProcessed(snsMessageId)))) {
+    if (snsMessageId && db.hasProcessedEvent(snsMessageId)) {
 
       return res.status(200).json({
 
@@ -380,8 +380,6 @@ webhooksRouter.post('/ses', async (req: Request, res: Response) => {
     if (snsMessageId) {
 
       db.recordProcessedEvent(snsMessageId);
-
-      await supabaseService.recordProcessedEvent(snsMessageId, 'SES_SNS');
 
     }
 
@@ -505,7 +503,7 @@ webhooksRouter.post('/kumomta', (req: Request, res: Response) => {
     }
 
     // Persist any status/counter-related message fields changed by the Kumo event.
-    supabaseService.updateMessageStatus({
+    convexService.updateMessageStatus({
       messageId: message.messageId,
       status: message.status,
       deliveredAt: message.deliveredAt,

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../store.js';
 import { personalizationService } from '../services/PersonalizationService.js';
-import { supabaseService } from '../services/SupabaseService.js';
+import { convexService } from '../services/ConvexService.js';
 import { eventProcessor } from '../services/EventProcessor.js';
 
 export const unsubscribeRouter = Router();
@@ -167,15 +167,13 @@ async function processUnsubscribe(tokenStr: string, req: Request) {
 
   token.unsubscribedAt = new Date().toISOString();
 
-  // 2. Persist to Supabase if configured
-  await supabaseService.markContactUnsubscribed(email, token.userId);
-  await supabaseService.addSuppression({
+  // 2. Persist to Convex if configured
+  await convexService.addSuppression({
     email,
     type: 'UNSUBSCRIBED',
     reason: 'User clicked unsubscribe link',
     source: 'unsubscribe_link',
-    userId: token.userId,
-  });
+  }, token.userId).catch(() => {});
 
   // 3. Record event if messageId exists
   if (token.messageId) {

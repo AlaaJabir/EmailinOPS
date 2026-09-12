@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { db, UnsubscribeToken } from '../store.js';
 import { Contact } from '../../src/types.js';
-import { supabaseService } from './SupabaseService.js';
 
 export interface UnsubscribeTokenData {
   token: string;
@@ -29,7 +28,7 @@ export class PersonalizationService {
   constructor() {
     this.secretKey =
       process.env.UNSUBSCRIBE_SECRET ||
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.CONVEX_URL ||
       'emailops-rfc8058-unsubscribe-secret-salt-2026';
   }
 
@@ -87,9 +86,6 @@ export class PersonalizationService {
     db.unsubscribeTokens = db.unsubscribeTokens || [];
     db.unsubscribeTokens.unshift(record);
 
-    // Persist to Supabase if configured
-    await supabaseService.saveUnsubscribeToken(record);
-
     const unsubscribeUrl = `${baseUrl}/unsubscribe/${rawToken}`;
 
     return {
@@ -105,18 +101,10 @@ export class PersonalizationService {
     if (!token || typeof token !== 'string') return null;
     const cleanToken = token.trim();
 
-    // 1. Check in-memory store
+    // Check in-memory store
     const local = (db.unsubscribeTokens || []).find((t) => t.token === cleanToken);
     if (local) {
       return local;
-    }
-
-    // 2. Check Supabase
-    const remote = await supabaseService.getUnsubscribeToken(cleanToken);
-    if (remote) {
-      db.unsubscribeTokens = db.unsubscribeTokens || [];
-      db.unsubscribeTokens.unshift(remote);
-      return remote;
     }
 
     return null;
