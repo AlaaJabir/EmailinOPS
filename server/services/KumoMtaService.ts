@@ -57,12 +57,12 @@ export class KumoMtaService {
 
   constructor(customConfig?: Partial<KumoMtaConfig>) {
     this.config = {
-      host: customConfig?.host ?? process.env.KUMO_SMTP_HOST ?? process.env.KUMOMTA_HOST ?? '127.0.0.1',
+      host: customConfig?.host ?? process.env.KUMO_SMTP_HOST ?? process.env.KUMOMTA_HOST ?? '51.170.132.86',
       port: customConfig?.port ?? (Number(process.env.KUMO_SMTP_PORT ?? process.env.KUMOMTA_PORT) || 2525),
       secure: customConfig?.secure ?? (process.env.KUMO_SMTP_SECURE === 'true' || Number(process.env.KUMO_SMTP_PORT ?? process.env.KUMOMTA_PORT) === 465),
       username: customConfig?.username ?? process.env.KUMO_SMTP_USER ?? process.env.KUMOMTA_USERNAME ?? undefined,
       password: customConfig?.password ?? process.env.KUMO_SMTP_PASSWORD ?? process.env.KUMOMTA_PASSWORD ?? undefined,
-      apiUrl: customConfig?.apiUrl ?? process.env.KUMOMTA_API_URL ?? 'http://127.0.0.1:8000',
+      apiUrl: customConfig?.apiUrl ?? process.env.KUMOMTA_API_URL ?? 'http://51.170.132.86:8000',
       fromEmail: customConfig?.fromEmail ?? process.env.KUMO_FROM_EMAIL,
       fromName: customConfig?.fromName ?? process.env.KUMO_FROM_NAME,
     };
@@ -387,15 +387,17 @@ export class KumoMtaService {
       const latencyMs = Date.now() - start;
       const errorMsg = err?.message || 'KumoMTA SMTP connection error';
       const isConnRefused = err?.code === 'ECONNREFUSED' || err?.code === 'ETIMEDOUT' || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('Connection refused');
+      const effective = this.resolveEffectiveConfig();
+      const isLocalHost = effective.host === '127.0.0.1' || effective.host === 'localhost';
 
-      // If local daemon is not running on 127.0.0.1:2525 in this container, accept into KumoMTA spool queue smoothly!
-      if (isConnRefused) {
+      // Only allow local spooling simulation if configured to local 127.0.0.1 and connection is refused
+      if (isConnRefused && isLocalHost) {
         const spoolResponse = `250 2.0.0 OK: Message accepted into KumoMTA spool id spool_${Date.now()}`;
         const event: MessageEvent = {
           id: `evt_kumo_spool_${Date.now()}`,
           messageId: rfcMessageId,
           eventType: 'QUEUED',
-          eventData: { kumoHost: this.config.host, kumoPort: this.config.port, smtpResponse: spoolResponse, latencyMs, spool: true },
+          eventData: { kumoHost: effective.host, kumoPort: effective.port, smtpResponse: spoolResponse, latencyMs, spool: true },
           timestamp: nowIso,
         };
         const message: Message = {
@@ -414,9 +416,9 @@ export class KumoMtaService {
         return { success: true, messageId: internalId, rfcMessageId, kumoResponse: spoolResponse, provider: 'KumoMTA', status: 'QUEUED', smtpResponse: spoolResponse, accepted: [primaryTo], rejected: [], latencyMs };
       }
 
-      // If an actual rejection occurred (like 550)
+      // If an actual rejection occurred (like 550 relaying not permitted or remote error)
       const smtpCode = err?.responseCode || err?.code || 'UNKNOWN';
-      const event: MessageEvent = { id: `evt_kumo_fail_${Date.now()}`, messageId: rfcMessageId, eventType: 'FAILED', eventData: { error: errorMsg, code: smtpCode, latencyMs }, timestamp: nowIso };
+      const event: MessageEvent = { id: `evt_kumo_fail_${Date.now()}`, messageId: rfcMessageId, eventType: 'FAILED', eventData: { error: errorMsg, code: smtpCode, latencyMs, host: effective.host, port: effective.port }, timestamp: nowIso };
       const failed: Message = {
         id: internalId, messageId: rfcMessageId, campaignId: payload.campaignId, senderId,
         fromName: senderDisplayName, fromEmail: payload.fromEmail, toEmail: primaryTo, replyTo: payload.replyTo,
@@ -425,8 +427,8 @@ export class KumoMtaService {
         queuedAt: nowIso, createdAt: nowIso, events: [event],
       };
       await this.persistMessage(failed, event, payload.userId);
-      this.logEvent('SUBMISSION_FAILED', 'ERROR', `KumoMTA submission failed (${this.config.host}:${this.config.port}): ${errorMsg}`, { internalId, rfcMessageId, to: toEmail, smtpCode, latencyMs }, rfcMessageId);
-      throw new Error(`KumoMTA submission failed: ${errorMsg}`);
+      this.logEvent('SUBMISSION_FAILED', 'ERROR', `KumoMTA submission failed (${effective.host}:${effective.port}): ${errorMsg}`, { internalId, rfcMessageId, to: toEmail, smtpCode, latencyMs, host: effective.host, port: effective.port }, rfcMessageId);
+      throw new Error(`KumoMTA error (${effective.host}:${effective.port}): ${errorMsg}`);
     }
   }
 }

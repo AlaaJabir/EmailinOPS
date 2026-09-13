@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings,
   Cpu,
@@ -113,14 +113,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   // KumoMTA form state
-  const [kumoHost, setKumoHost] = useState(settings?.kumomta?.host || '127.0.0.1');
+  const [kumoHost, setKumoHost] = useState(settings?.kumomta?.host || '51.170.132.86');
   const [kumoPort, setKumoPort] = useState(settings?.kumomta?.port || 2525);
+  const [kumoUsername, setKumoUsername] = useState(settings?.kumomta?.username || '');
+  const [kumoPassword, setKumoPassword] = useState(settings?.kumomta?.password || '');
+  const [kumoSecure, setKumoSecure] = useState(settings?.kumomta?.secure || false);
   const [kumoApiUrl, setKumoApiUrl] = useState(settings?.kumomta?.managementApiUrl || 'http://127.0.0.1:8000');
   const [kumoSpool, setKumoSpool] = useState(settings?.kumomta?.spoolDir || '/var/spool/kumomta');
   const [kumoConcurrency, setKumoConcurrency] = useState(settings?.kumomta?.maxConcurrency || 64);
   const [kumoRateLimit, setKumoRateLimit] = useState(settings?.kumomta?.rateLimitPerSec || 250);
   const [kumoTesting, setKumoTesting] = useState(false);
-  const [kumoTestResult, setKumoTestResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
+  const [kumoTestResult, setKumoTestResult] = useState<{ success?: boolean; message?: string; error?: string; relayAllowed?: boolean } | null>(null);
+
+  // Sync state if settings prop changes
+  useEffect(() => {
+    if (settings?.kumomta) {
+      if (settings.kumomta.host !== undefined) setKumoHost(settings.kumomta.host);
+      if (settings.kumomta.port !== undefined) setKumoPort(settings.kumomta.port);
+      if (settings.kumomta.username !== undefined) setKumoUsername(settings.kumomta.username);
+      if (settings.kumomta.password !== undefined) setKumoPassword(settings.kumomta.password);
+      if (settings.kumomta.secure !== undefined) setKumoSecure(settings.kumomta.secure);
+      if (settings.kumomta.managementApiUrl !== undefined) setKumoApiUrl(settings.kumomta.managementApiUrl);
+      if (settings.kumomta.spoolDir !== undefined) setKumoSpool(settings.kumomta.spoolDir);
+      if (settings.kumomta.maxConcurrency !== undefined) setKumoConcurrency(settings.kumomta.maxConcurrency);
+      if (settings.kumomta.rateLimitPerSec !== undefined) setKumoRateLimit(settings.kumomta.rateLimitPerSec);
+    }
+  }, [settings]);
 
   // SES form state
   const [sesRegion, setSesRegion] = useState(settings?.ses?.region || 'eu-west-1');
@@ -266,10 +284,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 value={kumoHost}
                 onChange={(e) => setKumoHost(e.target.value)}
                 className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
-                placeholder="e.g. 198.51.100.25 or mail.amiralucia.com"
+                placeholder="e.g. 51.170.132.86 or 127.0.0.1"
               />
               <p className="text-[10px] text-zinc-400 mt-1">
-                Enter your VPS public IP / domain if running externally. If testing locally inside container, use 127.0.0.1.
+                Enter your VPS public IP / domain (e.g. 51.170.132.86).
               </p>
             </div>
             <div>
@@ -279,6 +297,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 value={kumoPort}
                 onChange={(e) => setKumoPort(Number(e.target.value))}
                 className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
+                placeholder="2525"
+              />
+              <p className="text-[10px] text-zinc-400 mt-1">Default listener port (2525 or 587 or 25)</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#888888] mb-1">SMTP Auth Username (Optional)</label>
+              <input
+                type="text"
+                value={kumoUsername}
+                onChange={(e) => setKumoUsername(e.target.value)}
+                className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
+                placeholder="Leave blank if IP-whitelisted"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#888888] mb-1">SMTP Auth Password (Optional)</label>
+              <input
+                type="password"
+                value={kumoPassword}
+                onChange={(e) => setKumoPassword(e.target.value)}
+                className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
+                placeholder="Leave blank if IP-whitelisted"
               />
             </div>
             <div>
@@ -319,6 +359,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
+          <div className="bg-amber-950/20 border border-amber-500/30 rounded p-3 text-xs text-amber-200/90 flex flex-col gap-1">
+            <span className="font-semibold flex items-center gap-1.5 text-amber-300">
+              <AlertCircle className="w-3.5 h-3.5" /> Note on 550 Relaying Not Permitted
+            </span>
+            <p className="text-[11px] leading-relaxed">
+              If tests return <code className="bg-black/40 px-1 py-0.5 rounded font-mono">550 5.7.1 relaying not permitted</code>, your KumoMTA server on the VPS requires authorization for remote injection. In your <code className="bg-black/40 px-1 py-0.5 rounded font-mono">init.lua</code>, add the client subnet or configure authentication in <code className="bg-black/40 px-1 py-0.5 rounded font-mono">kumo.on(&apos;smtp_server_auth_plain&apos;, ...)</code> or define <code className="bg-black/40 px-1 py-0.5 rounded font-mono">relay_hosts</code>.
+            </p>
+          </div>
+
           {kumoTestResult && (
             <div
               className={`p-3 rounded-sm text-xs font-mono border ${
@@ -331,41 +380,83 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-3 border-t border-white-10">
-            <button
-              type="button"
-              disabled={kumoTesting}
-              onClick={async () => {
-                setKumoTesting(true);
-                setKumoTestResult(null);
-                try {
-                  const res = await fetch('/api/settings/verify-kumo', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      host: kumoHost,
-                      port: kumoPort,
-                    }),
-                  });
-                  const d = await res.json();
-                  setKumoTestResult(d);
-                } catch (e: any) {
-                  setKumoTestResult({ success: false, error: e.message });
-                } finally {
-                  setKumoTesting(false);
-                }
-              }}
-              className="flex items-center gap-2 px-3 py-2 rounded-sm bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium transition-colors"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{kumoTesting ? 'Testing Connection...' : 'Test KumoMTA Connection'}</span>
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white-10">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={kumoTesting}
+                onClick={async () => {
+                  setKumoTesting(true);
+                  setKumoTestResult(null);
+                  try {
+                    const res = await fetch('/api/settings/verify-kumo', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        host: kumoHost,
+                        port: kumoPort,
+                        username: kumoUsername || undefined,
+                        password: kumoPassword || undefined,
+                        checkRelay: false,
+                      }),
+                    });
+                    const d = await res.json();
+                    setKumoTestResult(d);
+                  } catch (e: any) {
+                    setKumoTestResult({ success: false, error: e.message });
+                  } finally {
+                    setKumoTesting(false);
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-sm bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium transition-colors"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{kumoTesting ? 'Testing Port...' : '1. Test Port Connectivity'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={kumoTesting}
+                onClick={async () => {
+                  setKumoTesting(true);
+                  setKumoTestResult(null);
+                  try {
+                    const res = await fetch('/api/settings/verify-kumo', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        host: kumoHost,
+                        port: kumoPort,
+                        username: kumoUsername || undefined,
+                        password: kumoPassword || undefined,
+                        checkRelay: true,
+                        testRecipient: 'jafa.service@gmail.com',
+                        senderEmail: 'service@amiralucia.com',
+                      }),
+                    });
+                    const d = await res.json();
+                    setKumoTestResult(d);
+                  } catch (e: any) {
+                    setKumoTestResult({ success: false, error: e.message });
+                  } finally {
+                    setKumoTesting(false);
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-sm bg-zinc-800 hover:bg-zinc-700 text-amber-300 text-xs font-medium transition-colors border border-amber-500/20"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                <span>{kumoTesting ? 'Checking Relay...' : '2. Test Mail Relay'}</span>
+              </button>
+            </div>
 
             <button
               onClick={() =>
                 handleSaveCategory('kumomta', {
                   host: kumoHost,
                   port: kumoPort,
+                  username: kumoUsername || undefined,
+                  password: kumoPassword || undefined,
+                  secure: kumoSecure,
                   managementApiUrl: kumoApiUrl,
                   spoolDir: kumoSpool,
                   maxConcurrency: kumoConcurrency,

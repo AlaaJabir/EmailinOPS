@@ -21,7 +21,16 @@ class DatabaseStore {
   messageEvents: MessageEvent[] = [];
   unsubscribeTokens: UnsubscribeToken[] = [];
   logs: TechnicalLog[] = [];
-  settings: Record<string, any> = {};
+  settings: Record<string, any> = {
+    kumomta: {
+      host: process.env.KUMO_SMTP_HOST || process.env.KUMOMTA_HOST || '51.170.132.86',
+      port: Number(process.env.KUMO_SMTP_PORT || process.env.KUMOMTA_PORT) || 2525,
+      managementApiUrl: process.env.KUMOMTA_API_URL || 'http://51.170.132.86:8000',
+      spoolDir: '/var/spool/kumomta',
+      maxConcurrency: 64,
+      rateLimitPerSec: 250,
+    },
+  };
   apiKeys: Array<{ id: string; name: string; keyPrefix: string; createdAt: string; lastUsedAt?: string }> = [];
   processedEventIds: Set<string> = new Set<string>();
 

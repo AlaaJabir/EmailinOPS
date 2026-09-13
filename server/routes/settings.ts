@@ -66,7 +66,7 @@ settingsRouter.post('/verify-ses', async (req: Request, res: Response) => {
 });
 
 settingsRouter.post('/verify-kumo', async (req: Request, res: Response) => {
-  const { host, port, username, password } = req.body;
+  const { host, port, username, password, checkRelay, testRecipient, senderEmail } = req.body;
   const targetHost = String(host || '127.0.0.1').trim();
   const targetPort = Number(port) || 2525;
 
@@ -85,6 +85,31 @@ settingsRouter.post('/verify-kumo', async (req: Request, res: Response) => {
     });
 
     await transporter.verify();
+
+    if (checkRelay) {
+      const recipient = testRecipient || 'relay-test@example.com';
+      const sender = senderEmail || 'service@amiralucia.com';
+      try {
+        await transporter.sendMail({
+          from: sender,
+          to: recipient,
+          subject: '[KumoMTA Relay Check]',
+          text: 'Relay capability verification test.',
+        });
+        return res.json({
+          success: true,
+          message: `KumoMTA connected and relay accepted for ${recipient} via ${targetHost}:${targetPort}!`,
+          relayAllowed: true,
+        });
+      } catch (relayErr: any) {
+        return res.status(422).json({
+          success: false,
+          error: `Connected to ${targetHost}:${targetPort}, but relay was rejected: ${relayErr?.message || '550 relaying not permitted'}. Check your KumoMTA listener policy (listener_domains or relay_hosts / allow_hosts).`,
+          relayAllowed: false,
+        });
+      }
+    }
+
     return res.json({ success: true, message: `Successfully connected to KumoMTA SMTP listener at ${targetHost}:${targetPort}!` });
   } catch (err: any) {
     return res.status(422).json({
