@@ -119,6 +119,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [kumoSpool, setKumoSpool] = useState(settings?.kumomta?.spoolDir || '/var/spool/kumomta');
   const [kumoConcurrency, setKumoConcurrency] = useState(settings?.kumomta?.maxConcurrency || 64);
   const [kumoRateLimit, setKumoRateLimit] = useState(settings?.kumomta?.rateLimitPerSec || 250);
+  const [kumoTesting, setKumoTesting] = useState(false);
+  const [kumoTestResult, setKumoTestResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
 
   // SES form state
   const [sesRegion, setSesRegion] = useState(settings?.ses?.region || 'eu-west-1');
@@ -264,7 +266,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 value={kumoHost}
                 onChange={(e) => setKumoHost(e.target.value)}
                 className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-2 text-xs font-mono text-white"
+                placeholder="e.g. 198.51.100.25 or mail.amiralucia.com"
               />
+              <p className="text-[10px] text-zinc-400 mt-1">
+                Enter your VPS public IP / domain if running externally. If testing locally inside container, use 127.0.0.1.
+              </p>
             </div>
             <div>
               <label className="block text-xs font-medium text-[#888888] mb-1">Ingest Port</label>
@@ -313,7 +319,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-end pt-3 border-t border-white-10">
+          {kumoTestResult && (
+            <div
+              className={`p-3 rounded-sm text-xs font-mono border ${
+                kumoTestResult.success
+                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+              }`}
+            >
+              {kumoTestResult.success ? `✓ ${kumoTestResult.message}` : `✕ ${kumoTestResult.error}`}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-3 border-t border-white-10">
+            <button
+              type="button"
+              disabled={kumoTesting}
+              onClick={async () => {
+                setKumoTesting(true);
+                setKumoTestResult(null);
+                try {
+                  const res = await fetch('/api/settings/verify-kumo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      host: kumoHost,
+                      port: kumoPort,
+                    }),
+                  });
+                  const d = await res.json();
+                  setKumoTestResult(d);
+                } catch (e: any) {
+                  setKumoTestResult({ success: false, error: e.message });
+                } finally {
+                  setKumoTesting(false);
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-sm bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium transition-colors"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{kumoTesting ? 'Testing Connection...' : 'Test KumoMTA Connection'}</span>
+            </button>
+
             <button
               onClick={() =>
                 handleSaveCategory('kumomta', {

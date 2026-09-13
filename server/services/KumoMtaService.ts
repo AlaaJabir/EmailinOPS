@@ -68,29 +68,41 @@ export class KumoMtaService {
     };
   }
 
+  private resolveEffectiveConfig(): KumoMtaConfig {
+    const s = db.settings?.kumomta || {};
+    return {
+      host: s.host || this.config.host,
+      port: Number(s.port) || this.config.port,
+      secure: s.secure !== undefined ? Boolean(s.secure) : this.config.secure,
+      username: s.username || this.config.username,
+      password: s.password || this.config.password,
+      apiUrl: s.managementApiUrl || s.apiUrl || this.config.apiUrl,
+      fromEmail: s.fromEmail || this.config.fromEmail,
+      fromName: s.fromName || this.config.fromName,
+    };
+  }
+
   public setTransporter(mockTransporter: Transporter): void {
     this.customTransporter = mockTransporter;
   }
 
   public getTransporter(): Transporter {
     if (this.customTransporter) return this.customTransporter;
-    if (!this.transporter) {
-      const auth = (this.config.username && this.config.password)
-        ? { user: this.config.username, pass: this.config.password }
-        : undefined;
+    const effective = this.resolveEffectiveConfig();
+    const auth = (effective.username && effective.password)
+      ? { user: effective.username, pass: effective.password }
+      : undefined;
 
-      this.transporter = nodemailer.createTransport({
-        host: this.config.host,
-        port: this.config.port,
-        secure: this.config.secure,
-        auth,
-        connectionTimeout: 4000,
-        greetingTimeout: 4000,
-        socketTimeout: 8000,
-        tls: { rejectUnauthorized: false },
-      });
-    }
-    return this.transporter;
+    return nodemailer.createTransport({
+      host: effective.host,
+      port: effective.port,
+      secure: effective.secure,
+      auth,
+      connectionTimeout: 4000,
+      greetingTimeout: 4000,
+      socketTimeout: 8000,
+      tls: { rejectUnauthorized: false },
+    });
   }
 
   public validateConfig(): { valid: boolean; errors: string[] } {

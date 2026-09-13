@@ -65,6 +65,35 @@ settingsRouter.post('/verify-ses', async (req: Request, res: Response) => {
   }
 });
 
+settingsRouter.post('/verify-kumo', async (req: Request, res: Response) => {
+  const { host, port, username, password } = req.body;
+  const targetHost = String(host || '127.0.0.1').trim();
+  const targetPort = Number(port) || 2525;
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const auth = (username && password) ? { user: username, pass: password } : undefined;
+    const transporter = nodemailer.default.createTransport({
+      host: targetHost,
+      port: targetPort,
+      secure: false,
+      auth,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
+      tls: { rejectUnauthorized: false },
+    });
+
+    await transporter.verify();
+    return res.json({ success: true, message: `Successfully connected to KumoMTA SMTP listener at ${targetHost}:${targetPort}!` });
+  } catch (err: any) {
+    return res.status(422).json({
+      success: false,
+      error: `Could not connect to KumoMTA at ${targetHost}:${targetPort} (${err?.message || 'Connection refused or timeout'}). Ensure port ${targetPort} is open in your firewall and KumoMTA is running.`,
+    });
+  }
+});
+
 settingsRouter.post('/api-keys', async (req: Request, res: Response) => {
   const name = String(req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
