@@ -44,3 +44,47 @@ export interface DashboardStats {
   topCampaigns:Array<{id:string;name:string;sent:number;delivered:number;openRate:number;clickRate:number;status?:CampaignStatus;totalRecipients?:number;createdAt?:string}>;
 }
 export interface PrometheusMetrics { kumomta_queue_size:number; kumomta_messages_in_flight:number; kumomta_messages_sent_total:number; kumomta_delivery_rate_per_second:number; kumomta_smtp_connection_pool_active:number; kumomta_smtp_connection_pool_idle:number; kumomta_memory_usage_bytes:number; kumomta_cpu_usage_percent:number; ses_quota_max_24_hour:number; ses_quota_sent_last_24_hour:number; ses_quota_max_send_rate:number; ses_reputation_bounce_rate:number; ses_reputation_complaint_rate:number; }
+
+export interface VirtualMta {
+  id: string;
+  name: string;
+  ipAddress: string;
+  hostname: string;
+  domain?: string;
+  maxMessageRate: number;
+  maxConnections: number;
+  retryInterval: string;
+  poolName?: string;
+  status: 'active' | 'paused' | 'warming';
+  sentToday: number;
+  bouncedToday: number;
+}
+
+export interface IpPool {
+  id: string;
+  name: string;
+  description: string;
+  virtualMtas: string[];
+  strategy: 'round-robin' | 'weighted' | 'failover';
+}
+
+export interface DomainPolicy {
+  id: string;
+  domainPattern: string;
+  maxMsgRate: string;
+  maxConnections: number;
+  useTls: 'required' | 'ifavailable' | 'no';
+  retryInterval: string;
+  bounceProcessing: boolean;
+}
+
+export interface DnsCheckResult {
+  domain: string;
+  spf: { status: 'pass' | 'fail' | 'missing'; record?: string; details: string };
+  dkim: { status: 'pass' | 'fail' | 'missing'; selector: string; record?: string; details: string };
+  dmarc: { status: 'pass' | 'fail' | 'missing'; record?: string; details: string };
+  mx: { status: 'pass' | 'fail' | 'missing'; records: string[]; details: string };
+  rdns: { status: 'pass' | 'fail' | 'missing'; ptr?: string; details: string };
+  ehlo: { status: 'pass' | 'fail' | 'missing'; hostname: string; details: string };
+  overall: 'HEALTHY' | 'WARNING' | 'FAILED';
+}

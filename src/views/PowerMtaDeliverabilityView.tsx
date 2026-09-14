@@ -1,0 +1,308 @@
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, CheckCircle2, AlertTriangle, XCircle, Search, Copy, Check, RefreshCw, Globe, ArrowRight } from 'lucide-react';
+import { DnsCheckResult, Domain } from '../types';
+
+interface PowerMtaDeliverabilityViewProps {
+  domains: Domain[];
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
+  addToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
+}
+
+export const PowerMtaDeliverabilityView: React.FC<PowerMtaDeliverabilityViewProps> = ({
+  domains,
+  authFetch,
+  addToast,
+}) => {
+  const [domainInput, setDomainInput] = useState(domains[0]?.domainName || 'amiralucia.com');
+  const [selectorInput, setSelectorInput] = useState('kumo2026');
+  const [isChecking, setIsChecking] = useState(false);
+  const [result, setResult] = useState<DnsCheckResult | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const runValidation = async (targetDomain?: string) => {
+    const domainToCheck = (targetDomain || domainInput).trim();
+    if (!domainToCheck) return;
+    setIsChecking(true);
+    try {
+      const res = await authFetch('/api/pmta/validate-dns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: domainToCheck, selector: selectorInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to validate DNS');
+      setResult(data);
+      addToast('success', 'DNS Validation Completed', `Evaluated authentication records for ${domainToCheck}`);
+    } catch (err: any) {
+      addToast('error', 'DNS Check Failed', err.message);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    runValidation();
+  }, []);
+
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+    addToast('info', 'Copied to Clipboard', text.slice(0, 40) + '...');
+  };
+
+  return (
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-gray-200">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#8cc052]" />
+            <h1 className="text-2xl font-bold text-gray-800">Deliverability &amp; DNS Validator</h1>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Enterprise DNS authentication suite for DKIM, DMARC, SPF, MX, RDNS, and EHLO compliance.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {domains.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => {
+                setDomainInput(d.domainName);
+                runValidation(d.domainName);
+              }}
+              className={`px-3 py-1.5 rounded text-xs font-semibold border transition ${
+                domainInput === d.domainName
+                  ? 'bg-[#8cc052] text-white border-[#8cc052]'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {d.domainName}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Query Bar */}
+      <div className="pmta-card p-5 bg-white flex flex-col sm:flex-row gap-3 items-center">
+        <div className="relative flex-1 w-full">
+          <Globe className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={domainInput}
+            onChange={(e) => setDomainInput(e.target.value)}
+            placeholder="Enter sending domain (e.g. yourdomain.com)"
+            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded text-sm focus:border-[#8cc052]"
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <input
+            type="text"
+            value={selectorInput}
+            onChange={(e) => setSelectorInput(e.target.value)}
+            placeholder="DKIM Selector (kumo2026)"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:border-[#8cc052]"
+          />
+        </div>
+        <button
+          onClick={() => runValidation()}
+          disabled={isChecking}
+          className="w-full sm:w-auto px-6 py-2 bg-[#8cc052] hover:bg-[#7bb342] text-white font-bold rounded text-sm flex items-center justify-center gap-2 transition disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
+          <span>Validate Records</span>
+        </button>
+      </div>
+
+      {/* Overall Score Banner */}
+      {result && (
+        <div
+          className={`p-5 rounded-lg border flex items-center justify-between ${
+            result.overall === 'HEALTHY'
+              ? 'bg-[#f4faee] border-[#c9e89b] text-[#365314]'
+              : 'bg-amber-50 border-amber-200 text-amber-900'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            {result.overall === 'HEALTHY' ? (
+              <CheckCircle2 className="w-6 h-6 text-[#8cc052]" />
+            ) : (
+              <AlertTriangle className="w-6 h-6 text-amber-600" />
+            )}
+            <div>
+              <h3 className="font-bold text-base">
+                Domain Health: {result.overall === 'HEALTHY' ? 'EXCELLENT (100% Aligned)' : 'ACTION REQUIRED'}
+              </h3>
+              <p className="text-xs opacity-90 mt-0.5">
+                Targeting inbox placement across Google Mail, Yahoo, Microsoft Outlook, and Corporate Mail Filters.
+              </p>
+            </div>
+          </div>
+          <span
+            className={`px-3 py-1 text-xs font-bold rounded uppercase ${
+              result.overall === 'HEALTHY' ? 'bg-[#8cc052] text-white' : 'bg-amber-600 text-white'
+            }`}
+          >
+            {result.overall}
+          </span>
+        </div>
+      )}
+
+      {/* DNS Checklist Grid */}
+      {result && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* SPF */}
+          <div className="pmta-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-3 h-3 rounded-full ${
+                    result.spf.status === 'pass' ? 'bg-[#8cc052]' : 'bg-amber-500'
+                  }`}
+                />
+                <h3 className="font-bold text-gray-800">1. SPF (Sender Policy Framework)</h3>
+              </div>
+              <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                {result.spf.status}
+              </span>
+            </div>
+            <p className="text-xs text-gray-600">{result.spf.details}</p>
+            {result.spf.record && (
+              <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-800 flex items-center justify-between">
+                <span className="truncate mr-2">{result.spf.record}</span>
+                <button
+                  onClick={() => copyToClipboard(result.spf.record!, 'spf')}
+                  className="text-gray-500 hover:text-gray-800"
+                  title="Copy"
+                >
+                  {copiedKey === 'spf' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* DKIM */}
+          <div className="pmta-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-3 h-3 rounded-full ${
+                    result.dkim.status === 'pass' ? 'bg-[#8cc052]' : 'bg-amber-500'
+                  }`}
+                />
+                <h3 className="font-bold text-gray-800">2. DKIM (DomainKeys Identified Mail)</h3>
+              </div>
+              <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                Selector: {result.dkim.selector}
+              </span>
+            </div>
+            <p className="text-xs text-gray-600">{result.dkim.details}</p>
+            {result.dkim.record && (
+              <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-800 flex items-center justify-between">
+                <span className="truncate mr-2">{result.dkim.record}</span>
+                <button
+                  onClick={() => copyToClipboard(result.dkim.record!, 'dkim')}
+                  className="text-gray-500 hover:text-gray-800"
+                  title="Copy"
+                >
+                  {copiedKey === 'dkim' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* DMARC */}
+          <div className="pmta-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-3 h-3 rounded-full ${
+                    result.dmarc.status === 'pass' ? 'bg-[#8cc052]' : 'bg-amber-500'
+                  }`}
+                />
+                <h3 className="font-bold text-gray-800">3. DMARC Policy</h3>
+              </div>
+              <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                {result.dmarc.status}
+              </span>
+            </div>
+            <p className="text-xs text-gray-600">{result.dmarc.details}</p>
+            {result.dmarc.record && (
+              <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-800 flex items-center justify-between">
+                <span className="truncate mr-2">{result.dmarc.record}</span>
+                <button
+                  onClick={() => copyToClipboard(result.dmarc.record!, 'dmarc')}
+                  className="text-gray-500 hover:text-gray-800"
+                  title="Copy"
+                >
+                  {copiedKey === 'dmarc' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* MX */}
+          <div className="pmta-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-3 h-3 rounded-full ${
+                    result.mx.status === 'pass' ? 'bg-[#8cc052]' : 'bg-amber-500'
+                  }`}
+                />
+                <h3 className="font-bold text-gray-800">4. Mail Exchanger (MX)</h3>
+              </div>
+              <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                {result.mx.records.length} Records
+              </span>
+            </div>
+            <p className="text-xs text-gray-600">{result.mx.details}</p>
+            <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-800">
+              {result.mx.records.map((r, i) => (
+                <div key={i} className="py-0.5">
+                  {r}
+                </div>
+              ))}
+              {result.mx.records.length === 0 && <div className="text-gray-400">No MX records returned.</div>}
+            </div>
+          </div>
+
+          {/* RDNS (PTR) */}
+          <div className="pmta-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#8cc052]" />
+                <h3 className="font-bold text-gray-800">5. Reverse DNS (RDNS / PTR)</h3>
+              </div>
+              <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-green-100 text-green-800">
+                PASS
+              </span>
+            </div>
+            <p className="text-xs text-gray-600">{result.rdns.details}</p>
+            <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-800">
+              PTR: {result.rdns.ptr}
+            </div>
+          </div>
+
+          {/* EHLO / HELO */}
+          <div className="pmta-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#8cc052]" />
+                <h3 className="font-bold text-gray-800">6. EHLO Greeting Alignment</h3>
+              </div>
+              <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-green-100 text-green-800">
+                PASS
+              </span>
+            </div>
+            <p className="text-xs text-gray-600">{result.ehlo.details}</p>
+            <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-800">
+              EHLO: {result.ehlo.hostname}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

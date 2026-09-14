@@ -1,22 +1,185 @@
 import React from 'react';
-import { LayoutDashboard, Send, Megaphone, MailCheck, Users, ShieldAlert, Server, BarChart3, Terminal, Settings, FileCode2, LogOut, HardDrive } from 'lucide-react';
+import {
+  Activity,
+  Server,
+  ShieldCheck,
+  Gauge,
+  Send,
+  Megaphone,
+  MailCheck,
+  Users,
+  ShieldAlert,
+  Terminal,
+  Settings,
+  FileCode2,
+  LogOut,
+  BookOpen,
+  DollarSign,
+  Layers,
+  Globe,
+} from 'lucide-react';
 
-export type NavTab = 'dashboard'|'send'|'campaigns'|'messages'|'contacts'|'suppression'|'senders'|'analytics'|'logs'|'settings'|'templates'|'storage';
-type ServiceStatus='healthy'|'degraded'|'offline'|'standby'|'unknown';
-interface SidebarProps{currentTab:NavTab;onSelectTab:(tab:NavTab)=>void;kumoStatus?:string;sesStatus?:string;queueCount?:number;user?:{name?:string;email?:string;role?:string;plan?:string}|null;onLogout?:()=>void;}
-const normalizeStatus=(s?:string):ServiceStatus=>s==='healthy'||s==='degraded'||s==='offline'||s==='standby'?s:'unknown';
-const statusLabel=(s?:string)=>({healthy:'ONLINE',degraded:'DEGRADED',offline:'STANDBY',standby:'STANDBY',unknown:'STANDBY'}[normalizeStatus(s)]);
-const statusClass=(s?:string)=>({healthy:'text-[#39ff9c]',degraded:'text-[#ffb454]',offline:'text-[#7c9188]',standby:'text-[#7c9188]',unknown:'text-[#4a5a53]'}[normalizeStatus(s)]);
-export const Sidebar:React.FC<SidebarProps>=({currentTab,onSelectTab,kumoStatus='unknown',sesStatus='unknown',queueCount=0,user,onLogout})=>{
- const groups=[
-  {label:'Monitor',items:[['dashboard','Overview',LayoutDashboard],['analytics','Deliverability',BarChart3]]},
-  {label:'Send',items:[['campaigns','Campaigns',Megaphone],['templates','Templates',FileCode2],['send','Compose',Send],['messages','Messages',MailCheck]]},
-  {label:'Data',items:[['contacts','Contacts',Users],['suppression','Suppression',ShieldAlert]]},
-  {label:'System',items:[['senders','Infrastructure',Server],['storage','Convex Storage',HardDrive],['settings','API & Settings',Settings],['logs','Technical Logs',Terminal]]}
- ] as const;
- return <aside className="w-[228px] bg-[#0b0e0d] border-r border-[#1e2825] flex flex-col shrink-0 h-screen sticky top-0 overflow-y-auto font-mono">
-  <div className="px-5 pt-6 pb-5 border-b border-[#1e2825]"><div className="flex items-center gap-2.5"><span className="w-2 h-2 rounded-[2px] bg-[#39ff9c] shadow-[0_0_12px_#39ff9c]"/><span className="font-mono font-bold text-[15px] tracking-wide text-[#d8e6df]">EmailinOPS</span></div><div className="text-[9px] uppercase tracking-[0.18em] text-[#4a5a53] mt-1.5 pl-[18px]">mail delivery engine</div></div>
-  <nav className="flex-1 px-3 py-3">{groups.map(g=><div key={g.label}><div className="text-[9px] uppercase tracking-[0.2em] text-[#4a5a53] px-2 py-3">{g.label}</div>{g.items.map(([id,label,Icon])=>{const active=currentTab===id;return <button key={id} onClick={()=>onSelectTab(id as NavTab)} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-[4px] text-[11.5px] mb-0.5 border-l-2 transition-all ${active?'bg-[#131917] text-[#39ff9c] border-[#39ff9c]':'text-[#7c9188] border-transparent hover:bg-[#131917] hover:text-[#d8e6df]'}`}><Icon className="w-3.5 h-3.5"/><span>{label}</span></button>})}</div>)}</nav>
-   <div className="p-4 border-t border-[#1e2825]"><div className="p-3 rounded-[5px] border border-[#1e2825] bg-[#0f1412] space-y-2"><div className="flex justify-between text-[10px]"><span className="text-[#7c9188]">KumoMTA</span><span className={statusClass(kumoStatus)}>● {statusLabel(kumoStatus)}</span></div><div className="flex justify-between text-[10px]"><span className="text-[#7c9188]">SES Relay</span><span className={statusClass(sesStatus)}>● {statusLabel(sesStatus)}</span></div><div className="pt-2 border-t border-[#1e2825] flex justify-between text-[10px]"><span className="text-[#4a5a53]">QUEUE</span><span className="text-[#d8e6df]">{Number(queueCount)||0} msgs</span></div></div><div className="mt-3 flex items-center justify-between"><div className="min-w-0"><div className="text-[10px] text-[#d8e6df] truncate">{user?.name||user?.email||'Email Operator'}</div><div className="text-[8px] uppercase tracking-widest text-[#4a5a53] mt-0.5">{user?.role||'ADMIN'} · {user?.plan||'PRO'}</div></div>{onLogout&&<button onClick={onLogout} className="p-1.5 text-[#4a5a53] hover:text-[#ff5c5c]"><LogOut className="w-3.5 h-3.5"/></button>}</div></div>
- </aside>;
+export type NavTab =
+  | 'dashboard'
+  | 'vmtas'
+  | 'deliverability'
+  | 'policies'
+  | 'send'
+  | 'campaigns'
+  | 'templates'
+  | 'messages'
+  | 'contacts'
+  | 'suppression'
+  | 'serverConfig'
+  | 'installation'
+  | 'pricing'
+  | 'senders'
+  | 'analytics'
+  | 'logs'
+  | 'settings'
+  | 'storage';
+
+interface SidebarProps {
+  currentTab: NavTab;
+  onSelectTab: (tab: NavTab) => void;
+  kumoStatus?: string;
+  sesStatus?: string;
+  queueCount?: number;
+  user?: { name?: string; email?: string; role?: string; plan?: string } | null;
+  onLogout?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  currentTab,
+  onSelectTab,
+  queueCount = 0,
+  user,
+  onLogout,
+}) => {
+  const groups = [
+    {
+      label: 'PowerMTA Engine',
+      items: [
+        ['dashboard', 'Spool Monitor', Activity],
+        ['vmtas', 'VirtualMTAs & Pools', Layers],
+        ['deliverability', 'DNS & Deliverability', ShieldCheck],
+        ['policies', 'Speed Throttling', Gauge],
+      ],
+    },
+    {
+      label: 'Email Marketer',
+      items: [
+        ['send', 'Quick Compose', Send],
+        ['campaigns', 'Campaigns', Megaphone],
+        ['templates', 'Templates', FileCode2],
+        ['messages', 'Message Spool', MailCheck],
+      ],
+    },
+    {
+      label: 'Audience & Hygiene',
+      items: [
+        ['contacts', 'Contacts & Lists', Users],
+        ['suppression', 'Bounce & Suppression', ShieldAlert],
+      ],
+    },
+    {
+      label: 'Management & Setup',
+      items: [
+        ['serverConfig', 'Server & CLI Console', Terminal],
+        ['installation', 'Installation Guide', BookOpen],
+        ['pricing', 'Pricing & Plans', DollarSign],
+        ['senders', 'Senders & Domains', Globe],
+        ['settings', 'Settings & API', Settings],
+      ],
+    },
+  ] as const;
+
+  return (
+    <aside className="w-64 bg-[#1e2631] text-gray-200 border-r border-gray-800 flex flex-col shrink-0 h-screen sticky top-0 overflow-y-auto font-sans select-none">
+      {/* Brand Header */}
+      <div className="p-5 border-b border-gray-800 bg-[#171e27]">
+        <div className="flex items-center gap-2.5">
+          <span className="w-3 h-3 rounded-full bg-[#8cc052] shadow-[0_0_10px_#8cc052]" />
+          <span className="font-extrabold text-lg tracking-wider text-white">
+            PowerMTA<span className="text-[#8cc052]">.PW</span>
+          </span>
+        </div>
+        <div className="text-[10px] uppercase font-bold tracking-[0.16em] text-gray-400 mt-1 pl-[22px]">
+          Enterprise Delivery &amp; Marketer
+        </div>
+      </div>
+
+      {/* Navigation Links */}
+      <nav className="flex-1 px-3 py-4 space-y-4">
+        {groups.map((g) => (
+          <div key={g.label}>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-gray-400 px-3 pb-1.5 font-bold">
+              {g.label}
+            </div>
+            <div className="space-y-0.5">
+              {g.items.map(([id, label, Icon]) => {
+                const active = currentTab === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => onSelectTab(id as NavTab)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold transition-all ${
+                      active
+                        ? 'bg-[#8cc052] text-white shadow-sm'
+                        : 'text-gray-300 hover:bg-[#253140] hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${active ? 'text-white' : 'text-gray-400'}`} />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Daemon Status Footer */}
+      <div className="p-4 border-t border-gray-800 bg-[#171e27] space-y-3">
+        <div className="p-2.5 rounded bg-[#1e2631] border border-gray-700/60 space-y-1.5 text-[11px]">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-400">PowerMTA Daemon</span>
+            <span className="text-[#8cc052] font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#8cc052]" />
+              ONLINE
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-[10px] text-gray-400">
+            <span>Port 2525 / 25</span>
+            <span className="text-gray-300 font-mono">LISTENING</span>
+          </div>
+          <div className="flex justify-between items-center text-[10px] text-gray-400 pt-1 border-t border-gray-800">
+            <span>Queue In-Flight</span>
+            <span className="text-white font-mono font-bold">{Number(queueCount) || 0} msgs</span>
+          </div>
+        </div>
+
+        {/* User Card */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-white truncate">
+              {user?.name || user?.email || 'MTA Admin'}
+            </div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wider">
+              {user?.role || 'ADMIN'} · {user?.plan || 'ENTERPRISE'}
+            </div>
+          </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="p-1.5 text-gray-400 hover:text-red-400 transition"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
 };

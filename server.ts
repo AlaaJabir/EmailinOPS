@@ -21,6 +21,7 @@ import { unsubscribeRouter } from './server/routes/unsubscribe.js';
 import { trackingRouter } from './server/routes/tracking.js';
 import { templatesRouter } from './server/routes/templates.js';
 import { storageRouter } from './server/routes/storage.js';
+import { powermtaRouter } from './server/routes/powermta.js';
 import { kumoMtaService } from './server/services/KumoMtaService.js';
 import { sesProvider } from './server/services/SesProvider.js';
 import { convexService } from './server/services/ConvexService.js';
@@ -360,7 +361,7 @@ async function startServer() {
       return res.status(500).json({ error: 'Failed to load dashboard statistics', details: err?.message || String(err) });
     }
   });
-  app.use('/api/auth',authRouter);app.use('/api/messages',messagesRouter);app.use('/api/campaigns',campaignsRouter);app.use('/api/senders',sendersRouter);app.use('/api/contacts',contactsRouter);app.use('/api/imports',importsRouter);app.use('/api/suppressions',suppressionsRouter);app.use('/api/analytics',analyticsRouter);app.use('/api/logs',logsRouter);app.use('/api/settings',settingsRouter);app.use('/api/metrics',metricsRouter);app.use('/api/webhooks',webhooksRouter);if(process.env.NODE_ENV!=='production'&&process.env.ENABLE_DEMO_DATA==='true')app.use('/api/seed',seedRouter);app.use('/api/tracking',trackingRouter);app.use('/api/unsubscribe',unsubscribeRouter);app.use('/api/templates',templatesRouter);app.use('/api/storage',storageRouter);app.use('/unsubscribe',unsubscribeRouter);
+  app.use('/api/auth',authRouter);app.use('/api/messages',messagesRouter);app.use('/api/campaigns',campaignsRouter);app.use('/api/senders',sendersRouter);app.use('/api/contacts',contactsRouter);app.use('/api/imports',importsRouter);app.use('/api/suppressions',suppressionsRouter);app.use('/api/analytics',analyticsRouter);app.use('/api/logs',logsRouter);app.use('/api/settings',settingsRouter);app.use('/api/metrics',metricsRouter);app.use('/api/webhooks',webhooksRouter);if(process.env.NODE_ENV!=='production'&&process.env.ENABLE_DEMO_DATA==='true')app.use('/api/seed',seedRouter);app.use('/api/tracking',trackingRouter);app.use('/api/unsubscribe',unsubscribeRouter);app.use('/api/templates',templatesRouter);app.use('/api/storage',storageRouter);app.use('/api/pmta',powermtaRouter);app.use('/unsubscribe',unsubscribeRouter);
   if(process.env.NODE_ENV!=='production'){const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares);}else{const distPath=path.join(process.cwd(),'dist');app.use(express.static(distPath));app.use('/api',(req,res)=>res.status(404).json({error:'API route not found',path:req.path,method:req.method}));app.get('*',(req,res)=>res.sendFile(path.join(distPath,'index.html')));}
   app.listen(PORT,'0.0.0.0',()=>console.log(`[EmailOps] Server started on http://0.0.0.0:${PORT}`));
 }
