@@ -277,12 +277,17 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
     }
   }, [senders]);
 
+  const safeParse = async (r: Response) => {
+    const t = await r.text();
+    try { return t ? JSON.parse(t) : {}; } catch { return { error: t.slice(0, 160) || `HTTP ${r.status}` }; }
+  };
+
   const loadTemplates = async () => {
     if (!authFetch) return;
     try {
       const r = await authFetch('/api/templates');
       if (r.ok) {
-        const d = await r.json();
+        const d = await safeParse(r);
         setTemplates(d.templates || []);
       }
     } catch (e) {
@@ -295,7 +300,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
     try {
       const r = await authFetch('/api/contacts/lists');
       if (r.ok) {
-        const d = await r.json();
+        const d = await safeParse(r);
         setLists(d.lists || []);
       }
     } catch (e) {
@@ -316,7 +321,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
     setAudienceLoading(true);
     try {
       const r = await authFetch(`/api/contacts?listId=${encodeURIComponent(listId)}`);
-      const d = await r.json().catch(() => ({}));
+      const d = await safeParse(r);
       if (!r.ok) throw new Error(d.error || 'Failed to load contact list');
       const loaded: Contact[] = d.contacts || [];
       setAudienceContacts(loaded);
@@ -391,8 +396,8 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
         body: JSON.stringify(body),
       });
       if (r.ok) {
-        const d = await r.json();
-        setTemplateId(d.template.id);
+        const d = await safeParse(r);
+        if (d?.template?.id) setTemplateId(d.template.id);
         await loadTemplates();
       }
     } finally {

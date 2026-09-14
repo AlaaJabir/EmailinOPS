@@ -198,6 +198,18 @@ messagesRouter.post('/send', optionalAuth, async (req: Request, res: Response) =
     const results: any[] = [];
     const failures: any[] = [];
 
+    // Pre-flight check: verify KumoMTA listener status
+    const health = await kumoMtaService.checkHealth();
+    if (health.status === 'offline') {
+      const reason = health.error || 'Connection failed';
+      return res.status(503).json({
+        success: false,
+        error: `KumoMTA is unreachable at ${health.host}:${health.port} (${reason}). Please verify VPS status and firewall.`,
+        failures: recipients.map((r) => ({ recipient: r, error: reason })),
+        warnings: validation.warnings,
+      });
+    }
+
     for (const recipient of recipients) {
       const internalId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
       const senderDomain = String(fromEmail || '').includes('@') ? String(fromEmail).split('@')[1] : 'kumo.internal';
@@ -311,9 +323,10 @@ messagesRouter.post('/send', optionalAuth, async (req: Request, res: Response) =
     }
 
     if (!results.length) {
+      const primaryError = failures[0]?.error || 'KumoMTA submission failed';
       return res.status(502).json({
         success: false,
-        error: 'All recipients failed to submit to KumoMTA',
+        error: primaryError,
         failures,
         warnings: validation.warnings,
       });
@@ -324,6 +337,7 @@ messagesRouter.post('/send', optionalAuth, async (req: Request, res: Response) =
       result: results.length === 1 ? results[0].result : results.map((r) => r.result),
       results,
       failures,
+      error: failures.length ? `Partial failure: ${failures[0]?.error}` : undefined,
       messageIds: results.map((r) => r.messageId),
       warnings: validation.warnings,
     });
@@ -335,6 +349,16 @@ messagesRouter.post('/send', optionalAuth, async (req: Request, res: Response) =
 messagesRouter.post('/test', optionalAuth, async (req: Request, res: Response) => {
   const { testEmail, fromName, fromEmail, subject, preheader, htmlBody, headHtml, plainText, enableOpenTracking, enableClickTracking } = req.body;
   if (!testEmail || !fromEmail) return res.status(400).json({ error: 'testEmail and fromEmail are required' });
+
+  // Pre-flight check: verify KumoMTA listener status
+  const health = await kumoMtaService.checkHealth();
+  if (health.status === 'offline') {
+    const reason = health.error || 'Connection failed';
+    return res.status(503).json({
+      success: false,
+      error: `KumoMTA is unreachable at ${health.host}:${health.port} (${reason}). Please verify VPS status and firewall.`,
+    });
+  }
 
   const userId = req.user?.id || await convexService.getDefaultUserId();
   try {
@@ -419,6 +443,6 @@ messagesRouter.post('/test', optionalAuth, async (req: Request, res: Response) =
       message: `Test email dispatched to ${testEmail} through KumoMTA.`,
     });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Failed to send test email via KumoMTA' });
+    return res.status(502).json({ success: false, error: err.message || 'Failed to send test email via KumoMTA' });
   }
 });

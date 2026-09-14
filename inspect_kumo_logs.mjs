@@ -1,13 +1,12 @@
 import fetch from 'node-fetch';
 
 async function checkKumoApi() {
-  const token = 'AKIA4MTWLS6DZLBWLFKG:BGsjuPnwv8Y8OzoR5j4YUybpD0xfzNyQto5qIMqr8yHF';
-  const basicAuth = Buffer.from(token).toString('base64');
+  const token = process.env.KUMO_API_TOKEN || '';
+  const basicAuth = token ? Buffer.from(token).toString('base64') : '';
   
   const headers = [
     {},
-    { 'Authorization': `Bearer ${token}` },
-    { 'Authorization': `Basic ${basicAuth}` }
+    ...(token ? [{ 'Authorization': `Bearer ${token}` }, { 'Authorization': `Basic ${basicAuth}` }] : [])
   ];
 
   for (const h of headers) {

@@ -24,6 +24,18 @@ import {
 } from 'lucide-react';
 import { ApiKey } from '../types';
 
+const safeJson = async (res: Response) => {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {
+      success: false,
+      error: text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) || `Server returned HTTP ${res.status}`,
+    };
+  }
+};
+
 interface SettingsViewProps {
   settings: any;
   apiKeys: ApiKey[];
@@ -55,7 +67,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       const res = await fetch('/api/storage/files');
       if (res.ok) {
-        const d = await res.json();
+        const d = await safeJson(res);
         setConvexFiles(d.files || []);
       }
     } catch {
@@ -400,7 +412,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         checkRelay: false,
                       }),
                     });
-                    const d = await res.json();
+                    const d = await safeJson(res);
                     setKumoTestResult(d);
                   } catch (e: any) {
                     setKumoTestResult({ success: false, error: e.message });
@@ -434,7 +446,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         senderEmail: 'service@amiralucia.com',
                       }),
                     });
-                    const d = await res.json();
+                    const d = await safeJson(res);
                     setKumoTestResult(d);
                   } catch (e: any) {
                     setKumoTestResult({ success: false, error: e.message });
@@ -573,7 +585,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       smtpHost: sesSmtpHost,
                     }),
                   });
-                  const d = await res.json();
+                  const d = await safeJson(res);
                   setSesTestResult(d);
                 } catch (e: any) {
                   setSesTestResult({ success: false, error: e.message });
@@ -673,7 +685,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ url: convexUrl }),
                     });
-                    const d = await res.json();
+                    const d = await safeJson(res);
                     setConvexTestResult(d);
                     if (d.success) fetchConvexFiles();
                   } catch (e: any) {

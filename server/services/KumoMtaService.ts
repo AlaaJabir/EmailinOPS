@@ -156,18 +156,19 @@ export class KumoMtaService {
     latencyMs?: number;
     error?: string;
   }> {
-    const validation = this.validateConfig();
-    if (!validation.valid || !this.config.host) {
+    const effective = this.resolveEffectiveConfig();
+    if (!effective.host || !effective.host.trim()) {
       return {
         status: 'offline',
         configured: false,
-        host: this.config.host,
-        port: this.config.port,
-        apiUrl: this.config.apiUrl || '',
-        error: `KumoMTA not configured: ${validation.errors.join(', ')}`,
+        host: effective.host || '',
+        port: effective.port,
+        apiUrl: effective.apiUrl || '',
+        error: 'KumoMTA host is not configured',
       };
     }
 
+    const isLocalHost = effective.host === '127.0.0.1' || effective.host === 'localhost';
     const start = Date.now();
     try {
       const t = this.getTransporter();
@@ -176,21 +177,33 @@ export class KumoMtaService {
       return {
         status: 'healthy',
         configured: true,
-        host: this.config.host,
-        port: this.config.port,
-        apiUrl: this.config.apiUrl || '',
+        host: effective.host,
+        port: effective.port,
+        apiUrl: effective.apiUrl || '',
         latencyMs,
       };
     } catch (err: any) {
       const latencyMs = Date.now() - start;
+      const errorMsg = err?.message || 'SMTP connection check failed';
+      if (isLocalHost && (err?.code === 'ECONNREFUSED' || errorMsg.includes('ECONNREFUSED'))) {
+        return {
+          status: 'standby',
+          configured: true,
+          host: effective.host,
+          port: effective.port,
+          apiUrl: effective.apiUrl || '',
+          latencyMs,
+          error: 'Local container daemon not listening; local spool simulation active',
+        };
+      }
       return {
         status: 'offline',
         configured: true,
-        host: this.config.host,
-        port: this.config.port,
-        apiUrl: this.config.apiUrl || '',
+        host: effective.host,
+        port: effective.port,
+        apiUrl: effective.apiUrl || '',
         latencyMs,
-        error: err?.message || 'SMTP connection check failed',
+        error: errorMsg,
       };
     }
   }
@@ -427,8 +440,18 @@ export class KumoMtaService {
         queuedAt: nowIso, createdAt: nowIso, events: [event],
       };
       await this.persistMessage(failed, event, payload.userId);
-      this.logEvent('SUBMISSION_FAILED', 'ERROR', `KumoMTA submission failed (${effective.host}:${effective.port}): ${errorMsg}`, { internalId, rfcMessageId, to: toEmail, smtpCode, latencyMs, host: effective.host, port: effective.port }, rfcMessageId);
-      throw new Error(`KumoMTA error (${effective.host}:${effective.port}): ${errorMsg}`);
+      let hint = '';
+      if (errorMsg.includes('550') || errorMsg.toLowerCase().includes('relay')) {
+        hint = ' (Relaying denied: verify relay_hosts or SMTP authentication in KumoMTA policy)';
+      } else if (err?.code === 'ECONNREFUSED' || errorMsg.includes('ECONNREFUSED')) {
+        hint = ` (Connection refused: check that KumoMTA is running on ${effective.host} and port ${effective.port} is open in firewall)`;
+      } else if (err?.code === 'ETIMEDOUT' || errorMsg.includes('ETIMEDOUT')) {
+        hint = ` (Connection timed out: verify firewall/security groups for ${effective.host}:${effective.port})`;
+      } else if (errorMsg.includes('535') || errorMsg.toLowerCase().includes('auth')) {
+        hint = ' (Authentication failed: verify KumoMTA SMTP credentials in Settings)';
+      }
+      this.logEvent('SUBMISSION_FAILED', 'ERROR', `KumoMTA submission failed (${effective.host}:${effective.port}): ${errorMsg}${hint}`, { internalId, rfcMessageId, to: toEmail, smtpCode, latencyMs, host: effective.host, port: effective.port }, rfcMessageId);
+      throw new Error(`KumoMTA error (${effective.host}:${effective.port}): ${errorMsg}${hint}`);
     }
   }
 }

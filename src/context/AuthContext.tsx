@@ -28,7 +28,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_BASE_URL = String(
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.NEXT_PUBLIC_API_URL ||
-  'https://emailops-api.amiralucia.com'
+  ''
 ).replace(/\/$/, '');
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -47,7 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           },
         });
         if (res.ok) {
-          const data = await res.json();
+          const text = await res.text();
+          let data: any = {};
+          try { data = text ? JSON.parse(text) : {}; } catch {}
           if (data.user) {
             setProfile({
               id: data.user.id,
