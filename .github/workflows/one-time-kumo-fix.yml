@@ -1,0 +1,53 @@
+name: one-time-kumo-fix
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-kumo-fix.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply production delivery fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('server/services/KumoMtaService.ts')
+          s = p.read_text()
+          s = s.replace("process.env.KUMOMTA_HOST ?? '51.170.132.86'", "process.env.KUMOMTA_HOST ?? '127.0.0.1'")
+          s = s.replace("process.env.KUMOMTA_API_URL ?? 'http://51.170.132.86:8000'", "process.env.KUMOMTA_API_URL ?? 'http://127.0.0.1:8000'")
+          s, n = re.subn(r"\n\s*// Only allow local spooling simulation if configured to local 127\.0\.0\.1 and connection is refused\n\s*if \(isConnRefused && isLocalHost\) \{.*?\n\s*\}\n\n\s*// If an actual rejection occurred", "\n\n      // A real SMTP connection failure is a hard failure. Never fabricate spool acceptance.\n      // If an actual rejection occurred", s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('Expected local spool simulation block was not found')
+          old = """      if (isLocalHost && (err?.code === 'ECONNREFUSED' || errorMsg.includes('ECONNREFUSED'))) {\n        return {\n          status: 'standby',\n          configured: true,\n          host: effective.host,\n          port: effective.port,\n          apiUrl: effective.apiUrl || '',\n          latencyMs,\n          error: 'Local container daemon not listening; local spool simulation active',\n        };\n      }\n"""
+          s = s.replace(old, "")
+          s = s.replace("    const isLocalHost = effective.host === '127.0.0.1' || effective.host === 'localhost';\n", "")
+          s = s.replace("      const isLocalHost = effective.host === '127.0.0.1' || effective.host === 'localhost';\n\n", "")
+          p.write_text(s)
+
+          p = Path('server.ts')
+          s = p.read_text()
+          s = s.replace("const delivered = messages.filter((m:any) => \n    (m.status === 'DELIVERED' || m.status === 'SENT' || openMessageIds.has(m.message_id) || openMessageIds.has(m.internal_id) || clickMessageIds.has(m.message_id) || clickMessageIds.has(m.internal_id)) &&\n    m.status !== 'BOUNCED' && m.status !== 'FAILED' && m.status !== 'REJECTED'\n  ).length;", "const delivered = messages.filter((m:any) => m.status === 'DELIVERED').length;")
+          s = s.replace("const previousDelivered = previousMessages.filter((m:any) => (m.status === 'DELIVERED' || m.status === 'SENT') && m.status !== 'BOUNCED' && m.status !== 'FAILED').length;", "const previousDelivered = previousMessages.filter((m:any) => m.status === 'DELIVERED').length;")
+          s = s.replace("if ((m.status === 'DELIVERED' || m.status === 'SENT') && m.status !== 'BOUNCED' && m.status !== 'FAILED') x.delivered++;", "if (m.status === 'DELIVERED') x.delivered++;")
+          s = s.replace("const del = ms.filter((m: any) => (m.status === 'DELIVERED' || m.status === 'SENT') && m.status !== 'BOUNCED').length;", "const del = ms.filter((m: any) => m.status === 'DELIVERED').length;")
+          s = s.replace("if (m.status !== 'BOUNCED' && m.status !== 'FAILED') existing.delivered++;", "if (m.status === 'DELIVERED') existing.delivered++;")
+          p.write_text(s)
+          PY
+      - name: Verify TypeScript build
+        run: |
+          npm ci
+          npm run lint
+          npm test
+      - name: Commit fixes and remove temporary workflow
+        run: |
+          rm -f .github/workflows/one-time-kumo-fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server/services/KumoMtaService.ts server.ts .github/workflows/one-time-kumo-fix.yml
+          git commit -m 'fix: make KumoMTA delivery state truthful [skip ci]'
+          git push
