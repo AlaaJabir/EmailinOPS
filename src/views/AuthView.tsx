@@ -7,11 +7,12 @@ import {
   AlertCircle,
   ArrowRight,
   Server,
+  Zap,
 } from 'lucide-react';
 
 export const AuthView: React.FC = () => {
   const { login, error, clearError } = useAuth();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -53,40 +54,40 @@ export const AuthView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#EDEDED] flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans select-none">
-      {/* Subtle Background Radial */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-emerald-500/5 blur-[120px] pointer-events-none rounded-full" />
-      
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans select-none">
+      {/* Background glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-indigo-500/5 blur-[120px] pointer-events-none rounded-full" />
+
       {/* Container */}
-      <div className="w-full max-w-md relative z-10">
+      <div className="w-full max-w-md relative z-10 space-y-6">
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 px-3 py-1.5 rounded-sm bg-white/5 border border-white/10 mb-4">
-            <div className="w-5 h-5 bg-white rounded-sm flex items-center justify-center text-black font-bold text-[10px]">
-              EO
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center gap-2.5 px-3 py-1 rounded-full bg-[#111827] border border-slate-800 text-xs">
+            <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px]">
+              <Zap className="w-3 h-3 text-white fill-white" />
             </div>
-            <span className="text-xs font-semibold text-white tracking-wide">
-              EmailOps Enterprise
+            <span className="font-semibold text-white tracking-wide">
+              EmailinOPS
             </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[9px] font-mono tracking-wider text-[#888888] uppercase">
-              PROD
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10B981]" />
+            <span className="text-[10px] font-mono text-slate-400 uppercase">
+              Control Plane
             </span>
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            Sign in to EmailOps
+            Sign in to EmailinOPS
           </h1>
-          <p className="text-xs text-[#888888] mt-1.5 max-w-sm mx-auto">
-            Enter your operator credentials to access the delivery control plane.
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            Access MTA spool queues, SES relay routing, and high-velocity deliverability controls.
           </p>
         </div>
 
         {/* Auth Card */}
-        <div className="bg-[#0F0F0F] border border-white/10 rounded-sm p-6 shadow-2xl backdrop-blur-md">
+        <div className="bg-[#111827] border border-slate-800 rounded-xl p-6 sm:p-8 shadow-2xl">
           {/* Error Alert */}
           {(formError || error) && (
-            <div className="mb-4 p-3 rounded-sm bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+            <div className="mb-4 p-3 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
               <div className="leading-tight flex-1">{formError || error}</div>
             </div>
           )}
@@ -94,11 +95,11 @@ export const AuthView: React.FC = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-medium text-[#888888] uppercase tracking-wider mb-1.5">
-                Work Email
+              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                Work Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-[#666666] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   id="input-email"
                   type="email"
@@ -106,23 +107,23 @@ export const AuthView: React.FC = () => {
                   autoFocus
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="operator@emailops.io"
-                  className="w-full bg-[#050505] border border-white/10 rounded-sm pl-9 pr-3 py-2 text-xs text-white placeholder:text-[#555555] focus:outline-none focus:border-white/40 transition-colors"
+                  placeholder="operator@emailinops.io"
+                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/70 transition-colors"
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-[11px] font-medium text-[#888888] uppercase tracking-wider">
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                   Password
                 </label>
-                <span className="text-[10px] text-[#666666]">
-                  Encrypted
+                <span className="text-[10px] text-slate-500">
+                  Encrypted Session
                 </span>
               </div>
               <div className="relative">
-                <Lock className="w-4 h-4 text-[#666666] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   id="input-password"
                   type="password"
@@ -130,7 +131,7 @@ export const AuthView: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-[#050505] border border-white/10 rounded-sm pl-9 pr-3 py-2 text-xs text-white placeholder:text-[#555555] focus:outline-none focus:border-white/40 transition-colors"
+                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/70 transition-colors"
                 />
               </div>
             </div>
@@ -139,16 +140,16 @@ export const AuthView: React.FC = () => {
               id="btn-auth-submit"
               type="submit"
               disabled={isSubmitting}
-              className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 px-4 bg-white hover:bg-neutral-200 text-black font-semibold text-xs rounded-sm transition-all shadow-md disabled:opacity-60 cursor-pointer"
+              className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-lg transition shadow-sm disabled:opacity-60 cursor-pointer"
             >
               {isSubmitting ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>Authenticating...</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In</span>
+                  <span>Sign In to Console</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
@@ -156,14 +157,14 @@ export const AuthView: React.FC = () => {
           </form>
 
           {/* Footer Security Badges */}
-          <div className="mt-6 pt-5 border-t border-white/10 flex items-center justify-between text-[10px] text-[#666666]">
+          <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
             <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3 h-3 text-emerald-500" />
-              <span>Supabase Auth & RLS</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>TLS 1.3 &bull; HMAC RLS</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Server className="w-3 h-3 text-[#888888]" />
-              <span>KumoMTA 51.170.132.86</span>
+              <Server className="w-3.5 h-3.5 text-slate-400" />
+              <span>KumoMTA Node</span>
             </div>
           </div>
         </div>

@@ -214,23 +214,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white-10 gap-6 text-xs font-medium">
+      <div className="flex border-b border-slate-800 gap-2 overflow-x-auto pb-1 text-xs font-medium">
         <button
           onClick={() => setActiveTab('kumomta')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'kumomta' ? 'border-white text-white font-semibold' : 'border-transparent text-[#888888] hover:text-white'
+          className={`px-3.5 py-2 rounded-t-md transition-colors flex items-center gap-2 ${
+            activeTab === 'kumomta' ? 'border-b-2 border-indigo-500 text-white font-semibold bg-indigo-600/10' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Cpu className="w-4 h-4" />
-          <span>KumoMTA Engine</span>
+          <Cpu className="w-4 h-4 text-indigo-400" />
+          <span>KumoMTA Node</span>
         </button>
         <button
           onClick={() => setActiveTab('ses')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'ses' ? 'border-white text-white font-semibold' : 'border-transparent text-[#888888] hover:text-white'
+          className={`px-3.5 py-2 rounded-t-md transition-colors flex items-center gap-2 ${
+            activeTab === 'ses' ? 'border-b-2 border-indigo-500 text-white font-semibold bg-indigo-600/10' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Radio className="w-4 h-4" />
+          <Radio className="w-4 h-4 text-amber-400" />
           <span>Amazon SES Relay</span>
         </button>
         <button
@@ -238,39 +238,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             setActiveTab('convex');
             fetchConvexFiles();
           }}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'convex' ? 'border-white text-white font-semibold' : 'border-transparent text-[#888888] hover:text-white'
+          className={`px-3.5 py-2 rounded-t-md transition-colors flex items-center gap-2 ${
+            activeTab === 'convex' ? 'border-b-2 border-indigo-500 text-white font-semibold bg-indigo-600/10' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <HardDrive className="w-4 h-4 text-emerald-400" />
-          <span>Convex Database &amp; Storage</span>
+          <span>Convex Storage</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">Real-time</span>
         </button>
         <button
           onClick={() => setActiveTab('prometheus')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'prometheus' ? 'border-white text-white font-semibold' : 'border-transparent text-[#888888] hover:text-white'
+          className={`px-3.5 py-2 rounded-t-md transition-colors flex items-center gap-2 ${
+            activeTab === 'prometheus' ? 'border-b-2 border-indigo-500 text-white font-semibold bg-indigo-600/10' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <BarChart className="w-4 h-4" />
+          <BarChart className="w-4 h-4 text-purple-400" />
           <span>Prometheus Exporter</span>
         </button>
         <button
           onClick={() => setActiveTab('compliance')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'compliance' ? 'border-white text-white font-semibold' : 'border-transparent text-[#888888] hover:text-white'
+          className={`px-3.5 py-2 rounded-t-md transition-colors flex items-center gap-2 ${
+            activeTab === 'compliance' ? 'border-b-2 border-indigo-500 text-white font-semibold bg-indigo-600/10' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <ShieldCheck className="w-4 h-4" />
+          <ShieldCheck className="w-4 h-4 text-emerald-400" />
           <span>Compliance & Tracking</span>
         </button>
         <button
           onClick={() => setActiveTab('apikeys')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'apikeys' ? 'border-white text-white font-semibold' : 'border-transparent text-[#888888] hover:text-white'
+          className={`px-3.5 py-2 rounded-t-md transition-colors flex items-center gap-2 ${
+            activeTab === 'apikeys' ? 'border-b-2 border-indigo-500 text-white font-semibold bg-indigo-600/10' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Key className="w-4 h-4" />
+          <Key className="w-4 h-4 text-yellow-400" />
           <span>API Access Keys</span>
         </button>
       </div>

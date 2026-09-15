@@ -534,9 +534,23 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
           </div>
           <p className="text-xs text-zinc-500 mt-1">Production composer · reusable templates · personalization · tracking</p>
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setShowTest(true)} className="px-3 py-2 rounded-md border border-[#28303a] bg-[#111419] text-xs"><Zap className="w-3.5 h-3.5 inline mr-1.5" />Send test</button>
-          <button form="email-composer" disabled={sending || !fromEmail || !to.trim() || !subject.trim()} className="px-4 py-2 rounded-md bg-white text-black text-xs font-bold disabled:opacity-40"><Send className="w-3.5 h-3.5 inline mr-1.5" />{sending ? 'Sending…' : 'Send now'}</button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowTest(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-slate-700/60 bg-[#162032] hover:bg-slate-800 text-xs text-slate-300 hover:text-white transition"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>Send Test</span>
+          </button>
+          <button
+            form="email-composer"
+            disabled={sending || !fromEmail || !to.trim() || !subject.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition disabled:opacity-40"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>{sending ? 'Dispatching...' : 'Send Email'}</span>
+          </button>
         </div>
       </div>
 

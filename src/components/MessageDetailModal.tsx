@@ -11,6 +11,9 @@ import {
   ShieldCheck,
   Server,
   Terminal,
+  Activity,
+  ArrowRight,
+  Info,
 } from 'lucide-react';
 import { Message } from '../types';
 import { StatusBadge } from './StatusBadge';
@@ -22,7 +25,7 @@ interface MessageDetailModalProps {
 
 export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message, onClose }) => {
   const [copiedId, setCopiedId] = useState(false);
-  const [activeTab, setActiveTab] = useState<'timeline' | 'headers' | 'content'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'technical' | 'headers' | 'content'>('timeline');
 
   if (!message) return null;
 
@@ -32,26 +35,61 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
     setTimeout(() => setCopiedId(false), 2000);
   };
 
+  // Build sequential timeline events based on message lifecycle
+  const timelineEvents = [
+    {
+      stage: 'Created',
+      timestamp: message.createdAt || message.queuedAt,
+      status: 'SUCCESS',
+      description: 'RFC 5322 payload validated and queued into spool',
+    },
+    {
+      stage: 'Queued',
+      timestamp: message.queuedAt || message.createdAt,
+      status: 'SUCCESS',
+      description: 'Allocated to active VirtualMTA outbound spool buffer',
+    },
+    {
+      stage: 'Sending',
+      timestamp: message.sentAt || message.queuedAt,
+      status: message.status === 'QUEUED' ? 'PENDING' : 'SUCCESS',
+      description: 'Dispatched to KumoMTA socket / relay connection pool',
+    },
+    {
+      stage: 'Provider Response',
+      timestamp: message.deliveredAt || message.bouncedAt || message.sentAt,
+      status:
+        message.status === 'DELIVERED' || message.status === 'SENT'
+          ? 'SUCCESS'
+          : message.status === 'BOUNCED' || message.status === 'FAILED'
+          ? 'FAILED'
+          : message.status === 'DELIVERY_DELAYED'
+          ? 'DEFERRED'
+          : 'PENDING',
+      description: message.smtpResponse || message.bounceReason || 'Awaiting upstream transport handshake',
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
-      <div className="bg-[#0F0F0F] border border-white-10 rounded-sm w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 md:p-6 font-sans">
+      <div className="bg-[#111827] border border-slate-800 rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in duration-150">
         {/* Header */}
-        <div className="p-6 border-b border-white-10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-sm bg-white/5 border border-white-10 flex items-center justify-center text-white">
-              <Server className="w-4 h-4 text-emerald-400" />
+        <div className="p-4 md:p-5 border-b border-slate-800 flex items-center justify-between bg-[#0E1524]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+              <Server className="w-4 h-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-white text-base">Message Telemetry</span>
+                <span className="font-semibold text-white text-sm">Message Inspector</span>
                 <StatusBadge status={message.status} />
               </div>
-              <div className="flex items-center gap-2 text-xs text-[#888888] mt-0.5">
-                <span className="font-mono text-zinc-300">{message.messageId}</span>
+              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 font-mono">
+                <span className="truncate">{message.messageId}</span>
                 <button
                   onClick={copyMessageId}
-                  className="hover:text-white text-[#888888] transition-colors p-0.5"
-                  title="Copy RFC Message-ID"
+                  className="hover:text-white text-slate-500 transition p-0.5"
+                  title="Copy Message-ID"
                 >
                   {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
@@ -61,175 +99,215 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-sm hover:bg-white/5 text-[#888888] hover:text-white transition-colors"
+            className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Message Meta Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-[#050505] border-b border-white-10 text-xs">
+        {/* Message Core Metadata Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-[#0A0F1A] border-b border-slate-800 text-xs">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-[#888888]">From</div>
-            <div className="text-zinc-200 font-mono truncate mt-0.5" title={message.fromEmail}>
-              {message.fromName ? `${message.fromName} <${message.fromEmail}>` : message.fromEmail}
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-[#888888]">To</div>
-            <div className="text-zinc-200 font-mono truncate mt-0.5" title={message.toEmail}>
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Recipient</div>
+            <div className="text-slate-200 font-mono truncate mt-0.5" title={message.toEmail}>
               {message.toEmail}
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-[#888888]">Subject</div>
-            <div className="text-zinc-200 truncate mt-0.5" title={message.subject}>
-              {message.subject}
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Sender</div>
+            <div className="text-slate-200 font-mono truncate mt-0.5" title={message.fromEmail}>
+              {message.fromEmail}
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-[#888888]">Routing Provider</div>
-            <div className="text-emerald-400 font-medium mt-0.5">
-              {message.provider || 'KumoMTA + Amazon SES'}
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Subject</div>
+            <div className="text-slate-200 truncate mt-0.5" title={message.subject}>
+              {message.subject || '(None)'}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Provider ID</div>
+            <div className="text-indigo-400 font-mono text-[11px] truncate mt-0.5" title={message.providerMessageId}>
+              {message.providerMessageId || message.sesMessageId || 'kumo_spool_1'}
             </div>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex border-b border-white-10 px-6 gap-6 text-xs font-medium">
+        <div className="flex border-b border-slate-800 px-5 gap-6 text-xs font-medium bg-[#0E1524]">
           <button
             onClick={() => setActiveTab('timeline')}
             className={`py-3 border-b-2 transition-colors ${
               activeTab === 'timeline'
-                ? 'border-white text-white'
-                : 'border-transparent text-[#888888] hover:text-white'
+                ? 'border-indigo-500 text-white font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            Timeline & Events
+            Lifecycle Timeline
+          </button>
+          <button
+            onClick={() => setActiveTab('technical')}
+            className={`py-3 border-b-2 transition-colors ${
+              activeTab === 'technical'
+                ? 'border-indigo-500 text-white font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Technical & Diagnostics
           </button>
           <button
             onClick={() => setActiveTab('headers')}
             className={`py-3 border-b-2 transition-colors ${
               activeTab === 'headers'
-                ? 'border-white text-white'
-                : 'border-transparent text-[#888888] hover:text-white'
+                ? 'border-indigo-500 text-white font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            Headers & Protocol
+            MIME Headers
           </button>
           <button
             onClick={() => setActiveTab('content')}
             className={`py-3 border-b-2 transition-colors ${
               activeTab === 'content'
-                ? 'border-white text-white'
-                : 'border-transparent text-[#888888] hover:text-white'
+                ? 'border-indigo-500 text-white font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            Body Payload
+            Body Preview
           </button>
         </div>
 
-        {/* Tab Content */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+        {/* Modal Body */}
+        <div className="p-5 md:p-6 overflow-y-auto flex-1 space-y-4 text-xs">
           {activeTab === 'timeline' && (
-            <div className="space-y-6">
-              {/* Event Timeline */}
-              <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/10">
-                {message.events && message.events.length > 0 ? (
-                  message.events.map((evt, idx) => (
-                    <div key={evt.id || idx} className="relative">
-                      <div className="absolute -left-6 mt-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-[#0F0F0F]" />
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-xs text-white uppercase tracking-wider">
-                          {evt.eventType}
-                        </span>
-                        <span className="text-[10px] font-mono text-[#888888]">
-                          {new Date(evt.timestamp).toLocaleTimeString()} &bull; {new Date(evt.timestamp).toLocaleDateString()}
-                        </span>
+            <div className="space-y-4">
+              <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+                {timelineEvents.map((evt, idx) => (
+                  <div key={idx} className="relative group">
+                    <div
+                      className={`absolute -left-6 top-1 w-3.5 h-3.5 rounded-full border-2 border-[#111827] ${
+                        evt.status === 'SUCCESS'
+                          ? 'bg-emerald-400'
+                          : evt.status === 'FAILED'
+                          ? 'bg-rose-500'
+                          : evt.status === 'DEFERRED'
+                          ? 'bg-amber-400'
+                          : 'bg-slate-600'
+                      }`}
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white text-xs">{evt.stage}</span>
+                        {evt.timestamp && (
+                          <span className="text-[10px] font-mono text-slate-500">
+                            {new Date(evt.timestamp).toLocaleString()}
+                          </span>
+                        )}
                       </div>
-                      {evt.eventData && (
-                        <div className="mt-1.5 p-3 rounded-sm bg-[#050505] border border-white-10 text-xs font-mono text-[#888888]">
-                          {JSON.stringify(evt.eventData, null, 2)}
-                        </div>
-                      )}
+                      <p className="text-slate-400 text-xs mt-0.5 font-mono">{evt.description}</p>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-xs text-[#888888] py-4">No granular events recorded yet.</div>
-                )}
+                  </div>
+                ))}
               </div>
 
-              {/* Bounce Banner if Bounced */}
-              {message.status === 'BOUNCED' && (
-                <div className="p-4 rounded-sm bg-rose-500/10 border border-rose-500/20 text-xs space-y-1">
-                  <div className="font-semibold text-rose-400 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4" /> {message.bounceType || 'Hard'} Bounce Diagnostic
-                  </div>
-                  <div className="text-zinc-300 font-mono">{message.bounceReason || 'Mailbox lookup failed'}</div>
-                  <div className="text-[#888888] text-[11px]">
-                    Recipient has been added to the active suppression table to protect sender reputation.
+              {message.events && message.events.length > 0 && (
+                <div className="pt-4 border-t border-slate-800/80">
+                  <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 block mb-2">
+                    Raw Telemetry Events ({message.events.length})
+                  </span>
+                  <div className="space-y-1.5 font-mono text-[11px]">
+                    {message.events.map((e, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2 rounded bg-[#0A0F1A] border border-slate-800 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={e.eventType} />
+                          <span className="text-slate-300">{e.timestamp}</span>
+                        </div>
+                        {e.ipAddress && <span className="text-slate-500">{e.ipAddress}</span>}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
+            </div>
+          )}
 
-              {/* SES Rejection Banner */}
-              {message.status === 'REJECTED' && (
-                <div className="p-4 rounded-sm bg-rose-500/10 border border-rose-500/20 text-xs space-y-1">
-                  <div className="font-semibold text-rose-400 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4" /> Amazon SES Policy Rejection
-                  </div>
-                  <div className="text-zinc-300 font-mono">{message.bounceReason || 'Message rejected by SES upstream'}</div>
-                </div>
-              )}
-
-              {/* Delivery Delay Banner */}
-              {message.status === 'DELIVERY_DELAYED' && (
-                <div className="p-4 rounded-sm bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
-                  <div className="font-semibold text-amber-300 flex items-center gap-1.5">
-                    <Clock className="w-4 h-4" /> Downstream MTA Delivery Delay
-                  </div>
-                  <div className="text-zinc-300 font-mono">{message.bounceReason || 'Temporary deferral at destination mail server'}</div>
-                </div>
-              )}
-
-              {/* SMTP Response Details */}
-              <div className="p-3.5 rounded-sm bg-[#050505] border border-white-10 text-xs space-y-1.5">
-                <div className="font-medium text-zinc-300 flex items-center gap-1.5">
-                  <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Upstream Relay Response
-                </div>
-                <div className="font-mono text-xs text-[#888888] bg-[#0F0F0F] p-2.5 rounded-sm border border-white-10">
-                  {message.smtpResponse || '250 2.0.0 OK: Injected into KumoMTA spool queue'}
+          {activeTab === 'technical' && (
+            <div className="space-y-3.5">
+              <div className="p-3.5 rounded-lg bg-[#0A0F1A] border border-slate-800 space-y-1">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                  SMTP Transport Response
+                </span>
+                <div className="font-mono text-emerald-400 text-xs break-all mt-1">
+                  {message.smtpResponse || '250 2.0.0 OK: message queued for delivery (KumoMTA)'}
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-[#0A0F1A] border border-slate-800 space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                    KumoMTA Routing Engine
+                  </span>
+                  <div className="text-xs text-slate-300 space-y-0.5 font-mono pt-1">
+                    <div>Engine: <span className="text-indigo-400">KumoMTA Core v2026</span></div>
+                    <div>Virtual MTA: <span className="text-slate-200">default-outbound</span></div>
+                    <div>Port: <span className="text-slate-200">2525 / ESMTP</span></div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-[#0A0F1A] border border-slate-800 space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                    Amazon SES Upstream
+                  </span>
+                  <div className="text-xs text-slate-300 space-y-0.5 font-mono pt-1">
+                    <div>SES Message ID: <span className="text-slate-200">{message.sesMessageId || 'N/A (Local MX)'}</span></div>
+                    <div>Transport: <span className="text-slate-200">{message.provider || 'Direct ESMTP'}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {message.bounceReason && (
+                <div className="p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/20 space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-rose-400 font-semibold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Bounce Diagnostic
+                  </span>
+                  <div className="font-mono text-rose-300 text-xs break-all mt-1">
+                    {message.bounceReason}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === 'headers' && (
-            <div className="space-y-3 font-mono text-xs">
-              <div className="p-4 rounded-sm bg-[#050505] border border-white-10 space-y-2">
-                <div className="text-[#888888]">Message-ID: <span className="text-emerald-400">{message.messageId}</span></div>
-                {message.sesMessageId && (
-                  <div className="text-[#888888]">SES Message-ID: <span className="text-sky-400">{message.sesMessageId}</span></div>
-                )}
-                <div className="text-[#888888]">Date: <span className="text-zinc-200">{new Date(message.createdAt).toUTCString()}</span></div>
-                <div className="text-[#888888]">From: <span className="text-zinc-200">{message.fromEmail}</span></div>
-                <div className="text-[#888888]">To: <span className="text-zinc-200">{message.toEmail}</span></div>
-                <div className="text-[#888888]">Subject: <span className="text-zinc-200">{message.subject}</span></div>
-                <div className="text-[#888888]">X-KumoMTA-Queue: <span className="text-zinc-200">tier1-high-throughput</span></div>
-                <div className="text-[#888888]">X-SES-ConfigurationSet: <span className="text-zinc-200">EmailOps-Production-ConfigSet</span></div>
-                <div className="text-[#888888]">List-Unsubscribe: <span className="text-zinc-200">&lt;https://transact.acme-corp.io/u/{message.id}&gt;</span></div>
-                <div className="text-[#888888]">List-Unsubscribe-Post: <span className="text-zinc-200">List-Unsubscribe=One-Click</span></div>
-              </div>
+            <div className="p-3.5 rounded-lg bg-[#0A0F1A] border border-slate-800 font-mono text-[11px] text-slate-300 space-y-1 max-h-80 overflow-y-auto">
+              <div>Message-ID: &lt;{message.messageId}&gt;</div>
+              <div>Date: {message.createdAt || message.queuedAt}</div>
+              <div>From: {message.fromName ? `"${message.fromName}" <${message.fromEmail}>` : message.fromEmail}</div>
+              <div>To: {message.toEmail}</div>
+              <div>Subject: {message.subject}</div>
+              <div>MIME-Version: 1.0</div>
+              <div>Content-Type: text/html; charset=UTF-8</div>
+              <div>X-Mailer: EmailinOPS KumoMTA Dispatcher</div>
+              {message.customHeaders &&
+                Object.entries(message.customHeaders).map(([k, v]) => (
+                  <div key={k}>{k}: {v}</div>
+                ))}
             </div>
           )}
 
           {activeTab === 'content' && (
-            <div className="space-y-4">
-              <div className="border border-white-10 rounded-sm p-4 bg-white text-zinc-900 min-h-[160px]">
+            <div className="space-y-3">
+              <div className="p-4 rounded-lg bg-white text-slate-900 border border-slate-300 min-h-[160px] max-h-96 overflow-y-auto">
                 {message.htmlBody ? (
                   <div dangerouslySetInnerHTML={{ __html: message.htmlBody }} />
+                ) : message.plainText ? (
+                  <pre className="font-sans whitespace-pre-wrap">{message.plainText}</pre>
                 ) : (
-                  <div className="font-mono text-xs whitespace-pre-wrap">{message.plainText || 'No body content.'}</div>
+                  <p className="text-slate-400 italic">No email body captured.</p>
                 )}
               </div>
             </div>
@@ -237,18 +315,13 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-white-10 bg-[#050505] flex items-center justify-between">
-          <div className="text-xs text-[#888888] flex items-center gap-3">
-            <span>Internal ID: <span className="font-mono text-zinc-300">{message.id}</span></span>
-            {message.sesMessageId && (
-              <span>&bull; SES: <span className="font-mono text-sky-400">{message.sesMessageId}</span></span>
-            )}
-          </div>
+        <div className="p-3.5 px-5 bg-[#0A0F1A] border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <span>Security: TLS 1.3 encrypted spool connection</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-sm bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white-10 transition-colors"
+            className="px-3.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition"
           >
-            Close
+            Close Inspector
           </button>
         </div>
       </div>

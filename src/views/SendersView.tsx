@@ -12,6 +12,7 @@ import {
   Lock,
   Copy,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import { Sender, Domain } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
@@ -79,110 +80,109 @@ export const SendersView: React.FC<SendersViewProps> = ({
   };
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto font-sans">
+    <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto font-sans">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            Senders & Sending Domains
+          <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+            <Globe className="w-5 h-5 text-indigo-400" />
+            <span>Senders &amp; DNS Domains</span>
           </h1>
-          <p className="text-xs text-[#888888] mt-1">
-            Manage authenticated RFC sender identities and DNS cryptographic alignment (DKIM / SPF / DMARC)
+          <p className="text-xs text-slate-400 mt-1">
+            Authenticated sender identities and cryptographic alignment (SPF, DKIM, DMARC, MX).
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {activeTab === 'senders' ? (
             <button
               onClick={() => setShowAddSenderModal(true)}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold shadow-sm transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Sender Identity</span>
+              <span>Add Sender</span>
             </button>
           ) : (
             <button
               onClick={() => setShowAddDomainModal(true)}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold shadow-sm transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Sending Domain</span>
+              <span>Add Domain</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white-10 gap-6 text-xs font-medium">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-1">
         <button
           onClick={() => setActiveTab('senders')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-t-md text-xs font-medium transition ${
             activeTab === 'senders'
-              ? 'border-white text-white font-semibold'
-              : 'border-transparent text-[#888888] hover:text-white'
+              ? 'border-b-2 border-indigo-500 text-white font-semibold'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Server className="w-4 h-4" />
+          <Server className="w-3.5 h-3.5" />
           <span>Sender Identities ({senders.length})</span>
         </button>
         <button
           onClick={() => setActiveTab('domains')}
-          className={`py-3 border-b-2 transition-colors flex items-center gap-2 ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-t-md text-xs font-medium transition ${
             activeTab === 'domains'
-              ? 'border-white text-white font-semibold'
-              : 'border-transparent text-[#888888] hover:text-white'
+              ? 'border-b-2 border-indigo-500 text-white font-semibold'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Globe className="w-4 h-4" />
+          <Globe className="w-3.5 h-3.5" />
           <span>Sending Domains ({domains.length})</span>
         </button>
       </div>
 
       {/* TAB 1: Senders List */}
       {activeTab === 'senders' && (
-        <div className="space-y-4">
-          <div className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-white-10 text-[10px] uppercase tracking-[0.15em] text-[#888888]">
-                    <th className="pb-3 font-semibold">Sender Identity</th>
-                    <th className="pb-3 font-semibold">From Email</th>
-                    <th className="pb-3 font-semibold">Domain</th>
-                    <th className="pb-3 font-semibold">Verification</th>
-                    <th className="pb-3 font-semibold">Status</th>
-                    <th className="pb-3 font-semibold">Sent Volume</th>
-                    <th className="pb-3 font-semibold">Bounce Rate</th>
-                    <th className="pb-3 font-semibold">Rate Limits</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white-5 font-mono text-[11px]">
-                  {senders.map((s) => {
-                    const bncRate = s.sentCount > 0 ? ((s.bouncedCount / s.sentCount) * 100).toFixed(2) : '0.00';
-                    return (
-                      <tr key={s.id} className="hover:bg-white/5 transition-colors">
-                        <td className="py-3 font-sans font-medium text-white">{s.name}</td>
-                        <td className="py-3 text-zinc-300">{s.fromEmail}</td>
-                        <td className="py-3 text-[#888888]">{s.domainName || 'N/A'}</td>
-                        <td className="py-3">
-                          <StatusBadge status={s.verification} />
-                        </td>
-                        <td className="py-3">
-                          <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-xs bg-white/5 border border-white-10 text-zinc-300">
-                            {s.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-white">{s.sentCount.toLocaleString()}</td>
-                        <td className="py-3 text-amber-300">{bncRate}%</td>
-                        <td className="py-3 text-[#888888] text-[10px]">
-                          {s.hourlyLimit.toLocaleString()} / hr &bull; {s.dailyLimit.toLocaleString()} / day
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+        <div className="rounded-lg bg-[#111827] border border-slate-800/90 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-[#0A0F1A] text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-slate-800">
+                <tr>
+                  <th className="py-3 px-4 font-semibold">Sender Identity</th>
+                  <th className="py-3 px-4 font-semibold">From Email</th>
+                  <th className="py-3 px-4 font-semibold">Domain</th>
+                  <th className="py-3 px-4 font-semibold">Verification</th>
+                  <th className="py-3 px-4 font-semibold">Status</th>
+                  <th className="py-3 px-4 font-semibold">Sent Volume</th>
+                  <th className="py-3 px-4 font-semibold">Bounce Rate</th>
+                  <th className="py-3 px-4 font-semibold hidden lg:table-cell">Rate Limits</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-sans">
+                {senders.map((s) => {
+                  const bncRate = s.sentCount > 0 ? ((s.bouncedCount / s.sentCount) * 100).toFixed(2) : '0.00';
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3 px-4 font-medium text-white">{s.name}</td>
+                      <td className="py-3 px-4 font-mono text-indigo-300">{s.fromEmail}</td>
+                      <td className="py-3 px-4 text-slate-400">{s.domainName || 'N/A'}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={s.verification} />
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-white">{s.sentCount.toLocaleString()}</td>
+                      <td className="py-3 px-4 font-mono text-amber-400">{bncRate}%</td>
+                      <td className="py-3 px-4 text-slate-400 font-mono text-[10px] hidden lg:table-cell">
+                        {s.hourlyLimit.toLocaleString()}/hr &bull; {s.dailyLimit.toLocaleString()}/day
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -191,29 +191,31 @@ export const SendersView: React.FC<SendersViewProps> = ({
       {activeTab === 'domains' && (
         <div className="space-y-6">
           {domains.map((dom) => (
-            <div key={dom.id} className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white-10 pb-4">
+            <div key={dom.id} className="p-6 rounded-lg bg-[#111827] border border-slate-800/90 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-sm bg-white/5 border border-white-10 flex items-center justify-center text-white">
-                    <Globe className="w-4 h-4" />
+                  <div className="w-10 h-10 rounded-lg bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <Globe className="w-5 h-5" />
                   </div>
                   <div>
                     <h2 className="text-sm font-semibold text-white font-mono">{dom.domainName}</h2>
-                    <div className="text-[11px] text-[#888888] mt-0.5">Created on {new Date(dom.createdAt).toLocaleDateString()}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      Created on {new Date(dom.createdAt).toLocaleDateString()}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm bg-[#050505] border border-white-10">
-                    <span className="text-[#888888]">SPF:</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded bg-[#0A0F1A] border border-slate-800">
+                    <span className="text-slate-400">SPF:</span>
                     <span className="text-emerald-400 font-mono font-semibold">{dom.spfStatus}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm bg-[#050505] border border-white-10">
-                    <span className="text-[#888888]">DKIM:</span>
+                  <div className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded bg-[#0A0F1A] border border-slate-800">
+                    <span className="text-slate-400">DKIM:</span>
                     <span className="text-emerald-400 font-mono font-semibold">{dom.dkimStatus}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm bg-[#050505] border border-white-10">
-                    <span className="text-[#888888]">DMARC:</span>
+                  <div className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded bg-[#0A0F1A] border border-slate-800">
+                    <span className="text-slate-400">DMARC:</span>
                     <span className="text-emerald-400 font-mono font-semibold">{dom.dmarcStatus}</span>
                   </div>
                 </div>
@@ -221,17 +223,21 @@ export const SendersView: React.FC<SendersViewProps> = ({
 
               {/* DNS Records Table */}
               <div className="space-y-2.5">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-[#888888]">Required DNS Configuration Records</div>
-                
+                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                  Required DNS Cryptographic Alignment Records
+                </div>
+
                 {/* SPF Record */}
-                <div className="p-3.5 rounded-sm bg-[#050505] border border-white-10 flex items-center justify-between text-xs font-mono">
+                <div className="p-3.5 rounded-md bg-[#0A0F1A] border border-slate-800 flex items-center justify-between text-xs font-mono">
                   <div className="space-y-1">
-                    <span className="text-[#888888] text-[10px] uppercase tracking-wider">TXT (SPF) &bull; Host: @</span>
-                    <div className="text-zinc-200">{dom.spfRecord}</div>
+                    <span className="text-slate-400 text-[10px] uppercase tracking-wider">
+                      TXT (SPF) &bull; Host: @
+                    </span>
+                    <div className="text-slate-200">{dom.spfRecord}</div>
                   </div>
                   <button
                     onClick={() => handleCopy(dom.spfRecord, `spf_${dom.id}`)}
-                    className="p-1.5 text-[#888888] hover:text-white"
+                    className="p-1.5 text-slate-400 hover:text-white"
                     title="Copy Record"
                   >
                     {copiedKey === `spf_${dom.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -239,14 +245,16 @@ export const SendersView: React.FC<SendersViewProps> = ({
                 </div>
 
                 {/* DKIM Record */}
-                <div className="p-3.5 rounded-sm bg-[#050505] border border-white-10 flex items-center justify-between text-xs font-mono">
+                <div className="p-3.5 rounded-md bg-[#0A0F1A] border border-slate-800 flex items-center justify-between text-xs font-mono">
                   <div className="space-y-1">
-                    <span className="text-[#888888] text-[10px] uppercase tracking-wider">TXT (DKIM) &bull; Host: {dom.dkimSelector}._domainkey.{dom.domainName}</span>
-                    <div className="text-zinc-200 truncate max-w-xl">{dom.dkimPublicKey}</div>
+                    <span className="text-slate-400 text-[10px] uppercase tracking-wider">
+                      TXT (DKIM) &bull; Host: {dom.dkimSelector}._domainkey.{dom.domainName}
+                    </span>
+                    <div className="text-slate-200 truncate max-w-xl">{dom.dkimPublicKey}</div>
                   </div>
                   <button
                     onClick={() => handleCopy(dom.dkimPublicKey, `dkim_${dom.id}`)}
-                    className="p-1.5 text-[#888888] hover:text-white"
+                    className="p-1.5 text-slate-400 hover:text-white"
                     title="Copy Record"
                   >
                     {copiedKey === `dkim_${dom.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -254,14 +262,16 @@ export const SendersView: React.FC<SendersViewProps> = ({
                 </div>
 
                 {/* DMARC Record */}
-                <div className="p-3.5 rounded-sm bg-[#050505] border border-white-10 flex items-center justify-between text-xs font-mono">
+                <div className="p-3.5 rounded-md bg-[#0A0F1A] border border-slate-800 flex items-center justify-between text-xs font-mono">
                   <div className="space-y-1">
-                    <span className="text-[#888888] text-[10px] uppercase tracking-wider">TXT (DMARC) &bull; Host: _dmarc.{dom.domainName}</span>
-                    <div className="text-zinc-200">{dom.dmarcRecord}</div>
+                    <span className="text-slate-400 text-[10px] uppercase tracking-wider">
+                      TXT (DMARC) &bull; Host: _dmarc.{dom.domainName}
+                    </span>
+                    <div className="text-slate-200">{dom.dmarcRecord}</div>
                   </div>
                   <button
                     onClick={() => handleCopy(dom.dmarcRecord, `dmarc_${dom.id}`)}
-                    className="p-1.5 text-[#888888] hover:text-white"
+                    className="p-1.5 text-slate-400 hover:text-white"
                     title="Copy Record"
                   >
                     {copiedKey === `dmarc_${dom.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -275,40 +285,40 @@ export const SendersView: React.FC<SendersViewProps> = ({
 
       {/* Modal: Add Sender */}
       {showAddSenderModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
             <h2 className="text-sm font-semibold text-white">Add Sender Identity</h2>
-            <form onSubmit={submitNewSender} className="space-y-3">
+            <form onSubmit={submitNewSender} className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">Display Name</label>
+                <label className="block text-slate-400 font-medium mb-1">Display Name</label>
                 <input
                   type="text"
                   required
                   value={senderName}
                   onChange={(e) => setSenderName(e.target.value)}
-                  placeholder="e.g. Acme Billing"
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs text-white"
+                  placeholder="e.g. Acme Notifications"
+                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/60"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">From Email Address</label>
+                <label className="block text-slate-400 font-medium mb-1">From Email Address</label>
                 <input
                   type="email"
                   required
                   value={fromEmail}
                   onChange={(e) => setFromEmail(e.target.value)}
-                  placeholder="billing@transact.acme-corp.io"
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs font-mono text-white"
+                  placeholder="alerts@mail.acme-corp.com"
+                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white font-mono focus:outline-none focus:border-indigo-500/60"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">Attached Domain</label>
+                <label className="block text-slate-400 font-medium mb-1">Attached Domain</label>
                 <select
                   value={domainId}
                   onChange={(e) => setDomainId(e.target.value)}
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs text-white"
+                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/60"
                 >
                   {domains.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -320,21 +330,21 @@ export const SendersView: React.FC<SendersViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-[#888888] mb-1">Daily Limit</label>
+                  <label className="block text-slate-400 font-medium mb-1">Daily Limit</label>
                   <input
                     type="number"
                     value={dailyLimit}
                     onChange={(e) => setDailyLimit(e.target.value)}
-                    className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs font-mono text-white"
+                    className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white font-mono focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#888888] mb-1">Hourly Limit</label>
+                  <label className="block text-slate-400 font-medium mb-1">Hourly Limit</label>
                   <input
                     type="number"
                     value={hourlyLimit}
                     onChange={(e) => setHourlyLimit(e.target.value)}
-                    className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs font-mono text-white"
+                    className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white font-mono focus:outline-none"
                   />
                 </div>
               </div>
@@ -343,13 +353,13 @@ export const SendersView: React.FC<SendersViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddSenderModal(false)}
-                  className="px-3 py-1.5 rounded-sm bg-white/5 hover:bg-white/10 text-[#888888] hover:text-white border border-white-10 text-xs font-medium"
+                  className="px-3.5 py-1.5 rounded bg-slate-800 text-slate-400 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold"
+                  className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
                 >
                   Create Sender
                 </button>
@@ -361,31 +371,31 @@ export const SendersView: React.FC<SendersViewProps> = ({
 
       {/* Modal: Add Domain */}
       {showAddDomainModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#0F0F0F] border border-white-10 rounded-sm max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl font-sans">
             <h2 className="text-sm font-semibold text-white">Add Sending Domain</h2>
-            <form onSubmit={submitNewDomain} className="space-y-3">
+            <form onSubmit={submitNewDomain} className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">Domain FQDN</label>
+                <label className="block text-slate-400 font-medium mb-1">Domain FQDN</label>
                 <input
                   type="text"
                   required
                   value={newDomainName}
                   onChange={(e) => setNewDomainName(e.target.value)}
-                  placeholder="e.g. alerts.acme-corp.com"
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs font-mono text-white"
+                  placeholder="e.g. mail.acme-corp.com"
+                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white font-mono focus:outline-none focus:border-indigo-500/60"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#888888] mb-1">DKIM Key Selector</label>
+                <label className="block text-slate-400 font-medium mb-1">DKIM Key Selector</label>
                 <input
                   type="text"
                   required
                   value={dkimSelector}
                   onChange={(e) => setDkimSelector(e.target.value)}
                   placeholder="kumo2026"
-                  className="w-full bg-[#050505] border border-white-10 rounded-sm px-3 py-1.5 text-xs font-mono text-white"
+                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white font-mono focus:outline-none focus:border-indigo-500/60"
                 />
               </div>
 
@@ -393,13 +403,13 @@ export const SendersView: React.FC<SendersViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddDomainModal(false)}
-                  className="px-3 py-1.5 rounded-sm bg-white/5 hover:bg-white/10 text-[#888888] hover:text-white border border-white-10 text-xs font-medium"
+                  className="px-3.5 py-1.5 rounded bg-slate-800 text-slate-400 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-sm bg-white hover:bg-zinc-200 text-black text-xs font-semibold"
+                  className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
                 >
                   Register Domain
                 </button>

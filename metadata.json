@@ -1,6 +1,6 @@
 {
-  "name": "EmailOps Dashboard",
-  "description": "PowerMTA & Interspire Email Marketer enterprise delivery suite with VirtualMTAs, IP rotation, live spool monitoring, bounce processor, DKIM/SPF/DMARC validator, and campaign sender.",
+  "name": "EmailinOPS",
+  "description": "Email Infrastructure Command Center powered by KumoMTA and Amazon SES with high-throughput queuing, virtual MTAs, delivery telemetry, and bounce intelligence.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

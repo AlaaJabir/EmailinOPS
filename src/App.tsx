@@ -23,6 +23,7 @@ import { LogsView } from './views/LogsView';
 import { SettingsView } from './views/SettingsView';
 import { TemplatesView } from './views/TemplatesView';
 import { StorageView } from './views/StorageView';
+import { KumoOperationsDashboard } from './views/KumoOperationsDashboard';
 import { ImportHistoryPanel } from './components/ImportHistoryPanel';
 import {
   DashboardStats,
@@ -405,7 +406,7 @@ export function App() {
     );
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6] text-gray-800 flex antialiased font-sans">
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex antialiased font-sans selection:bg-indigo-500 selection:text-white">
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
@@ -437,8 +438,12 @@ export function App() {
               onRefresh={refreshAll}
               isLoading={isLoading}
               authFetch={authFetch}
-              onNavigateTab={(tab) => setCurrentTab(tab)}
+              onNavigateTab={(tab) => setCurrentTab(tab as NavTab)}
             />
+          )}
+
+          {currentTab === 'infra-kumo' && (
+            <KumoOperationsDashboard authFetch={authFetch} />
           )}
 
           {currentTab === 'vmtas' && (
@@ -476,7 +481,7 @@ export function App() {
             />
           )}
 
-          {currentTab === 'senders' && (
+          {(currentTab === 'senders' || currentTab === 'infra-smtp') && (
             <SendersView
               senders={senders}
               domains={domains}
@@ -497,7 +502,13 @@ export function App() {
             />
           )}
 
-          {currentTab === 'messages' && (
+          {(currentTab === 'messages' ||
+            currentTab === 'queue' ||
+            currentTab === 'delivery-sent' ||
+            currentTab === 'delivery-delivered' ||
+            currentTab === 'delivery-deferred' ||
+            currentTab === 'delivery-bounced' ||
+            currentTab === 'delivery-failed') && (
             <MessagesView
               messages={messages}
               senders={senders}
@@ -505,10 +516,25 @@ export function App() {
               onSelectMessage={setSelectedMessage}
               onRefresh={fetchMessages}
               isLoading={isLoading}
+              initialStatus={
+                currentTab === 'queue'
+                  ? 'QUEUED'
+                  : currentTab === 'delivery-sent'
+                  ? 'SENT'
+                  : currentTab === 'delivery-delivered'
+                  ? 'DELIVERED'
+                  : currentTab === 'delivery-deferred'
+                  ? 'DEFERRED'
+                  : currentTab === 'delivery-bounced'
+                  ? 'BOUNCED'
+                  : currentTab === 'delivery-failed'
+                  ? 'FAILED'
+                  : 'ALL'
+              }
             />
           )}
 
-          {currentTab === 'contacts' && (
+          {(currentTab === 'contacts' || currentTab === 'contacts-import') && (
             <>
               <ContactsView
                 contacts={contacts}
@@ -521,7 +547,7 @@ export function App() {
             </>
           )}
 
-          {currentTab === 'suppression' && (
+          {(currentTab === 'suppression' || currentTab === 'optimization') && (
             <SuppressionView
               suppressions={suppressions}
               onAddSuppression={handleAddSuppression}
@@ -529,7 +555,10 @@ export function App() {
             />
           )}
 
-          {currentTab === 'analytics' && (
+          {(currentTab === 'analytics' ||
+            currentTab === 'analytics-performance' ||
+            currentTab === 'analytics-engagement' ||
+            currentTab === 'analytics-reputation') && (
             <AnalyticsView stats={stats} senders={senders} campaigns={campaigns} />
           )}
 
@@ -541,11 +570,14 @@ export function App() {
             />
           )}
 
-          {currentTab === 'logs' && (
+          {(currentTab === 'logs' || currentTab === 'system-health') && (
             <LogsView logs={logs} onRefresh={fetchLogs} isLoading={isLoading} />
           )}
 
-          {currentTab === 'settings' && (
+          {(currentTab === 'settings' ||
+            currentTab === 'settings-general' ||
+            currentTab === 'settings-account' ||
+            currentTab === 'email-config') && (
             <SettingsView
               settings={settings}
               apiKeys={apiKeys}
