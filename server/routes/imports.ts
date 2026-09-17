@@ -16,7 +16,31 @@ type ImportRow = {
   valid: boolean;
 };
 
-function parseCsvLine(line: string): string[] {
+function detectDelimiter(line: string): string {
+  const candidates = [',', ';', '\t', '|'];
+  let best = ',';
+  let bestCount = -1;
+  for (const delimiter of candidates) {
+    let quoted = false;
+    let count = 0;
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (quoted && line[i + 1] === '"') i += 1;
+        else quoted = !quoted;
+      } else if (ch === delimiter && !quoted) {
+        count += 1;
+      }
+    }
+    if (count > bestCount) {
+      best = delimiter;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+function parseCsvLine(line: string, delimiter: string): string[] {
   const out: string[] = [];
   let cur = '';
   let quoted = false;
@@ -29,7 +53,7 @@ function parseCsvLine(line: string): string[] {
       } else {
         quoted = !quoted;
       }
-    } else if (ch === ',' && !quoted) {
+    } else if (ch === delimiter && !quoted) {
       out.push(cur.trim());
       cur = '';
     } else {
@@ -40,15 +64,49 @@ function parseCsvLine(line: string): string[] {
   return out.map((value) => value.replace(/^['"]|['"]$/g, '').trim());
 }
 
+function looksLikeEmail(value: unknown): boolean {
+  return EMAIL_RE.test(String(value || '').trim().toLowerCase());
+}
+
+function findEmailColumn(headers: string[]): number {
+  const normalized = headers.map((value) => value.toLowerCase().replace(/[\s_-]+/g, ''));
+  const preferred = ['email', 'emailaddress', 'mail', 'emailid', 'e-mail'];
+  const preferredIndex = normalized.findIndex((value) => preferred.includes(value));
+  return preferredIndex;
+}
+
 function parseRows(text: string, startRow: number): ImportRow[] {
   const rows: ImportRow[] = [];
+  const lines = text.replace(/\r/g, '').split('\n').filter((line) => line.trim());
+  if (!lines.length) return rows;
+
+  const delimiter = detectDelimiter(lines[0]);
+  const firstCols = parseCsvLine(lines[0], delimiter);
+  const headerEmailColumn = findEmailColumn(firstCols);
+  const hasHeader = headerEmailColumn >= 0;
+  const emailColumn = hasHeader ? headerEmailColumn : -1;
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
   let rowNumber = startRow;
-  for (const line of text.replace(/\r/g, '').split('\n')) {
-    if (!line.trim()) continue;
-    const cols = parseCsvLine(line);
-    const email = String(cols[0] || '').trim().toLowerCase();
+  for (const line of dataLines) {
+    const cols = parseCsvLine(line, delimiter);
     rowNumber += 1;
-    rows.push({ rowNumber, email, normalizedEmail: email, firstName: cols[1] || null, lastName: cols[2] || null, company: cols[3] || null, valid: EMAIL_RE.test(email) });
+
+    let emailIndex = emailColumn;
+    if (emailIndex < 0 || !looksLikeEmail(cols[emailIndex])) {
+      emailIndex = cols.findIndex((value) => looksLikeEmail(value));
+    }
+
+    const email = emailIndex >= 0 ? String(cols[emailIndex] || '').trim().toLowerCase() : '';
+    rows.push({
+      rowNumber,
+      email,
+      normalizedEmail: email,
+      firstName: null,
+      lastName: null,
+      company: null,
+      valid: EMAIL_RE.test(email),
+    });
   }
   return rows;
 }
@@ -128,7 +186,7 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
     const nextOffset = offset + receivedBytes;
     const updated = await client.mutation('imports:processChunk' as any, {
       userId, importId, chunkId, offset, nextOffset, parserTail: tail,
-      rows: validRows.map((row) => ({ email: row.normalizedEmail, firstName: row.firstName || undefined, lastName: row.lastName || undefined, company: row.company || undefined })),
+      rows: validRows.map((row) => ({ email: row.normalizedEmail })),
       invalidRows, suppressedEmails, now: new Date().toISOString(),
     });
 
