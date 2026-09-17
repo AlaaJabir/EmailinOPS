@@ -5,8 +5,8 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     fullName: v.optional(v.string()),
-    role: v.string(), // "ADMIN" | "OPERATOR" | "VIEWER"
-    plan: v.string(), // "PRO" | "ENTERPRISE"
+    role: v.string(),
+    plan: v.string(),
     passwordHash: v.optional(v.string()),
     createdAt: v.string(),
   }).index("by_email", ["email"]),
@@ -16,8 +16,8 @@ export default defineSchema({
     name: v.string(),
     fromEmail: v.string(),
     replyTo: v.optional(v.string()),
-    status: v.string(), // "active" | "inactive"
-    verification: v.string(), // "VERIFIED" | "PENDING"
+    status: v.string(),
+    verification: v.string(),
     sentCount: v.number(),
     dailyQuota: v.number(),
     dailySent: v.number(),
@@ -44,7 +44,7 @@ export default defineSchema({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     company: v.optional(v.string()),
-    status: v.string(), // "ACTIVE" | "UNSUBSCRIBED" | "BOUNCED"
+    status: v.string(),
     tags: v.array(v.string()),
     customFields: v.optional(v.any()),
     createdAt: v.string(),
@@ -59,13 +59,47 @@ export default defineSchema({
     createdAt: v.string(),
   }).index("by_userId", ["userId"]),
 
+  contact_list_memberships: defineTable({
+    userId: v.string(),
+    listId: v.string(),
+    contactId: v.string(),
+    joinedAt: v.string(),
+  })
+    .index("by_userId_listId", ["userId", "listId"])
+    .index("by_userId_contactId", ["userId", "contactId"])
+    .index("by_listId_contactId", ["listId", "contactId"]),
+
+  import_jobs: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    originalFilename: v.string(),
+    status: v.string(),
+    listId: v.string(),
+    sourceSizeBytes: v.number(),
+    uploadOffsetBytes: v.number(),
+    processedRows: v.number(),
+    totalRows: v.number(),
+    validRows: v.number(),
+    invalidRows: v.number(),
+    duplicateRows: v.number(),
+    suppressedRows: v.number(),
+    importedRows: v.number(),
+    lastChunkId: v.optional(v.string()),
+    parserTail: v.optional(v.string()),
+    startedAt: v.string(),
+    completedAt: v.optional(v.string()),
+    updatedAt: v.string(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_status", ["userId", "status"]),
+
   campaigns: defineTable({
     userId: v.string(),
     name: v.string(),
     subject: v.string(),
     senderId: v.string(),
     listId: v.optional(v.string()),
-    status: v.string(), // "DRAFT" | "QUEUED" | "SENDING" | "COMPLETED" | "PAUSED" | "CANCELLED"
+    status: v.string(),
     htmlBody: v.optional(v.string()),
     headHtml: v.optional(v.string()),
     plainText: v.optional(v.string()),
@@ -96,8 +130,8 @@ export default defineSchema({
     subject: v.string(),
     htmlBody: v.optional(v.string()),
     plainText: v.optional(v.string()),
-    status: v.string(), // "QUEUED" | "SENDING" | "SENT" | "DELIVERED" | "BOUNCED" | "FAILED" | "REJECTED"
-    provider: v.string(), // "KumoMTA"
+    status: v.string(),
+    provider: v.string(),
     smtpResponse: v.optional(v.string()),
     bounceReason: v.optional(v.string()),
     queuedAt: v.string(),
@@ -109,7 +143,7 @@ export default defineSchema({
   message_events: defineTable({
     userId: v.string(),
     messageId: v.string(),
-    eventType: v.string(), // "QUEUED" | "SENT" | "DELIVERED" | "OPENED" | "CLICKED" | "BOUNCED" | "FAILED"
+    eventType: v.string(),
     eventData: v.optional(v.any()),
     timestamp: v.string(),
   }).index("by_userId", ["userId"]).index("by_messageId", ["messageId"]),
