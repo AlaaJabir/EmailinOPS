@@ -39,6 +39,7 @@ interface DashboardViewProps {
   isLoading: boolean;
   authFetch?: (url: string, options?: RequestInit) => Promise<Response>;
   onNavigateTab?: (tab: any) => void;
+  throughputPerSec?: number;
 }
 
 interface KumoMetricsData {
@@ -65,6 +66,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   isLoading,
   authFetch,
   onNavigateTab,
+  throughputPerSec = 0,
 }) => {
   // Navigation tabs matching PowerMTA Management Console & Web Monitor
   const [activeTab, setActiveTab] = useState<'dashboard' | 'webmonitor' | 'monitoring' | 'reporting' | 'config'>('dashboard');
@@ -154,7 +156,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ];
 
   // Traffic Totals in / out (Screenshot 2: top-left)
+  const currentRateStr = (throughputPerSec > 0 ? throughputPerSec : (kumoMetrics?.kumomta_delivery_rate_per_second || 0)).toFixed(1);
   const trafficTotals = [
+    { metric: 'current rate', inVal: '0.0 msg/s', outVal: `${currentRateStr} msg/s` },
     { metric: 'total', inVal: sent > 0 ? (sent * 1.00003).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '17,945,307', outVal: sent > 0 ? sent.toLocaleString() : '17,945,840' },
     { metric: 'last hour', inVal: '94,918', outVal: '95,855' },
     { metric: 'top/hour', inVal: '527,470', outVal: '526,060' },
@@ -287,8 +291,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
 
-          {/* Silver/Metallic Version Badge + Quick Action */}
+          {/* Silver/Metallic Version Badge + Live Speed + Quick Action */}
           <div className="flex items-center gap-2 py-1 sm:py-0">
+            {/* Real-time speed badge */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#F0FDF4] border border-[#BBF7D0] text-[11px] font-mono shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+              </span>
+              <span className="text-gray-600 font-bold text-[10px] uppercase">Speed:</span>
+              <span className="font-extrabold text-[#15803D] text-xs">
+                {currentRateStr}
+              </span>
+              <span className="text-gray-500 text-[10px]">msg/s</span>
+            </div>
+
             <button
               onClick={onNavigateToSend}
               className="text-[11px] font-semibold bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-2.5 py-1 rounded shadow-xs flex items-center gap-1 transition"
@@ -304,8 +321,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
             </button>
-            <div className="hidden lg:flex items-center px-2.5 py-1 rounded bg-gradient-to-b from-[#555555] via-[#444444] to-[#333333] border border-[#666666] text-gray-200 text-[10px] font-mono tracking-tight shadow-inner">
-              PowerMTA Management Console v1.5c1
+            <div className="hidden xl:flex items-center px-2.5 py-1 rounded bg-gradient-to-b from-[#555555] via-[#444444] to-[#333333] border border-[#666666] text-gray-200 text-[10px] font-mono tracking-tight shadow-inner">
+              PowerMTA v1.5c1
             </div>
           </div>
         </div>

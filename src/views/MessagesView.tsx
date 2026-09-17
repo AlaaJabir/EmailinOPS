@@ -1,19 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Inbox,
   Search,
-  Filter,
   RefreshCw,
   Copy,
   Check,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
-  Calendar,
-  Layers,
-  ArrowUpDown,
-  Mail,
+  Send,
   Clock,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  FileText,
 } from 'lucide-react';
 import { Message, Sender, Campaign } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
@@ -26,6 +25,7 @@ interface MessagesViewProps {
   onRefresh: () => void;
   isLoading: boolean;
   initialStatusFilter?: string;
+  initialStatus?: string;
   title?: string;
   subtitle?: string;
 }
@@ -37,25 +37,27 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   onSelectMessage,
   onRefresh,
   isLoading,
-  initialStatusFilter = 'ALL',
-  title = 'Outbound Queue & Telemetry',
-  subtitle = 'Searchable real-time log of RFC 5322 messages, spool lifecycle events, and MTA relay responses.',
+  initialStatusFilter,
+  initialStatus,
+  title = 'Message Spool & Outbound Queue',
+  subtitle = 'Real-time RFC 5322 outbound spool, transmission logs, delivery receipts, and queue telemetry.',
 }) => {
+  const defaultStatus = initialStatus || initialStatusFilter || 'ALL';
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
+  const [statusFilter, setStatusFilter] = useState(defaultStatus);
   const [senderFilter, setSenderFilter] = useState('ALL');
   const [dateFilter, setDateFilter] = useState('ALL');
   const [page, setPage] = useState(1);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const pageSize = 20;
 
-  // Sync initialStatusFilter if changed from parent (e.g. navigating from Sidebar "Sent" vs "Delivered")
-  React.useEffect(() => {
-    if (initialStatusFilter) {
-      setStatusFilter(initialStatusFilter);
+  useEffect(() => {
+    const s = initialStatus || initialStatusFilter;
+    if (s) {
+      setStatusFilter(s);
       setPage(1);
     }
-  }, [initialStatusFilter]);
+  }, [initialStatus, initialStatusFilter]);
 
   const handleCopy = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -106,208 +108,220 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   }, [filtered, page]);
 
   const statusTabs = [
-    { id: 'ALL', label: 'All Messages' },
-    { id: 'QUEUED', label: 'Queued' },
-    { id: 'SENDING', label: 'Sending' },
-    { id: 'SENT', label: 'Sent' },
-    { id: 'DELIVERED', label: 'Delivered' },
-    { id: 'DEFERRED', label: 'Deferred' },
-    { id: 'BOUNCED', label: 'Bounced' },
-    { id: 'FAILED', label: 'Failed' },
+    { id: 'ALL', label: 'All Spool', icon: Inbox },
+    { id: 'QUEUED', label: 'Queued', icon: Clock },
+    { id: 'SENT', label: 'Sent', icon: Send },
+    { id: 'DELIVERED', label: 'Delivered', icon: CheckCircle2 },
+    { id: 'DEFERRED', label: 'Deferred', icon: Clock },
+    { id: 'BOUNCED', label: 'Bounced', icon: AlertTriangle },
+    { id: 'FAILED', label: 'Failed', icon: XCircle },
   ];
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-5 font-sans">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Inbox className="w-5 h-5 text-indigo-400" />
-            <span>{title}</span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
-        </div>
+    <div className="p-2 sm:p-4 md:p-6 bg-[#E8ECEF] min-h-[calc(100vh-3.5rem)] font-sans text-gray-800">
+      <div className="max-w-[1240px] mx-auto bg-white rounded-lg shadow-md border border-[#C5CED6] overflow-hidden">
+        {/* PowerMTA Top Crimson Header */}
+        <div className="px-4 py-3 sm:px-6 sm:py-3.5 bg-gradient-to-r from-[#8B1A10] via-[#A81D14] to-[#75110B] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-[#E0A328]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded bg-black/25 flex items-center justify-center text-white border border-white/20 shrink-0">
+              <Inbox className="w-4 h-4" />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                <span>{title}</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/30 border border-white/20 text-[#FFD54F]">
+                  Spool Telemetry
+                </span>
+              </h1>
+              <p className="text-[11px] text-gray-200 mt-0.5 hidden sm:block">{subtitle}</p>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={onRefresh}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#162032] hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 text-xs font-medium transition"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-400' : ''}`} />
-            <span>Sync Spool</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Status Filter Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none border-b border-slate-800/80">
-        {statusTabs.map((tab) => {
-          const active = statusFilter === tab.id;
-          const count = messages.filter((m) => {
-            if (tab.id === 'ALL') return true;
-            if (tab.id === 'DEFERRED') return m.status === 'DELIVERY_DELAYED' || (m.status as any) === 'DEFERRED';
-            return m.status === tab.id;
-          }).length;
-
-          return (
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              key={tab.id}
-              onClick={() => {
-                setStatusFilter(tab.id);
-                setPage(1);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 whitespace-nowrap transition-colors ${
-                active
-                  ? 'border-indigo-500 text-white font-semibold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#37474F] hover:bg-[#263238] text-white text-xs font-semibold shadow-xs transition disabled:opacity-50"
             >
-              <span>{tab.label}</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh Spool</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Status Filter Tabs (PowerMTA tab ribbon) */}
+        <div className="px-3 pt-2 bg-[#F1F4F7] border-b border-[#CCD2D8] flex items-center gap-1 overflow-x-auto scrollbar-none">
+          {statusTabs.map((tab) => {
+            const active = statusFilter === tab.id;
+            const count = messages.filter((m) => {
+              if (tab.id === 'ALL') return true;
+              if (tab.id === 'DEFERRED')
+                return m.status === 'DELIVERY_DELAYED' || (m.status as any) === 'DEFERRED';
+              return m.status === tab.id;
+            }).length;
+
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setStatusFilter(tab.id);
+                  setPage(1);
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition-all rounded-t-sm border-t border-x ${
                   active
-                    ? 'bg-indigo-500/20 text-indigo-300'
-                    : 'bg-slate-800/60 text-slate-400'
+                    ? 'bg-gradient-to-b from-[#E0A328] via-[#C98B18] to-[#AC710D] text-white shadow-xs border-[#E9B446]'
+                    : 'bg-[#E2E7EC] text-gray-700 hover:bg-[#D8DEE4] border-transparent'
                 }`}
               >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="p-3.5 rounded-lg bg-[#111827] border border-slate-800/90 flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search by RFC Message-ID, recipient, subject, or provider ID..."
-            className="w-full bg-[#0A0F1A] border border-slate-800 rounded-md pl-9 pr-4 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none transition"
-          />
+                <span>{tab.label}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${
+                    active ? 'bg-black/30 text-white' : 'bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Sender Filter */}
-          <select
-            value={senderFilter}
-            onChange={(e) => {
-              setSenderFilter(e.target.value);
-              setPage(1);
-            }}
-            className="bg-[#0A0F1A] border border-slate-800 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:border-indigo-500/60 focus:outline-none"
-          >
-            <option value="ALL">All Senders</option>
-            {senders.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.fromEmail})
-              </option>
-            ))}
-          </select>
+        {/* Search & Filter Bar */}
+        <div className="p-3 sm:p-4 bg-white border-b border-[#CCD2D8] flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by RFC Message-ID, recipient, subject, or provider ID..."
+              className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded pl-9 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-400 focus:border-[#8B1A10] focus:outline-none transition"
+            />
+          </div>
 
-          {/* Time Filter */}
-          <select
-            value={dateFilter}
-            onChange={(e) => {
-              setDateFilter(e.target.value);
-              setPage(1);
-            }}
-            className="bg-[#0A0F1A] border border-slate-800 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:border-indigo-500/60 focus:outline-none"
-          >
-            <option value="ALL">All Time</option>
-            <option value="1h">Last 1 Hour</option>
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Sender Filter */}
+            <select
+              value={senderFilter}
+              onChange={(e) => {
+                setSenderFilter(e.target.value);
+                setPage(1);
+              }}
+              className="bg-[#F8FAFC] border border-[#CCD2D8] rounded px-2.5 py-1.5 text-xs text-gray-700 focus:border-[#8B1A10] focus:outline-none"
+            >
+              <option value="ALL">All Senders</option>
+              {senders.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.fromEmail})
+                </option>
+              ))}
+            </select>
+
+            {/* Time Filter */}
+            <select
+              value={dateFilter}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                setPage(1);
+              }}
+              className="bg-[#F8FAFC] border border-[#CCD2D8] rounded px-2.5 py-1.5 text-xs text-gray-700 focus:border-[#8B1A10] focus:outline-none"
+            >
+              <option value="ALL">All Time</option>
+              <option value="1h">Last 1 Hour</option>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+            </select>
+          </div>
         </div>
-      </div>
 
-      {/* Operations Table */}
-      <div className="rounded-lg bg-[#111827] border border-slate-800/90 overflow-hidden">
+        {/* Operations Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-[#0A0F1A] text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-slate-800">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-[#546E7A] text-white uppercase font-mono text-[10px] tracking-wider border-b border-[#37474F]">
               <tr>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Recipient</th>
-                <th className="py-3 px-4 hidden md:table-cell">Sender</th>
-                <th className="py-3 px-4">Subject</th>
-                <th className="py-3 px-4 font-mono hidden lg:table-cell">Message ID</th>
-                <th className="py-3 px-4 font-mono hidden xl:table-cell">Provider ID</th>
-                <th className="py-3 px-4 hidden sm:table-cell">Created</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-2.5 px-3">Status</th>
+                <th className="py-2.5 px-3">Recipient</th>
+                <th className="py-2.5 px-3 hidden md:table-cell">Sender</th>
+                <th className="py-2.5 px-3">Subject</th>
+                <th className="py-2.5 px-3 font-mono hidden lg:table-cell">Message ID</th>
+                <th className="py-2.5 px-3 font-mono hidden xl:table-cell">Provider ID</th>
+                <th className="py-2.5 px-3 hidden sm:table-cell">Queued / Sent</th>
+                <th className="py-2.5 px-3 text-right">Inspect</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-sans">
+            <tbody className="divide-y divide-[#E2E8F0] font-sans">
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
-                    <Inbox className="w-8 h-8 mx-auto text-slate-600 mb-2" />
-                    <p className="text-sm font-medium text-slate-400">No messages match your criteria</p>
-                    <p className="text-xs text-slate-500 mt-1">Try resetting your filters or search keywords.</p>
+                  <td colSpan={8} className="py-12 text-center text-gray-500">
+                    <Inbox className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm font-semibold text-gray-700">No messages found in spool</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Try resetting search keywords or status filter.</p>
                   </td>
                 </tr>
               ) : (
-                paginated.map((msg) => {
-                  const createdStr = msg.createdAt || msg.queuedAt
-                    ? new Date(msg.createdAt || msg.queuedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : '-';
+                paginated.map((msg, idx) => {
+                  const createdStr =
+                    msg.createdAt || msg.queuedAt
+                      ? new Date(msg.createdAt || msg.queuedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '-';
+                  const isEven = idx % 2 === 0;
                   return (
                     <tr
                       key={msg.id}
                       onClick={() => onSelectMessage(msg)}
-                      className="hover:bg-slate-800/40 cursor-pointer transition-colors group"
+                      className={`${
+                        isEven ? 'bg-white' : 'bg-[#F8FAFC]'
+                      } hover:bg-[#FFF9E6] cursor-pointer transition-colors group`}
                     >
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-2 px-3 whitespace-nowrap">
                         <StatusBadge status={msg.status} />
                       </td>
-                      <td className="py-3 px-4 font-mono text-slate-200 truncate max-w-[200px]">
+                      <td className="py-2 px-3 font-mono font-medium text-gray-900 truncate max-w-[200px]">
                         {msg.toEmail}
                       </td>
-                      <td className="py-3 px-4 font-mono text-slate-400 truncate max-w-[180px] hidden md:table-cell">
+                      <td className="py-2 px-3 font-mono text-gray-600 truncate max-w-[180px] hidden md:table-cell">
                         {msg.fromEmail}
                       </td>
-                      <td className="py-3 px-4 text-slate-300 truncate max-w-[240px]">
+                      <td className="py-2 px-3 text-gray-800 truncate max-w-[240px]">
                         {msg.subject || '(No Subject)'}
                       </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-400 truncate max-w-[160px] hidden lg:table-cell">
+                      <td className="py-2 px-3 font-mono text-[11px] text-gray-600 truncate max-w-[160px] hidden lg:table-cell">
                         <div className="flex items-center gap-1">
                           <span className="truncate">{msg.messageId}</span>
                           <button
                             onClick={(e) => handleCopy(msg.messageId, e)}
-                            className="text-slate-500 hover:text-slate-300 p-0.5"
+                            className="text-gray-400 hover:text-gray-700 p-0.5"
                             title="Copy ID"
                           >
                             {copiedId === msg.messageId ? (
-                              <Check className="w-3 h-3 text-emerald-400" />
+                              <Check className="w-3 h-3 text-emerald-600" />
                             ) : (
                               <Copy className="w-3 h-3" />
                             )}
                           </button>
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-400 truncate max-w-[140px] hidden xl:table-cell">
-                        {msg.providerMessageId || msg.sesMessageId || 'kumo_injected'}
+                      <td className="py-2 px-3 font-mono text-[11px] text-gray-500 truncate max-w-[140px] hidden xl:table-cell">
+                        {msg.providerMessageId || msg.sesMessageId || 'kumo_spool'}
                       </td>
-                      <td className="py-3 px-4 text-slate-400 font-mono text-[11px] whitespace-nowrap hidden sm:table-cell">
+                      <td className="py-2 px-3 text-gray-600 font-mono text-[11px] whitespace-nowrap hidden sm:table-cell">
                         {createdStr}
                       </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <td className="py-2 px-3 text-right whitespace-nowrap">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             onSelectMessage(msg);
                           }}
-                          className="px-2.5 py-1 rounded bg-slate-800/80 hover:bg-indigo-600 text-slate-300 hover:text-white font-medium text-[11px] transition-colors"
+                          className="px-2 py-0.5 rounded bg-[#ECEFF1] hover:bg-[#37474F] hover:text-white text-gray-700 font-semibold text-[10px] transition-colors border border-[#CFD8DC]"
                         >
-                          Inspect
+                          View
                         </button>
                       </td>
                     </tr>
@@ -319,30 +333,30 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-4 py-3 bg-[#0A0F1A] border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <div className="px-4 py-2.5 bg-[#F1F4F7] border-t border-[#CCD2D8] flex items-center justify-between text-xs text-gray-600 font-sans">
           <div>
-            Showing <span className="font-mono text-slate-200">{filtered.length > 0 ? (page - 1) * pageSize + 1 : 0}</span> to{' '}
-            <span className="font-mono text-slate-200">{Math.min(page * pageSize, filtered.length)}</span> of{' '}
-            <span className="font-mono text-slate-200">{filtered.length}</span> messages
+            Showing <span className="font-mono font-bold text-gray-800">{filtered.length > 0 ? (page - 1) * pageSize + 1 : 0}</span> to{' '}
+            <span className="font-mono font-bold text-gray-800">{Math.min(page * pageSize, filtered.length)}</span> of{' '}
+            <span className="font-mono font-bold text-gray-800">{filtered.length}</span> messages
           </div>
 
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="p-1 rounded bg-slate-800/80 text-slate-300 hover:text-white disabled:opacity-40 transition"
+              className="p-1 rounded bg-white border border-[#CCD2D8] text-gray-700 hover:bg-gray-100 disabled:opacity-40 transition"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5" />
             </button>
-            <span className="px-2 font-mono text-slate-300">
+            <span className="px-2 font-mono text-gray-700 font-bold">
               {page} / {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="p-1 rounded bg-slate-800/80 text-slate-300 hover:text-white disabled:opacity-40 transition"
+              className="p-1 rounded bg-white border border-[#CCD2D8] text-gray-700 hover:bg-gray-100 disabled:opacity-40 transition"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

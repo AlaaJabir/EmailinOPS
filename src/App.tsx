@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ToastContainer, ToastMessage } from './components/Toast';
@@ -75,6 +75,10 @@ export function App() {
   const [selectedAudienceId, setSelectedAudienceId] = useState<string | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [throughputRate, setThroughputRate] = useState<number>(0);
+  const prevSentRef = useRef<number | null>(null);
+  const prevTimeRef = useRef<number>(Date.now());
 
   const authFetch = useCallback(
     (url: string, options: RequestInit = {}) => {
@@ -100,10 +104,33 @@ export function App() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const r = await authFetch('/api/dashboard/stats?period=30d');
-      if (r.ok) {
-        const d = await parseJsonSafely(r);
-        if (d && !d.raw) setStats(d);
+      const [rStats, rMetrics] = await Promise.all([
+        authFetch('/api/dashboard/stats?period=30d'),
+        authFetch('/api/metrics').catch(() => null),
+      ]);
+      if (rStats.ok) {
+        const d = await parseJsonSafely(rStats);
+        if (d && !d.raw) {
+          setStats(d);
+          const now = Date.now();
+          const currentSent = d.totalSent ?? 0;
+          if (prevSentRef.current !== null && now > prevTimeRef.current) {
+            const deltaSent = currentSent - prevSentRef.current;
+            const deltaSec = (now - prevTimeRef.current) / 1000;
+            if (deltaSec > 0 && deltaSent >= 0) {
+              const measuredRate = deltaSent / deltaSec;
+              setThroughputRate(measuredRate);
+            }
+          }
+          prevSentRef.current = currentSent;
+          prevTimeRef.current = now;
+        }
+      }
+      if (rMetrics && rMetrics.ok) {
+        const m = await parseJsonSafely(rMetrics);
+        if (m && typeof m.kumomta_delivery_rate_per_second === 'number' && m.kumomta_delivery_rate_per_second > 0) {
+          setThroughputRate(m.kumomta_delivery_rate_per_second);
+        }
       }
     } catch (e) {
       console.error('[App] stats fetch failed', e);
@@ -260,7 +287,7 @@ export function App() {
         fetchMessages();
         fetchLogs();
       }
-    }, 25000);
+    }, 3000); // 3s real-time refresh
     return () => clearInterval(id);
   }, [user, refreshAll, fetchStats, fetchMessages, fetchLogs]);
 
@@ -406,13 +433,14 @@ export function App() {
     );
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex antialiased font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#E8ECEF] text-gray-800 flex antialiased font-sans selection:bg-[#8B1A10] selection:text-white">
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         kumoStatus={stats?.kumoHealth}
         sesStatus={stats?.sesHealth}
         queueCount={stats?.queueSize ?? 0}
+        throughputPerSec={throughputRate}
         user={{
           name: profile?.fullName || user.email?.split('@')[0],
           email: user.email,
@@ -420,11 +448,21 @@ export function App() {
           plan: profile?.plan,
         }}
         onLogout={logout}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         <Header
+          currentTab={currentTab}
           onOpenQuickSend={() => setCurrentTab('send')}
+          onRefresh={refreshAll}
+          isLoading={isLoading}
+          onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          kumoStatus={stats?.kumoHealth as any}
+          sesStatus={stats?.sesHealth as any}
           queueCount={stats?.queueSize ?? 0}
+          throughputPerSec={throughputRate}
+          lastUpdated={new Date()}
         />
         <main className="flex-1 pb-16">
           {currentTab === 'dashboard' && (
@@ -439,6 +477,7 @@ export function App() {
               isLoading={isLoading}
               authFetch={authFetch}
               onNavigateTab={(tab) => setCurrentTab(tab as NavTab)}
+              throughputPerSec={throughputRate}
             />
           )}
 
