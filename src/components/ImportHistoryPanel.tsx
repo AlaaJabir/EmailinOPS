@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Archive, CheckCircle2, Loader2, Play, Upload, XCircle } from 'lucide-react';
+import { Archive, CheckCircle2, Loader2, Play, XCircle } from 'lucide-react';
 
 interface ImportRecord {
   id: string;
@@ -71,6 +71,12 @@ export const ImportHistoryPanel: React.FC<{
 
   useEffect(() => {
     load();
+  }, []);
+
+  useEffect(() => {
+    const openImportPicker = () => fileRef.current?.click();
+    window.addEventListener('emailops:open-import', openImportPicker);
+    return () => window.removeEventListener('emailops:open-import', openImportPicker);
   }, []);
 
   const importFile = async (file: File) => {
@@ -159,16 +165,12 @@ export const ImportHistoryPanel: React.FC<{
 
   return (
     <section className="p-6 rounded-sm bg-[#0F0F0F] border border-white-10 space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2"><Archive className="w-4 h-4" />Import History & Reusable Audiences</h2>
-          <p className="text-xs text-[#888888] mt-1">Imported files stay available as reusable audiences. Large files are streamed in chunks and interrupted uploads can resume from the saved offset.</p>
-        </div>
-        <button disabled={uploading} onClick={() => fileRef.current?.click()} className="flex items-center gap-2 px-4 py-2 rounded-sm bg-white text-black text-xs font-semibold disabled:opacity-50">
-          <Upload className="w-3.5 h-3.5" />{uploading ? 'Importing…' : 'Import CSV / TXT'}
-        </button>
-        <input ref={fileRef} hidden type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); }} />
+      <div>
+        <h2 className="text-sm font-semibold text-white flex items-center gap-2"><Archive className="w-4 h-4" />Import History & Reusable Audiences</h2>
+        <p className="text-xs text-[#888888] mt-1">Imported files stay available as reusable audiences. Large files are streamed in chunks and interrupted uploads can resume from the saved offset.</p>
       </div>
+
+      <input ref={fileRef} hidden type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); }} />
 
       {current && (
         <div className="p-4 rounded-sm bg-[#050505] border border-white-10">

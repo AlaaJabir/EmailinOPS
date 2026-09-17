@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, UserPlus, Search, ListFilter, FolderPlus } from 'lucide-react';
+import { Users, UserPlus, Search, ListFilter, FolderPlus, Upload } from 'lucide-react';
 import { Contact, ContactList } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -8,7 +8,6 @@ interface ContactsViewProps {
   lists: ContactList[];
   onAddContact: (contact: any) => Promise<void>;
   onCreateList: (list: any) => Promise<void>;
-  onImportCsv?: (contacts: any[], listId?: string) => Promise<void>;
   initialTab?: 'contacts' | 'lists';
 }
 
@@ -80,6 +79,10 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
     }
   };
 
+  const openImportCsv = () => {
+    window.dispatchEvent(new Event('emailops:open-import'));
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-gray-900">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[#CCD2D8]">
@@ -132,6 +135,14 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
         >
           <ListFilter className="w-3.5 h-3.5" />
           <span>Audience Lists ({lists.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={openImportCsv}
+          className="ml-auto flex items-center gap-2 px-3.5 py-2 rounded-t text-xs font-bold bg-white border border-[#CCD2D8] border-b-0 text-gray-800 hover:text-[#8B1A10] hover:border-[#8B1A10] transition"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          <span>Import CSV</span>
         </button>
       </div>
 
