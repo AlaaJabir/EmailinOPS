@@ -482,7 +482,15 @@ export function App() {
           )}
 
           {currentTab === 'infra-kumo' && (
-            <KumoOperationsDashboard authFetch={authFetch} />
+            <KumoOperationsDashboard
+              stats={stats}
+              recentMessages={messages}
+              onSelectMessage={setSelectedMessage}
+              onNavigateToSend={() => setCurrentTab('send')}
+              onRefresh={refreshAll}
+              isLoading={isLoading}
+              authFetch={authFetch}
+            />
           )}
 
           {currentTab === 'vmtas' && (

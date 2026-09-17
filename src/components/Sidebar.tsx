@@ -181,13 +181,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isHealthy = kumoStatus.toLowerCase() === 'healthy';
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-[#1A2330] text-[#CBD5E1] font-sans select-none border-r border-[#2C384A]">
+    <div className="flex flex-col h-full bg-[#F2F5F8] text-gray-800 font-sans select-none border-r border-[#CCD2D8]">
       {/* POWERMTA BRAND HEADER */}
-      <div className="h-16 px-4 flex items-center justify-between border-b border-[#2C384A] shrink-0 bg-[#141C27]">
+      <div className="h-16 px-4 flex items-center justify-between border-b border-[#CCD2D8] shrink-0 bg-white">
         <div className="flex items-center gap-2 min-w-0">
           {/* Mechanical Cog Icon */}
           <div className="relative flex items-center select-none shrink-0">
-            <svg className="w-7 h-7 text-[#7E8896] -mr-2.5" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="w-7 h-7 text-[#8B1A10] -mr-2.5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
               <path
                 fillRule="evenodd"
@@ -195,20 +195,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 clipRule="evenodd"
               />
             </svg>
-            <span className="text-xl font-black tracking-tight text-[#D32F2F] lowercase drop-shadow-xs">
+            <span className="text-xl font-black tracking-tight text-[#8B1A10] lowercase drop-shadow-xs">
               power
             </span>
-            <span className="text-xl font-black tracking-tight text-white uppercase">
+            <span className="text-xl font-black tracking-tight text-gray-900 uppercase">
               MTA
             </span>
           </div>
 
           {!isCollapsed && (
             <div className="min-w-0 pl-1">
-              <span className="text-[9px] uppercase font-mono font-bold tracking-widest text-[#E0A328] block truncate">
+              <span className="text-[9px] uppercase font-mono font-bold tracking-widest text-[#8B1A10] block truncate">
                 PORT25 OPS
               </span>
-              <span className="text-[10px] text-gray-400 block truncate -mt-0.5">
+              <span className="text-[10px] text-gray-500 font-medium block truncate -mt-0.5">
                 v1.5c1 Enterprise
               </span>
             </div>
@@ -219,7 +219,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {onCloseMobile && (
           <button
             onClick={onCloseMobile}
-            className="md:hidden p-1.5 rounded text-gray-400 hover:text-white hover:bg-[#2C384A] transition"
+            className="md:hidden p-1.5 rounded text-gray-600 hover:text-gray-900 hover:bg-gray-200 transition"
             aria-label="Close sidebar"
           >
             <X className="w-5 h-5" />
@@ -230,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="hidden md:flex p-1 rounded hover:bg-[#2C384A] text-gray-400 hover:text-white transition"
+            className="hidden md:flex p-1 rounded hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition"
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -240,21 +240,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* REAL-TIME SPEED TICKER IN SIDEBAR */}
       {!isCollapsed && (
-        <div className="px-3 py-2 bg-gradient-to-r from-[#212B3B] to-[#1B2433] border-b border-[#2C384A] flex items-center justify-between">
+        <div className="px-3 py-2 bg-[#E9EEF3] border-b border-[#CCD2D8] flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-[11px] font-mono">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
             </span>
-            <span className="text-gray-300 font-semibold text-[10px] uppercase tracking-wider">
+            <span className="text-gray-700 font-bold text-[10px] uppercase tracking-wider">
               Speed:
             </span>
-            <span className="text-emerald-400 font-bold">
+            <span className="text-[#15803D] font-extrabold">
               {throughputPerSec > 0 ? throughputPerSec.toFixed(1) : '0.0'}
             </span>
-            <span className="text-gray-400 text-[9px]">msg/s</span>
+            <span className="text-gray-600 text-[9px]">msg/s</span>
           </div>
-          <span className="text-[10px] font-mono text-[#E0A328] bg-[#C98B18]/20 px-1.5 py-0.5 rounded border border-[#C98B18]/30">
+          <span className="text-[10px] font-mono font-bold text-[#8B1A10] bg-[#8B1A10]/10 px-1.5 py-0.5 rounded border border-[#8B1A10]/20">
             LIVE
           </span>
         </div>
@@ -265,7 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {groups.map((group) => (
           <div key={group.title} className="space-y-0.5">
             {!isCollapsed && (
-              <div className="px-2 pb-1 text-[9px] font-bold tracking-wider text-[#7E8B9B] uppercase font-mono border-b border-[#243040] mb-1">
+              <div className="px-2 pb-1 text-[9px] font-bold tracking-wider text-gray-600 uppercase font-mono border-b border-[#CCD2D8] mb-1">
                 {group.title}
               </div>
             )}
@@ -281,15 +281,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       if (onCloseMobile) onCloseMobile();
                     }}
                     title={isCollapsed ? item.label : undefined}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all group ${
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-bold transition-all group ${
                       active
-                        ? 'bg-gradient-to-r from-[#8B1A10] via-[#A81D14] to-[#B7241A] text-white shadow-xs border-l-3 border-[#E0A328]'
-                        : 'text-[#94A3B8] hover:text-white hover:bg-[#243040] border-l-3 border-transparent'
+                        ? 'bg-[#8B1A10] text-white shadow-xs border-l-4 border-[#C98B18]'
+                        : 'text-gray-700 hover:text-gray-900 hover:bg-[#E2E8F0] border-l-4 border-transparent'
                     }`}
                   >
                     <Icon
                       className={`w-3.5 h-3.5 shrink-0 transition-colors ${
-                        active ? 'text-[#FFD54F]' : 'text-[#7E8B9B] group-hover:text-gray-200'
+                        active ? 'text-[#FFD54F]' : 'text-gray-600 group-hover:text-gray-900'
                       }`}
                     />
                     {!isCollapsed && (
@@ -298,7 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {!isCollapsed && 'badge' in item && item.badge !== undefined && (
                       <span
                         className={`ml-auto px-1.5 py-0.2 rounded text-[10px] font-mono font-bold text-white shadow-xs ${
-                          (item as any).badgeColor || 'bg-[#8B1A10]'
+                          active ? 'bg-[#C98B18]' : 'bg-[#8B1A10]'
                         }`}
                       >
                         {item.badge}
@@ -313,19 +313,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* BOTTOM NODE STATUS & USER FOOTER */}
-      <div className="p-2.5 border-t border-[#2C384A] bg-[#141C27] space-y-2 shrink-0">
+      <div className="p-2.5 border-t border-[#CCD2D8] bg-white space-y-2 shrink-0">
         {!isCollapsed ? (
-          <div className="p-2 rounded bg-[#1B2533] border border-[#2A374A] space-y-1.5 text-xs">
+          <div className="p-2 rounded bg-[#F8FAFC] border border-[#CCD2D8] space-y-1.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-gray-300 font-bold text-[11px] tracking-tight">fe.int.port25.com</span>
+              <span className="text-gray-900 font-bold text-[11px] tracking-tight">fe.int.port25.com</span>
               <div className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-b from-[#86EFAC] via-[#22C55E] to-[#15803D] shadow-[0_0_6px_#22c55e]" />
-                <span className="text-[10px] font-mono font-bold text-emerald-400">ONLINE</span>
+                <span className="text-[10px] font-mono font-bold text-emerald-700">ONLINE</span>
               </div>
             </div>
-            <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1 border-t border-[#243142] font-mono">
+            <div className="flex items-center justify-between text-[10px] text-gray-600 pt-1 border-t border-[#CCD2D8] font-mono">
               <span>Spool Queue:</span>
-              <span className="text-[#E0A328] font-bold">{queueCount.toLocaleString()}</span>
+              <span className="text-[#8B1A10] font-bold">{queueCount.toLocaleString()}</span>
             </div>
           </div>
         ) : (
@@ -337,15 +337,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* User Account Strip */}
         <div className="flex items-center justify-between pt-0.5">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 rounded bg-[#2C384A] border border-[#3E4D63] flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+            <div className="w-6 h-6 rounded bg-[#8B1A10] border border-[#6B140C] flex items-center justify-center text-[10px] font-bold text-white shrink-0">
               {(user?.name || user?.email || 'A')[0].toUpperCase()}
             </div>
             {!isCollapsed && (
               <div className="min-w-0">
-                <div className="text-xs font-semibold text-gray-200 truncate">
+                <div className="text-xs font-bold text-gray-900 truncate">
                   {user?.name || user?.email?.split('@')[0] || 'Administrator'}
                 </div>
-                <div className="text-[9px] text-gray-400 font-mono truncate">
+                <div className="text-[9px] text-gray-500 font-mono truncate">
                   Port25 Operator
                 </div>
               </div>
@@ -354,7 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {onLogout && !isCollapsed && (
             <button
               onClick={onLogout}
-              className="p-1 text-gray-400 hover:text-rose-400 hover:bg-[#2C384A] rounded transition"
+              className="p-1 text-gray-500 hover:text-rose-700 hover:bg-gray-100 rounded transition"
               title="Sign Out"
             >
               <LogOut className="w-3.5 h-3.5" />

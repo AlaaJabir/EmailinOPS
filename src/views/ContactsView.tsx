@@ -163,15 +163,15 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
   });
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 font-sans">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-gray-900">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[#CCD2D8]">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-400" />
-            <span>Audience & Contact Management</span>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <Users className="w-5 h-5 text-[#8B1A10]" />
+            <span>Audience &amp; Contact Management</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             Segmented recipient lists, bounce-suppression verification, and CSV batch ingestion.
           </p>
         </div>
@@ -179,14 +179,14 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowListModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#162032] hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 text-xs font-medium transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-gray-100 text-gray-800 border border-[#CCD2D8] text-xs font-bold transition shadow-xs"
           >
-            <FolderPlus className="w-3.5 h-3.5" />
+            <FolderPlus className="w-3.5 h-3.5 text-gray-600" />
             <span>New List</span>
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-xs font-bold shadow-xs transition"
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Add Contact</span>
@@ -195,13 +195,13 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-1">
+      <div className="flex items-center gap-2 border-b border-[#CCD2D8] pb-1">
         <button
           onClick={() => setActiveTab('contacts')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-t-md text-xs font-medium transition ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-t text-xs font-bold transition ${
             activeTab === 'contacts'
-              ? 'border-b-2 border-indigo-500 text-white font-semibold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'border-b-2 border-[#8B1A10] text-[#8B1A10] bg-white'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <Users className="w-3.5 h-3.5" />
@@ -209,10 +209,10 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('lists')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-t-md text-xs font-medium transition ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-t text-xs font-bold transition ${
             activeTab === 'lists'
-              ? 'border-b-2 border-indigo-500 text-white font-semibold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'border-b-2 border-[#8B1A10] text-[#8B1A10] bg-white'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <ListFilter className="w-3.5 h-3.5" />
@@ -220,10 +220,10 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('import')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-t-md text-xs font-medium transition ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-t text-xs font-bold transition ${
             activeTab === 'import'
-              ? 'border-b-2 border-indigo-500 text-white font-semibold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'border-b-2 border-[#8B1A10] text-[#8B1A10] bg-white'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <Upload className="w-3.5 h-3.5" />
@@ -234,15 +234,15 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       {/* Tab 1: Contacts Table */}
       {activeTab === 'contacts' && (
         <div className="space-y-4">
-          <div className="p-3.5 rounded-lg bg-[#111827] border border-slate-800/90 flex flex-wrap items-center justify-between gap-3">
+          <div className="p-3.5 rounded bg-white border border-[#CCD2D8] flex flex-wrap items-center justify-between gap-3 shadow-xs">
             <div className="relative flex-1 min-w-[240px]">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by email, name, or company..."
-                className="w-full bg-[#0A0F1A] border border-slate-800 rounded-md pl-9 pr-4 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none"
+                className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded pl-9 pr-4 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-[#8B1A10] focus:outline-none"
               />
             </div>
 
@@ -250,7 +250,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               <select
                 value={selectedListFilter}
                 onChange={(e) => setSelectedListFilter(e.target.value)}
-                className="bg-[#0A0F1A] border border-slate-800 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none"
+                className="bg-[#F8FAFC] border border-[#CCD2D8] rounded px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:outline-none"
               >
                 <option value="ALL">All Lists</option>
                 {lists.map((l) => (
@@ -262,36 +262,36 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             </div>
           </div>
 
-          <div className="rounded-lg bg-[#111827] border border-slate-800/90 overflow-hidden">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-[#0A0F1A] text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-slate-800">
+          <div className="rounded bg-white border border-[#CCD2D8] overflow-hidden shadow-xs">
+            <table className="w-full text-left text-xs text-gray-800">
+              <thead className="bg-[#F2F4F7] text-gray-700 uppercase font-mono text-[10px] tracking-wider border-b border-[#CCD2D8]">
                 <tr>
-                  <th className="py-3 px-4">Contact Email</th>
-                  <th className="py-3 px-4">Full Name</th>
-                  <th className="py-3 px-4 hidden md:table-cell">Company</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 hidden sm:table-cell">Added</th>
+                  <th className="py-2.5 px-4 font-bold">Contact Email</th>
+                  <th className="py-2.5 px-4 font-bold">Full Name</th>
+                  <th className="py-2.5 px-4 hidden md:table-cell font-bold">Company</th>
+                  <th className="py-2.5 px-4 font-bold">Status</th>
+                  <th className="py-2.5 px-4 hidden sm:table-cell font-bold">Added</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-sans">
+              <tbody className="divide-y divide-[#E2E8F0] font-sans">
                 {filteredContacts.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-500">
+                    <td colSpan={5} className="py-12 text-center text-gray-500 font-medium">
                       No contacts found matching your criteria.
                     </td>
                   </tr>
                 ) : (
                   filteredContacts.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4 font-mono text-slate-200">{c.email}</td>
-                      <td className="py-3 px-4 font-medium text-white">
+                    <tr key={c.id} className="hover:bg-[#F8FAFC] transition-colors">
+                      <td className="py-2.5 px-4 font-mono text-gray-900 font-semibold">{c.email}</td>
+                      <td className="py-2.5 px-4 font-medium text-gray-900">
                         {c.firstName || c.lastName ? `${c.firstName} ${c.lastName}` : '-'}
                       </td>
-                      <td className="py-3 px-4 text-slate-400 hidden md:table-cell">{c.company || '-'}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-4 text-gray-600 hidden md:table-cell">{c.company || '-'}</td>
+                      <td className="py-2.5 px-4">
                         <StatusBadge status={c.status || 'ACTIVE'} />
                       </td>
-                      <td className="py-3 px-4 text-slate-400 font-mono text-[11px] hidden sm:table-cell">
+                      <td className="py-2.5 px-4 text-gray-500 font-mono text-[11px] hidden sm:table-cell">
                         {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Active'}
                       </td>
                     </tr>
@@ -309,21 +309,21 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           {lists.map((l) => (
             <div
               key={l.id}
-              className="p-5 rounded-lg bg-[#111827] border border-slate-800/90 flex flex-col justify-between space-y-4 hover:border-slate-700/80 transition-colors"
+              className="p-5 rounded bg-white border border-[#CCD2D8] flex flex-col justify-between space-y-4 hover:border-gray-400 transition-colors shadow-xs"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-white">{l.name}</h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                  <h3 className="text-sm font-bold text-gray-900">{l.name}</h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#8B1A10]/10 text-[#8B1A10] border border-[#8B1A10]/20 font-bold">
                     {l.memberCount || 0} members
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                <p className="text-xs text-gray-600 mt-1 line-clamp-2">
                   {l.description || 'No description provided.'}
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+              <div className="pt-2 border-t border-[#CCD2D8] flex items-center justify-between text-xs text-gray-500">
                 <span className="font-mono text-[11px]">
                   {l.createdAt ? new Date(l.createdAt).toLocaleDateString() : 'System Default'}
                 </span>
@@ -332,9 +332,9 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                     setSelectedListFilter(l.id);
                     setActiveTab('contacts');
                   }}
-                  className="text-indigo-400 hover:text-indigo-300 font-medium"
+                  className="text-[#8B1A10] hover:text-[#73140C] font-bold"
                 >
-                  View Members →
+                  View Members &rarr;
                 </button>
               </div>
             </div>
@@ -344,23 +344,23 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
       {/* Tab 3: Structured CSV Import Flow */}
       {activeTab === 'import' && (
-        <div className="max-w-3xl mx-auto p-6 rounded-lg bg-[#111827] border border-slate-800/90 space-y-6">
+        <div className="max-w-3xl mx-auto p-6 rounded bg-white border border-[#CCD2D8] space-y-6 shadow-xs">
           {/* Step Progress indicator */}
-          <div className="grid grid-cols-3 gap-2 border-b border-slate-800 pb-4 text-xs">
-            <div className={`flex items-center gap-2 ${importStep >= 1 ? 'text-indigo-400 font-semibold' : 'text-slate-500'}`}>
-              <span className="w-5 h-5 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-[10px]">
+          <div className="grid grid-cols-3 gap-2 border-b border-[#CCD2D8] pb-4 text-xs">
+            <div className={`flex items-center gap-2 ${importStep >= 1 ? 'text-[#8B1A10] font-bold' : 'text-gray-400'}`}>
+              <span className="w-5 h-5 rounded-full bg-[#8B1A10]/10 border border-[#8B1A10]/30 flex items-center justify-center text-[10px] font-bold">
                 1
               </span>
               <span>1. Upload CSV</span>
             </div>
-            <div className={`flex items-center gap-2 ${importStep >= 2 ? 'text-indigo-400 font-semibold' : 'text-slate-500'}`}>
-              <span className="w-5 h-5 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-[10px]">
+            <div className={`flex items-center gap-2 ${importStep >= 2 ? 'text-[#8B1A10] font-bold' : 'text-gray-400'}`}>
+              <span className="w-5 h-5 rounded-full bg-[#8B1A10]/10 border border-[#8B1A10]/30 flex items-center justify-center text-[10px] font-bold">
                 2
               </span>
-              <span>2. Map & Preview</span>
+              <span>2. Map &amp; Preview</span>
             </div>
-            <div className={`flex items-center gap-2 ${importStep >= 3 ? 'text-indigo-400 font-semibold' : 'text-slate-500'}`}>
-              <span className="w-5 h-5 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-[10px]">
+            <div className={`flex items-center gap-2 ${importStep >= 3 ? 'text-[#8B1A10] font-bold' : 'text-gray-400'}`}>
+              <span className="w-5 h-5 rounded-full bg-[#8B1A10]/10 border border-[#8B1A10]/30 flex items-center justify-center text-[10px] font-bold">
                 3
               </span>
               <span>3. Results</span>
@@ -371,10 +371,10 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           {importStep === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-white mb-1">
+                <label className="block text-xs font-bold text-gray-800 mb-1">
                   Upload CSV or Text File
                 </label>
-                <div className="border-2 border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg p-8 text-center transition cursor-pointer bg-[#0A0F1A]">
+                <div className="border-2 border-dashed border-[#CCD2D8] hover:border-[#8B1A10] rounded p-8 text-center transition cursor-pointer bg-[#F8FAFC]">
                   <input
                     type="file"
                     accept=".csv,.txt"
@@ -383,11 +383,11 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                     id="csv-file-input"
                   />
                   <label htmlFor="csv-file-input" className="cursor-pointer space-y-2 block">
-                    <FileSpreadsheet className="w-8 h-8 mx-auto text-indigo-400" />
-                    <div className="text-xs font-semibold text-white">
-                      Click to choose CSV or drag & drop here
+                    <FileSpreadsheet className="w-8 h-8 mx-auto text-[#8B1A10]" />
+                    <div className="text-xs font-bold text-gray-900">
+                      Click to choose CSV or drag &amp; drop here
                     </div>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-gray-500">
                       Standard comma-separated format: email, firstName, lastName, company
                     </p>
                   </label>
@@ -395,7 +395,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-white mb-1">
+                <label className="block text-xs font-bold text-gray-800 mb-1">
                   Or Paste Raw CSV Data
                 </label>
                 <textarea
@@ -403,7 +403,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                   value={csvRawText}
                   onChange={(e) => setCsvRawText(e.target.value)}
                   placeholder="email,firstName,lastName,company&#10;user@example.com,John,Doe,Acme Corp"
-                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded-md p-3 text-xs font-mono text-white focus:border-indigo-500/60 focus:outline-none"
+                  className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-3 text-xs font-mono text-gray-900 focus:border-[#8B1A10] focus:outline-none"
                 />
               </div>
 
@@ -411,7 +411,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 <button
                   disabled={!csvRawText.trim()}
                   onClick={() => setImportStep(2)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-40 transition"
+                  className="flex items-center gap-2 px-4 py-2 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-xs font-bold disabled:opacity-40 transition shadow-xs"
                 >
                   <span>Continue to Mapping</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -423,19 +423,19 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           {/* Step 2: Map Columns and Preview */}
           {importStep === 2 && (
             <div className="space-y-4 text-xs">
-              <div className="p-3 rounded-md bg-[#0A0F1A] border border-slate-800 flex items-center justify-between">
+              <div className="p-3 rounded bg-[#F8FAFC] border border-[#CCD2D8] flex items-center justify-between">
                 <div>
-                  <span className="font-semibold text-white">Parsed Rows: {parsedRows.length}</span>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <span className="font-bold text-gray-900">Parsed Rows: {parsedRows.length}</span>
+                  <p className="text-[11px] text-gray-600 mt-0.5">
                     {validCount} contacts with valid email formatting.
                   </p>
                 </div>
                 <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Assign to Audience List</label>
+                  <label className="text-[11px] text-gray-600 block mb-1 font-medium">Assign to Audience List</label>
                   <select
                     value={importListId}
                     onChange={(e) => setImportListId(e.target.value)}
-                    className="bg-[#111827] border border-slate-800 rounded px-2.5 py-1 text-xs text-white"
+                    className="bg-white border border-[#CCD2D8] rounded px-2.5 py-1 text-xs text-gray-900 font-medium"
                   >
                     <option value="">Default (No list)</option>
                     {lists.map((l) => (
@@ -448,15 +448,15 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               </div>
 
               {/* Column Mapping Selectors */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-md bg-[#0A0F1A] border border-slate-800">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded bg-[#F8FAFC] border border-[#CCD2D8]">
                 <div>
-                  <label className="text-[10px] uppercase font-semibold text-indigo-400 block mb-1">
+                  <label className="text-[10px] uppercase font-bold text-[#8B1A10] block mb-1">
                     Email Column *
                   </label>
                   <select
                     value={colEmailIdx}
                     onChange={(e) => setColEmailIdx(Number(e.target.value))}
-                    className="w-full bg-[#111827] border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                    className="w-full bg-white border border-[#CCD2D8] rounded px-2 py-1 text-xs text-gray-900 font-medium"
                   >
                     {parsedRows[0]?.map((header, idx) => (
                       <option key={idx} value={idx}>
@@ -467,13 +467,13 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  <label className="text-[10px] uppercase font-bold text-gray-600 block mb-1">
                     First Name
                   </label>
                   <select
                     value={colFirstIdx}
                     onChange={(e) => setColFirstIdx(Number(e.target.value))}
-                    className="w-full bg-[#111827] border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                    className="w-full bg-white border border-[#CCD2D8] rounded px-2 py-1 text-xs text-gray-900 font-medium"
                   >
                     {parsedRows[0]?.map((header, idx) => (
                       <option key={idx} value={idx}>
@@ -484,13 +484,13 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  <label className="text-[10px] uppercase font-bold text-gray-600 block mb-1">
                     Last Name
                   </label>
                   <select
                     value={colLastIdx}
                     onChange={(e) => setColLastIdx(Number(e.target.value))}
-                    className="w-full bg-[#111827] border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                    className="w-full bg-white border border-[#CCD2D8] rounded px-2 py-1 text-xs text-gray-900 font-medium"
                   >
                     {parsedRows[0]?.map((header, idx) => (
                       <option key={idx} value={idx}>
@@ -501,13 +501,13 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  <label className="text-[10px] uppercase font-bold text-gray-600 block mb-1">
                     Company
                   </label>
                   <select
                     value={colCompanyIdx}
                     onChange={(e) => setColCompanyIdx(Number(e.target.value))}
-                    className="w-full bg-[#111827] border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                    className="w-full bg-white border border-[#CCD2D8] rounded px-2 py-1 text-xs text-gray-900 font-medium"
                   >
                     {parsedRows[0]?.map((header, idx) => (
                       <option key={idx} value={idx}>
@@ -520,32 +520,32 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
               {/* Sample Preview Table */}
               <div className="space-y-1">
-                <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 block">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-600 block">
                   Validation Preview (First 5 Rows)
                 </span>
-                <div className="border border-slate-800 rounded-md overflow-hidden bg-[#0A0F1A]">
-                  <table className="w-full text-left text-[11px] text-slate-300">
-                    <thead className="bg-[#111827] text-slate-400 uppercase font-mono text-[9px] border-b border-slate-800">
+                <div className="border border-[#CCD2D8] rounded overflow-hidden bg-white">
+                  <table className="w-full text-left text-[11px] text-gray-800">
+                    <thead className="bg-[#F2F4F7] text-gray-700 uppercase font-mono text-[9px] border-b border-[#CCD2D8]">
                       <tr>
-                        <th className="p-2">Email</th>
-                        <th className="p-2">Name</th>
-                        <th className="p-2">Company</th>
-                        <th className="p-2">Validation</th>
+                        <th className="p-2 font-bold">Email</th>
+                        <th className="p-2 font-bold">Name</th>
+                        <th className="p-2 font-bold">Company</th>
+                        <th className="p-2 font-bold">Validation</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                    <tbody className="divide-y divide-[#E2E8F0] font-mono">
                       {previewContacts.slice(0, 5).map((p, idx) => (
                         <tr key={idx}>
-                          <td className="p-2 text-white">{p.email || '(Missing)'}</td>
-                          <td className="p-2 text-slate-300">{p.firstName} {p.lastName}</td>
-                          <td className="p-2 text-slate-400">{p.company || '-'}</td>
+                          <td className="p-2 text-gray-900 font-semibold">{p.email || '(Missing)'}</td>
+                          <td className="p-2 text-gray-700 font-sans">{p.firstName} {p.lastName}</td>
+                          <td className="p-2 text-gray-600 font-sans">{p.company || '-'}</td>
                           <td className="p-2">
                             {p.isValid ? (
-                              <span className="text-emerald-400 flex items-center gap-1 font-sans">
+                              <span className="text-emerald-700 flex items-center gap-1 font-sans font-bold">
                                 <CheckCircle2 className="w-3 h-3" /> Valid
                               </span>
                             ) : (
-                              <span className="text-rose-400 flex items-center gap-1 font-sans">
+                              <span className="text-rose-700 flex items-center gap-1 font-sans font-bold">
                                 <AlertCircle className="w-3 h-3" /> Invalid
                               </span>
                             )}
@@ -557,11 +557,11 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-between pt-3 border-t border-[#CCD2D8]">
                 <button
                   type="button"
                   onClick={() => setImportStep(1)}
-                  className="px-3.5 py-1.5 rounded-md bg-slate-800 text-slate-400 hover:text-white"
+                  className="px-3.5 py-1.5 rounded border border-[#CCD2D8] text-gray-600 hover:text-gray-900 font-semibold"
                 >
                   Back
                 </button>
@@ -569,7 +569,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                   type="button"
                   disabled={validCount === 0 || busy}
                   onClick={handleExecuteImport}
-                  className="flex items-center gap-2 px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-semibold disabled:opacity-40 transition"
+                  className="flex items-center gap-2 px-4 py-1.5 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white font-bold disabled:opacity-40 transition shadow-xs"
                 >
                   {busy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                   <span>Execute Import ({validCount} Contacts)</span>
@@ -580,15 +580,15 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
           {/* Step 3: Success Result */}
           {importStep === 3 && (
-            <div className="p-8 text-center space-y-4 bg-[#0A0F1A] rounded-lg border border-slate-800">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mx-auto">
+            <div className="p-8 text-center space-y-4 bg-white rounded border border-[#CCD2D8] shadow-xs">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-700 mx-auto">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white">Contacts Successfully Imported!</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Added <span className="font-mono text-indigo-400 font-semibold">{importResult?.count}</span> contacts to list{' '}
-                  <span className="text-white font-medium">"{importResult?.listName}"</span>.
+                <h3 className="text-base font-bold text-gray-900">Contacts Successfully Imported!</h3>
+                <p className="text-xs text-gray-600 mt-1">
+                  Added <span className="font-mono text-[#8B1A10] font-bold">{importResult?.count}</span> contacts to list{' '}
+                  <span className="text-gray-900 font-bold">"{importResult?.listName}"</span>.
                 </p>
               </div>
               <div className="flex items-center justify-center gap-3 pt-2">
@@ -597,13 +597,13 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                     setImportStep(1);
                     setImportResult(null);
                   }}
-                  className="px-3.5 py-1.5 rounded-md bg-slate-800 text-slate-300 hover:text-white text-xs"
+                  className="px-3.5 py-1.5 rounded border border-[#CCD2D8] text-gray-700 hover:text-gray-900 text-xs font-semibold"
                 >
                   Import Another File
                 </button>
                 <button
                   onClick={() => setActiveTab('contacts')}
-                  className="px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+                  className="px-4 py-1.5 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-xs font-bold shadow-xs"
                 >
                   View All Contacts
                 </button>
@@ -615,59 +615,59 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
       {/* Add Contact Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-slate-800 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl font-sans">
-            <h2 className="text-sm font-semibold text-white">Add New Contact</h2>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#CCD2D8] rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl font-sans text-gray-900">
+            <h2 className="text-sm font-bold text-gray-900 pb-2 border-b border-[#CCD2D8]">Add New Contact</h2>
             <form onSubmit={submitContact} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-400 font-medium mb-1">Email Address *</label>
+                <label className="block text-gray-700 font-bold mb-1">Email Address *</label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="contact@company.com"
-                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/60"
+                  className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded px-3 py-1.5 text-gray-900 focus:outline-none focus:border-[#8B1A10]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-400 font-medium mb-1">First Name</label>
+                  <label className="block text-gray-700 font-bold mb-1">First Name</label>
                   <input
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="John"
-                    className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/60"
+                    className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded px-3 py-1.5 text-gray-900 focus:outline-none focus:border-[#8B1A10]"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 font-medium mb-1">Last Name</label>
+                  <label className="block text-gray-700 font-bold mb-1">Last Name</label>
                   <input
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="Doe"
-                    className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/60"
+                    className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded px-3 py-1.5 text-gray-900 focus:outline-none focus:border-[#8B1A10]"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-slate-400 font-medium mb-1">Company</label>
+                <label className="block text-gray-700 font-bold mb-1">Company</label>
                 <input
                   type="text"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                   placeholder="Acme Corp"
-                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/60"
+                  className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded px-3 py-1.5 text-gray-900 focus:outline-none focus:border-[#8B1A10]"
                 />
               </div>
               <div>
-                <label className="block text-slate-400 font-medium mb-1">Assign to List</label>
+                <label className="block text-gray-700 font-bold mb-1">Assign to List</label>
                 <select
                   value={targetListId}
                   onChange={(e) => setTargetListId(e.target.value)}
-                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/60"
+                  className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded px-3 py-1.5 text-gray-900 focus:outline-none focus:border-[#8B1A10]"
                 >
                   <option value="">No list</option>
                   {lists.map((l) => (
@@ -678,18 +678,18 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 </select>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#CCD2D8]">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-3.5 py-1.5 rounded bg-slate-800 text-slate-400 hover:text-white"
+                  className="px-3.5 py-1.5 rounded border border-[#CCD2D8] text-gray-600 hover:text-gray-900 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
+                  className="px-4 py-1.5 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white font-bold shadow-xs"
                 >
                   Save Contact
                 </button>
@@ -701,43 +701,43 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
       {/* New List Modal */}
       {showListModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-slate-800 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl font-sans">
-            <h2 className="text-sm font-semibold text-white">Create Audience List</h2>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#CCD2D8] rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl font-sans text-gray-900">
+            <h2 className="text-sm font-bold text-gray-900 pb-2 border-b border-[#CCD2D8]">Create Audience List</h2>
             <form onSubmit={submitList} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-400 font-medium mb-1">List Name *</label>
+                <label className="block text-gray-700 font-bold mb-1">List Name *</label>
                 <input
                   type="text"
                   required
                   value={listName}
                   onChange={(e) => setListName(e.target.value)}
                   placeholder="e.g. VIP Newsletter Subscribers"
-                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/60"
+                  className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded px-3 py-1.5 text-gray-900 focus:outline-none focus:border-[#8B1A10]"
                 />
               </div>
               <div>
-                <label className="block text-slate-400 font-medium mb-1">Description</label>
+                <label className="block text-gray-700 font-bold mb-1">Description</label>
                 <textarea
                   rows={3}
                   value={listDesc}
                   onChange={(e) => setListDesc(e.target.value)}
                   placeholder="Describe the members in this audience..."
-                  className="w-full bg-[#0A0F1A] border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500/60"
+                  className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2.5 text-gray-900 focus:outline-none focus:border-[#8B1A10]"
                 />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#CCD2D8]">
                 <button
                   type="button"
                   onClick={() => setShowListModal(false)}
-                  className="px-3.5 py-1.5 rounded bg-slate-800 text-slate-400 hover:text-white"
+                  className="px-3.5 py-1.5 rounded border border-[#CCD2D8] text-gray-600 hover:text-gray-900 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
+                  className="px-4 py-1.5 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white font-bold shadow-xs"
                 >
                   Create List
                 </button>

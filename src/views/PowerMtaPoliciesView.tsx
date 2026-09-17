@@ -78,29 +78,29 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-gray-200">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-[#CCD2D8]">
         <div>
           <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#8cc052]" />
-            <h1 className="text-2xl font-bold text-gray-800">Email Speed Throttling &amp; ISP Policies</h1>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#8B1A10]" />
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Email Speed Throttling &amp; ISP Policies</h1>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-xs sm:text-sm text-gray-600 mt-1">
             Fine-tuned delivery rate limits, concurrent SMTP connections, and TLS enforcement for major mailbox providers.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={loadPolicies}
-            className="p-2 border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition"
+            className="p-2 border border-[#CCD2D8] rounded bg-white hover:bg-gray-100 text-gray-700 transition shadow-2xs"
             title="Refresh"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#8B1A10]' : ''}`} />
           </button>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 bg-[#8cc052] hover:bg-[#7bb342] text-white rounded text-sm font-bold flex items-center gap-1.5 shadow-sm transition"
+            className="px-4 py-1.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-xs transition"
           >
             <Plus className="w-4 h-4" />
             <span>Add Domain Policy</span>
@@ -109,98 +109,98 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
       </div>
 
       {/* Preset ISP Recommendations */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="pmta-card p-4 space-y-2 border-l-4 border-l-blue-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white border border-[#CCD2D8] p-3.5 space-y-1.5 border-t-4 border-t-[#2563EB] shadow-2xs">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-gray-800 text-sm">Gmail / Google</h4>
-            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold">Strict</span>
+            <h4 className="font-bold text-gray-900 text-xs sm:text-sm">Gmail / Google</h4>
+            <span className="text-[10px] bg-[#EFF6FF] text-[#1D4ED8] px-2 py-0.5 rounded font-mono font-bold border border-[#BFDBFE]">Strict</span>
           </div>
-          <p className="text-xs text-gray-500">Requires TLS, Max 12 connections, 120 msgs/min to avoid rate-limiting deferrals.</p>
+          <p className="text-[11px] text-gray-600">Requires TLS, Max 12 connections, 120 msgs/min to avoid rate-limiting deferrals.</p>
         </div>
-        <div className="pmta-card p-4 space-y-2 border-l-4 border-l-purple-500">
+        <div className="bg-white border border-[#CCD2D8] p-3.5 space-y-1.5 border-t-4 border-t-[#7C3AED] shadow-2xs">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-gray-800 text-sm">Yahoo / AOL</h4>
-            <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-semibold">Paced</span>
+            <h4 className="font-bold text-gray-900 text-xs sm:text-sm">Yahoo / AOL</h4>
+            <span className="text-[10px] bg-[#F5F3FF] text-[#6D28D9] px-2 py-0.5 rounded font-mono font-bold border border-[#DDD6FE]">Paced</span>
           </div>
-          <p className="text-xs text-gray-500">Low concurrency (6 conn), Max 60 msgs/min. Sensitive to sudden volume spikes.</p>
+          <p className="text-[11px] text-gray-600">Low concurrency (6 conn), Max 60 msgs/min. Sensitive to sudden volume spikes.</p>
         </div>
-        <div className="pmta-card p-4 space-y-2 border-l-4 border-l-sky-500">
+        <div className="bg-white border border-[#CCD2D8] p-3.5 space-y-1.5 border-t-4 border-t-[#0284C7] shadow-2xs">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-gray-800 text-sm">Outlook / Hotmail</h4>
-            <span className="text-xs bg-sky-50 text-sky-700 px-2 py-0.5 rounded font-semibold">Standard</span>
+            <h4 className="font-bold text-gray-900 text-xs sm:text-sm">Outlook / Hotmail</h4>
+            <span className="text-[10px] bg-[#F0F9FF] text-[#0369A1] px-2 py-0.5 rounded font-mono font-bold border border-[#BAE6FD]">Standard</span>
           </div>
-          <p className="text-xs text-gray-500">Max 10 connections, 90 msgs/min, strict SPF/DKIM alignment checks.</p>
+          <p className="text-[11px] text-gray-600">Max 10 connections, 90 msgs/min, strict SPF/DKIM alignment checks.</p>
         </div>
-        <div className="pmta-card p-4 space-y-2 border-l-4 border-l-[#8cc052]">
+        <div className="bg-white border border-[#CCD2D8] p-3.5 space-y-1.5 border-t-4 border-t-[#8B1A10] shadow-2xs">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-gray-800 text-sm">Default Wildcard (*)</h4>
-            <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded font-semibold">Active</span>
+            <h4 className="font-bold text-gray-900 text-xs sm:text-sm">Default Wildcard (*)</h4>
+            <span className="text-[10px] bg-[#FEF2F2] text-[#991B1B] px-2 py-0.5 rounded font-mono font-bold border border-[#FECACA]">Active</span>
           </div>
-          <p className="text-xs text-gray-500">Applies to all other domains. Max 200 msgs/min with automatic STARTTLS.</p>
+          <p className="text-[11px] text-gray-600">Applies to all other domains. Max 200 msgs/min with automatic STARTTLS.</p>
         </div>
       </div>
 
       {/* Policies Table */}
-      <div className="pmta-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+      <div className="bg-white border border-[#CCD2D8] shadow-2xs overflow-hidden">
+        <div className="px-4 py-3 border-b border-[#CCD2D8] bg-[#F8FAFC] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Gauge className="w-4 h-4 text-[#8cc052]" />
-            <h2 className="font-bold text-gray-800 text-base">Configured Domain Rules</h2>
+            <Gauge className="w-4 h-4 text-[#8B1A10]" />
+            <h2 className="font-bold text-gray-900 text-sm sm:text-base">Configured Domain Rules</h2>
           </div>
-          <span className="text-xs text-gray-500 font-medium">Active policies: {policies.length}</span>
+          <span className="text-xs text-gray-600 font-mono font-bold">Active policies: {policies.length}</span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-100 text-gray-700 text-xs uppercase font-semibold border-b border-gray-200">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-[#546E7A] text-white uppercase font-mono text-[10px] tracking-wider border-b border-[#37474F]">
               <tr>
-                <th className="px-6 py-3">Destination Domain</th>
-                <th className="px-6 py-3">Max Rate</th>
-                <th className="px-6 py-3">Max Concurrency</th>
-                <th className="px-6 py-3">TLS Encryption</th>
-                <th className="px-6 py-3">Retry After</th>
-                <th className="px-6 py-3">Bounce Processor</th>
-                <th className="px-6 py-3 text-right">Actions</th>
+                <th className="py-2.5 px-4">Destination Domain</th>
+                <th className="py-2.5 px-4 font-mono">Max Rate</th>
+                <th className="py-2.5 px-4 font-mono">Max Concurrency</th>
+                <th className="py-2.5 px-4">TLS Encryption</th>
+                <th className="py-2.5 px-4 font-mono">Retry After</th>
+                <th className="py-2.5 px-4">Bounce Processor</th>
+                <th className="py-2.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#E2E8F0] font-sans">
               {policies.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 font-mono font-bold text-gray-800 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#8cc052]" />
+                  <td className="py-3 px-4 font-mono font-bold text-gray-900 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#15803D]" />
                     {p.domainPattern}
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs text-gray-800 font-semibold">
+                  <td className="py-3 px-4 font-mono text-xs text-gray-900 font-bold">
                     {p.maxMsgRate}
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs">
+                  <td className="py-3 px-4 font-mono text-xs text-gray-800">
                     {p.maxConnections} connections
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="py-3 px-4">
                     <span
-                      className={`text-xs px-2.5 py-0.5 rounded font-semibold ${
+                      className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
                         p.useTls === 'required'
-                          ? 'bg-green-100 text-green-800'
+                          ? 'bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]'
                           : p.useTls === 'ifavailable'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-600'
+                          ? 'bg-[#DBEAFE] text-[#1E40AF] border border-[#BFDBFE]'
+                          : 'bg-gray-100 text-gray-700'
                       }`}
                     >
                       {p.useTls}
                     </span>
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs">
+                  <td className="py-3 px-4 font-mono text-xs text-gray-800">
                     {p.retryInterval}
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-800 font-medium">
+                  <td className="py-3 px-4">
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-800 font-mono font-bold uppercase border border-gray-200">
                       {p.bounceProcessing ? 'Enabled' : 'Disabled'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="py-3 px-4 text-right">
                     <button
                       onClick={() => handleDeletePolicy(p.id, p.domainPattern)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 rounded transition"
+                      className="p-1 text-gray-400 hover:text-rose-600 rounded transition"
                       title="Delete Policy"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -208,6 +208,13 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
                   </td>
                 </tr>
               ))}
+              {policies.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-gray-500">
+                    No domain policies configured yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -215,15 +222,15 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-800 text-base">Add Domain Policy Rule</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#CCD2D8] shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#CCD2D8] bg-gradient-to-r from-[#8B1A10] to-[#A81D14] text-white flex items-center justify-between">
+              <h3 className="font-bold text-white text-sm sm:text-base">Add Domain Policy Rule</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-white/80 hover:text-white text-lg">
                 &times;
               </button>
             </div>
-            <form onSubmit={handleSavePolicy} className="p-6 space-y-4">
+            <form onSubmit={handleSavePolicy} className="p-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Destination Domain</label>
                 <input
@@ -232,7 +239,7 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
                   placeholder="e.g. icloud.com or *.edu"
                   value={domainPattern}
                   onChange={(e) => setDomainPattern(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:border-[#8cc052]"
+                  className="w-full px-3 py-2 border border-[#CCD2D8] rounded text-xs sm:text-sm text-gray-900 focus:border-[#8B1A10] focus:outline-none"
                 />
               </div>
 
@@ -245,7 +252,7 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
                     placeholder="e.g. 100/m or 5000/h"
                     value={maxMsgRate}
                     onChange={(e) => setMaxMsgRate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:border-[#8cc052]"
+                    className="w-full px-3 py-2 border border-[#CCD2D8] rounded text-xs sm:text-sm text-gray-900 focus:border-[#8B1A10] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -255,7 +262,7 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
                     required
                     value={maxConnections}
                     onChange={(e) => setMaxConnections(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:border-[#8cc052]"
+                    className="w-full px-3 py-2 border border-[#CCD2D8] rounded text-xs sm:text-sm text-gray-900 focus:border-[#8B1A10] focus:outline-none"
                   />
                 </div>
               </div>
@@ -266,7 +273,7 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
                   <select
                     value={useTls}
                     onChange={(e: any) => setUseTls(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:border-[#8cc052]"
+                    className="w-full px-3 py-2 border border-[#CCD2D8] rounded text-xs sm:text-sm text-gray-900 focus:border-[#8B1A10] focus:outline-none"
                   >
                     <option value="required">Required (High Security)</option>
                     <option value="ifavailable">If Available (Opportunistic)</option>
@@ -279,22 +286,22 @@ export const PowerMtaPoliciesView: React.FC<PowerMtaPoliciesViewProps> = ({ auth
                     type="text"
                     value={retryInterval}
                     onChange={(e) => setRetryInterval(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:border-[#8cc052]"
+                    className="w-full px-3 py-2 border border-[#CCD2D8] rounded text-xs sm:text-sm text-gray-900 focus:border-[#8B1A10] focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-gray-100">
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-[#CCD2D8]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-100 font-semibold"
+                  className="px-4 py-1.5 border border-[#CCD2D8] rounded text-xs sm:text-sm text-gray-700 hover:bg-gray-100 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#8cc052] hover:bg-[#7bb342] text-white rounded text-sm font-bold shadow-sm"
+                  className="px-5 py-1.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded text-xs sm:text-sm font-bold shadow-xs"
                 >
                   Save Policy
                 </button>

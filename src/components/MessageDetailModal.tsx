@@ -71,27 +71,27 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 md:p-6 font-sans">
-      <div className="bg-[#111827] border border-slate-800 rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in duration-150">
-        {/* Header */}
-        <div className="p-4 md:p-5 border-b border-slate-800 flex items-center justify-between bg-[#0E1524]">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 md:p-6 font-sans">
+      <div className="bg-white border border-[#CCD2D8] rounded-none w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in duration-150">
+        {/* Header - PowerMTA Header style */}
+        <div className="p-3 sm:p-4 border-b border-[#CCD2D8] flex items-center justify-between bg-gradient-to-r from-[#8B1A10] to-[#A81D14] text-white">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+            <div className="w-8 h-8 rounded bg-black/30 border border-white/20 flex items-center justify-center text-[#FFD54F] shrink-0">
               <Server className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-white text-sm">Message Inspector</span>
+                <span className="font-bold text-white text-sm">PowerMTA Message Inspector</span>
                 <StatusBadge status={message.status} />
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 font-mono">
+              <div className="flex items-center gap-2 text-xs text-gray-200 mt-0.5 font-mono">
                 <span className="truncate">{message.messageId}</span>
                 <button
                   onClick={copyMessageId}
-                  className="hover:text-white text-slate-500 transition p-0.5"
+                  className="hover:text-white text-gray-300 transition p-0.5"
                   title="Copy Message-ID"
                 >
-                  {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedId ? <Check className="w-3.5 h-3.5 text-[#FFD54F]" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
@@ -99,78 +99,78 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            className="p-1.5 rounded hover:bg-black/30 text-white/80 hover:text-white transition"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Message Core Metadata Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-[#0A0F1A] border-b border-slate-800 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 sm:p-4 bg-[#F8FAFC] border-b border-[#CCD2D8] text-xs">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Recipient</div>
-            <div className="text-slate-200 font-mono truncate mt-0.5" title={message.toEmail}>
+            <div className="text-[10px] uppercase tracking-wider text-gray-600 font-bold">Recipient</div>
+            <div className="text-gray-900 font-mono font-semibold truncate mt-0.5" title={message.toEmail}>
               {message.toEmail}
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Sender</div>
-            <div className="text-slate-200 font-mono truncate mt-0.5" title={message.fromEmail}>
+            <div className="text-[10px] uppercase tracking-wider text-gray-600 font-bold">Sender</div>
+            <div className="text-gray-900 font-mono font-semibold truncate mt-0.5" title={message.fromEmail}>
               {message.fromEmail}
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Subject</div>
-            <div className="text-slate-200 truncate mt-0.5" title={message.subject}>
+            <div className="text-[10px] uppercase tracking-wider text-gray-600 font-bold">Subject</div>
+            <div className="text-gray-900 font-medium truncate mt-0.5" title={message.subject}>
               {message.subject || '(None)'}
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Provider ID</div>
-            <div className="text-indigo-400 font-mono text-[11px] truncate mt-0.5" title={message.providerMessageId}>
+            <div className="text-[10px] uppercase tracking-wider text-gray-600 font-bold">Provider ID</div>
+            <div className="text-[#8B1A10] font-mono font-bold text-[11px] truncate mt-0.5" title={message.providerMessageId}>
               {message.providerMessageId || message.sesMessageId || 'kumo_spool_1'}
             </div>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex border-b border-slate-800 px-5 gap-6 text-xs font-medium bg-[#0E1524]">
+        <div className="flex border-b border-[#CCD2D8] px-4 gap-2 text-xs font-bold bg-[#F1F4F7]">
           <button
             onClick={() => setActiveTab('timeline')}
-            className={`py-3 border-b-2 transition-colors ${
+            className={`py-2.5 px-3 border-b-2 transition-colors ${
               activeTab === 'timeline'
-                ? 'border-indigo-500 text-white font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#8B1A10] text-[#8B1A10]'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
             Lifecycle Timeline
           </button>
           <button
             onClick={() => setActiveTab('technical')}
-            className={`py-3 border-b-2 transition-colors ${
+            className={`py-2.5 px-3 border-b-2 transition-colors ${
               activeTab === 'technical'
-                ? 'border-indigo-500 text-white font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#8B1A10] text-[#8B1A10]'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            Technical & Diagnostics
+            Diagnostics & Terminal
           </button>
           <button
             onClick={() => setActiveTab('headers')}
-            className={`py-3 border-b-2 transition-colors ${
+            className={`py-2.5 px-3 border-b-2 transition-colors ${
               activeTab === 'headers'
-                ? 'border-indigo-500 text-white font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#8B1A10] text-[#8B1A10]'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
             MIME Headers
           </button>
           <button
             onClick={() => setActiveTab('content')}
-            className={`py-3 border-b-2 transition-colors ${
+            className={`py-2.5 px-3 border-b-2 transition-colors ${
               activeTab === 'content'
-                ? 'border-indigo-500 text-white font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#8B1A10] text-[#8B1A10]'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
             Body Preview
@@ -178,54 +178,54 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 md:p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 text-xs bg-[#F8FAFC]">
           {activeTab === 'timeline' && (
-            <div className="space-y-4">
-              <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+            <div className="space-y-4 bg-white p-4 border border-[#CCD2D8]">
+              <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#CCD2D8]">
                 {timelineEvents.map((evt, idx) => (
                   <div key={idx} className="relative group">
                     <div
-                      className={`absolute -left-6 top-1 w-3.5 h-3.5 rounded-full border-2 border-[#111827] ${
+                      className={`absolute -left-6 top-1 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs ${
                         evt.status === 'SUCCESS'
-                          ? 'bg-emerald-400'
+                          ? 'bg-emerald-600'
                           : evt.status === 'FAILED'
-                          ? 'bg-rose-500'
+                          ? 'bg-rose-600'
                           : evt.status === 'DEFERRED'
-                          ? 'bg-amber-400'
-                          : 'bg-slate-600'
+                          ? 'bg-amber-500'
+                          : 'bg-gray-400'
                       }`}
                     />
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-xs">{evt.stage}</span>
+                        <span className="font-bold text-gray-900 text-xs">{evt.stage}</span>
                         {evt.timestamp && (
-                          <span className="text-[10px] font-mono text-slate-500">
+                          <span className="text-[10px] font-mono text-gray-500">
                             {new Date(evt.timestamp).toLocaleString()}
                           </span>
                         )}
                       </div>
-                      <p className="text-slate-400 text-xs mt-0.5 font-mono">{evt.description}</p>
+                      <p className="text-gray-700 text-xs mt-0.5 font-mono">{evt.description}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
               {message.events && message.events.length > 0 && (
-                <div className="pt-4 border-t border-slate-800/80">
-                  <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 block mb-2">
+                <div className="pt-4 border-t border-[#CCD2D8]">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-gray-600 block mb-2 font-mono">
                     Raw Telemetry Events ({message.events.length})
                   </span>
                   <div className="space-y-1.5 font-mono text-[11px]">
                     {message.events.map((e, idx) => (
                       <div
                         key={idx}
-                        className="p-2 rounded bg-[#0A0F1A] border border-slate-800 flex items-center justify-between"
+                        className="p-2 bg-[#F8FAFC] border border-[#CCD2D8] flex items-center justify-between"
                       >
                         <div className="flex items-center gap-2">
                           <StatusBadge status={e.eventType} />
-                          <span className="text-slate-300">{e.timestamp}</span>
+                          <span className="text-gray-800">{e.timestamp}</span>
                         </div>
-                        {e.ipAddress && <span className="text-slate-500">{e.ipAddress}</span>}
+                        {e.ipAddress && <span className="text-gray-500">{e.ipAddress}</span>}
                       </div>
                     ))}
                   </div>
@@ -236,45 +236,45 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
 
           {activeTab === 'technical' && (
             <div className="space-y-3.5">
-              <div className="p-3.5 rounded-lg bg-[#0A0F1A] border border-slate-800 space-y-1">
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                  SMTP Transport Response
+              <div className="p-3 bg-black border border-gray-800 space-y-1 font-mono">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold block">
+                  SMTP Transport Response (PowerMTA Live Protocol Stream)
                 </span>
-                <div className="font-mono text-emerald-400 text-xs break-all mt-1">
+                <div className="text-[#00FF66] text-xs break-all mt-1">
                   {message.smtpResponse || '250 2.0.0 OK: message queued for delivery (KumoMTA)'}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg bg-[#0A0F1A] border border-slate-800 space-y-1">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                    KumoMTA Routing Engine
+                <div className="p-3 bg-white border border-[#CCD2D8] space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-600 font-bold font-mono">
+                    Routing Engine
                   </span>
-                  <div className="text-xs text-slate-300 space-y-0.5 font-mono pt-1">
-                    <div>Engine: <span className="text-indigo-400">KumoMTA Core v2026</span></div>
-                    <div>Virtual MTA: <span className="text-slate-200">default-outbound</span></div>
-                    <div>Port: <span className="text-slate-200">2525 / ESMTP</span></div>
+                  <div className="text-xs text-gray-800 space-y-0.5 font-mono pt-1">
+                    <div>Engine: <span className="text-[#8B1A10] font-bold">KumoMTA Core v2026</span></div>
+                    <div>Virtual MTA: <span className="text-gray-900 font-semibold">default-outbound</span></div>
+                    <div>Port: <span className="text-gray-900">2525 / ESMTP</span></div>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-lg bg-[#0A0F1A] border border-slate-800 space-y-1">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                <div className="p-3 bg-white border border-[#CCD2D8] space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-600 font-bold font-mono">
                     Amazon SES Upstream
                   </span>
-                  <div className="text-xs text-slate-300 space-y-0.5 font-mono pt-1">
-                    <div>SES Message ID: <span className="text-slate-200">{message.sesMessageId || 'N/A (Local MX)'}</span></div>
-                    <div>Transport: <span className="text-slate-200">{message.provider || 'Direct ESMTP'}</span></div>
+                  <div className="text-xs text-gray-800 space-y-0.5 font-mono pt-1">
+                    <div>SES ID: <span className="text-gray-900 font-semibold">{message.sesMessageId || 'N/A (Direct MX)'}</span></div>
+                    <div>Transport: <span className="text-gray-900">{message.provider || 'Direct ESMTP'}</span></div>
                   </div>
                 </div>
               </div>
 
               {message.bounceReason && (
-                <div className="p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/20 space-y-1">
-                  <span className="text-[10px] uppercase tracking-wider text-rose-400 font-semibold flex items-center gap-1.5">
+                <div className="p-3 bg-rose-50 border border-rose-300 space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-rose-800 font-bold flex items-center gap-1.5 font-mono">
                     <AlertTriangle className="w-3.5 h-3.5" />
                     Bounce Diagnostic
                   </span>
-                  <div className="font-mono text-rose-300 text-xs break-all mt-1">
+                  <div className="font-mono text-rose-900 text-xs break-all mt-1">
                     {message.bounceReason}
                   </div>
                 </div>
@@ -283,7 +283,7 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
           )}
 
           {activeTab === 'headers' && (
-            <div className="p-3.5 rounded-lg bg-[#0A0F1A] border border-slate-800 font-mono text-[11px] text-slate-300 space-y-1 max-h-80 overflow-y-auto">
+            <div className="p-3.5 bg-black border border-gray-800 font-mono text-[11px] text-[#00FF66] space-y-1 max-h-80 overflow-y-auto">
               <div>Message-ID: &lt;{message.messageId}&gt;</div>
               <div>Date: {message.createdAt || message.queuedAt}</div>
               <div>From: {message.fromName ? `"${message.fromName}" <${message.fromEmail}>` : message.fromEmail}</div>
@@ -301,13 +301,13 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
 
           {activeTab === 'content' && (
             <div className="space-y-3">
-              <div className="p-4 rounded-lg bg-white text-slate-900 border border-slate-300 min-h-[160px] max-h-96 overflow-y-auto">
+              <div className="p-4 bg-white text-gray-900 border border-[#CCD2D8] min-h-[160px] max-h-96 overflow-y-auto">
                 {message.htmlBody ? (
                   <div dangerouslySetInnerHTML={{ __html: message.htmlBody }} />
                 ) : message.plainText ? (
                   <pre className="font-sans whitespace-pre-wrap">{message.plainText}</pre>
                 ) : (
-                  <p className="text-slate-400 italic">No email body captured.</p>
+                  <p className="text-gray-500 italic">No email body captured.</p>
                 )}
               </div>
             </div>
@@ -315,11 +315,11 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({ message,
         </div>
 
         {/* Footer */}
-        <div className="p-3.5 px-5 bg-[#0A0F1A] border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <span>Security: TLS 1.3 encrypted spool connection</span>
+        <div className="p-3 px-5 bg-white border-t border-[#CCD2D8] flex items-center justify-between text-xs text-gray-600">
+          <span className="font-mono text-[11px]">Security: TLS 1.3 encrypted spool connection</span>
           <button
             onClick={onClose}
-            className="px-3.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition"
+            className="px-4 py-1.5 rounded bg-[#37474F] hover:bg-[#263238] text-white font-bold transition shadow-xs"
           >
             Close Inspector
           </button>

@@ -525,28 +525,28 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-[1750px] mx-auto space-y-5 text-zinc-100">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="p-4 md:p-6 max-w-[1750px] mx-auto space-y-5 text-gray-900 font-sans">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-[#CCD2D8]">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">Compose Email</h1>
-            <span className="text-[10px] uppercase tracking-widest px-2 py-1 rounded border border-[#28303a] bg-[#101318] text-zinc-500">KumoMTA</span>
+            <h1 className="text-2xl font-bold text-gray-900">Compose Email</h1>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border border-[#CCD2D8] bg-[#F1F5F9] text-gray-700">PowerMTA / Kumo</span>
           </div>
-          <p className="text-xs text-zinc-500 mt-1">Production composer · reusable templates · personalization · tracking</p>
+          <p className="text-xs text-gray-600 mt-1">Production composer · reusable templates · personalization · live tracking</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setShowTest(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-slate-700/60 bg-[#162032] hover:bg-slate-800 text-xs text-slate-300 hover:text-white transition"
+            className="flex items-center gap-1.5 px-3 py-2 rounded border border-[#CCD2D8] bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700 shadow-xs transition"
           >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
             <span>Send Test</span>
           </button>
           <button
             form="email-composer"
             disabled={sending || !fromEmail || !to.trim() || !subject.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition disabled:opacity-40"
+            className="flex items-center gap-1.5 px-4 py-2 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-xs font-bold shadow-xs transition disabled:opacity-40 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
             <span>{sending ? 'Dispatching...' : 'Send Email'}</span>
@@ -554,46 +554,57 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
         </div>
       </div>
 
-      {senders.length === 0 && <div className="rounded-lg border border-amber-900/60 bg-amber-950/30 p-4 text-xs text-amber-200">No verified sender is available. Add and verify a sender before dispatching.</div>}
+      {senders.length === 0 && <div className="rounded border border-amber-300 bg-amber-50 p-4 text-xs font-medium text-amber-900">No verified sender is available. Add and verify a sender before dispatching.</div>}
 
-      <div className="bg-[#101216] border border-[#242832] rounded-lg p-4 flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[240px]"><label className="text-[10px] uppercase tracking-wider text-zinc-600">Template</label><select value={templateId} onChange={e => loadTemplate(e.target.value)} className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs"><option value="">Start from scratch</option>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-        <div className="flex-1 min-w-[180px]"><label className="text-[10px] uppercase tracking-wider text-zinc-600">Template name</label><input value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Monthly newsletter" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs" /></div>
-        <button type="button" onClick={saveTemplate} disabled={templateBusy || !templateName.trim()} className="px-3 py-2.5 rounded-md bg-[#191d24] border border-[#303641] text-xs disabled:opacity-40">{templateBusy ? 'Saving…' : templateId ? 'Update template' : 'Save template'}</button>
-        {templateId && <button type="button" onClick={deleteTemplate} disabled={templateBusy} className="px-3 py-2.5 rounded-md border border-red-900/60 text-red-300 text-xs"><Trash2 className="w-3.5 h-3.5 inline mr-1" />Delete</button>}
+      <div className="bg-white border border-[#CCD2D8] rounded shadow-xs p-4 flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-[240px]">
+          <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Template</label>
+          <select value={templateId} onChange={e => loadTemplate(e.target.value)} className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs text-gray-900">
+            <option value="">Start from scratch</option>
+            {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[180px]">
+          <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Template name</label>
+          <input value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Monthly newsletter" className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs text-gray-900" />
+        </div>
+        <button type="button" onClick={saveTemplate} disabled={templateBusy || !templateName.trim()} className="px-3 py-2 rounded bg-[#F1F5F9] hover:bg-[#E2E8F0] border border-[#CCD2D8] text-xs font-semibold text-gray-800 disabled:opacity-40">
+          {templateBusy ? 'Saving…' : templateId ? 'Update template' : 'Save template'}
+        </button>
+        {templateId && <button type="button" onClick={deleteTemplate} disabled={templateBusy} className="px-3 py-2 rounded border border-red-300 bg-red-50 text-red-700 text-xs font-semibold"><Trash2 className="w-3.5 h-3.5 inline mr-1" />Delete</button>}
       </div>
 
       {/* Deliverability & Inbox Placement Shield */}
-      <div className="bg-[#0e1116] border border-[#232832] rounded-lg p-4 space-y-3 shadow-lg">
+      <div className="bg-white border border-[#CCD2D8] rounded shadow-xs p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3.5">
             <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center font-bold shrink-0 transition-all ${
               deliverabilityAnalysis.score >= 90
-                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
                 : deliverabilityAnalysis.score >= 70
-                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                : 'bg-rose-50 text-rose-800 border border-rose-300'
             }`}>
               <span className="text-base leading-none">{deliverabilityAnalysis.score}%</span>
               <span className="text-[9px] uppercase tracking-tight font-medium opacity-80 mt-0.5">Inbox</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  Inbox Placement & Anti-Spam Guard
+                <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  Inbox Placement &amp; Anti-Spam Guard
                 </span>
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   deliverabilityAnalysis.score >= 90
-                    ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/60'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                     : deliverabilityAnalysis.score >= 70
-                    ? 'bg-amber-950/70 text-amber-300 border border-amber-800/60'
-                    : 'bg-rose-950/70 text-rose-300 border border-rose-800/60'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : 'bg-rose-100 text-rose-800 border border-rose-300'
                 }`}>
                   {deliverabilityAnalysis.score >= 90 ? 'High Inbox Placement Confidence' : deliverabilityAnalysis.score >= 70 ? 'Moderate Deliverability' : 'Spam Filter Risk'}
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-400 mt-0.5">
+              <p className="text-[11px] text-gray-600 mt-0.5">
                 Evaluates DKIM (kumo2026), SPF, RFC 8058 One-Click List-Unsubscribe, multipart sync, and spam trigger score.
               </p>
             </div>
@@ -603,15 +614,15 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
             <button
               type="button"
               onClick={autoOptimizeForInbox}
-              className="px-3.5 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+              className="px-3.5 py-2 rounded bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
             >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
               <span>{justOptimized ? 'Optimized for Inbox!' : '⚡ Optimize for Inbox'}</span>
             </button>
             <button
               type="button"
               onClick={() => setShowDeliverabilityDetails(!showDeliverabilityDetails)}
-              className="px-3 py-2 rounded-md border border-[#292e37] bg-[#14171d] text-zinc-300 text-xs flex items-center gap-1.5 hover:text-white transition-colors"
+              className="px-3 py-2 rounded border border-[#CCD2D8] bg-[#F8FAFC] text-gray-700 text-xs font-medium flex items-center gap-1.5 hover:bg-gray-100 transition"
             >
               <span>{showDeliverabilityDetails ? 'Hide Details' : 'Deliverability Audit'}</span>
               {showDeliverabilityDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -620,23 +631,23 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
         </div>
 
         {showDeliverabilityDetails && (
-          <div className="pt-3 border-t border-[#1f242d] space-y-3">
+          <div className="pt-3 border-t border-[#CCD2D8] space-y-3">
             {deliverabilityAnalysis.issues.length > 0 && (
               <div className="space-y-1.5">
-                <div className="text-[10px] uppercase font-semibold text-zinc-400 tracking-wider">Recommended Adjustments</div>
+                <div className="text-[10px] uppercase font-bold text-gray-700 tracking-wider">Recommended Adjustments</div>
                 {deliverabilityAnalysis.issues.map((iss, i) => (
-                  <div key={i} className={`flex items-start justify-between gap-3 p-2.5 rounded-md text-xs border ${
-                    iss.type === 'critical' ? 'bg-rose-950/25 border-rose-900/60 text-rose-200' : iss.type === 'warning' ? 'bg-amber-950/25 border-amber-900/60 text-amber-200' : 'bg-blue-950/25 border-blue-900/60 text-blue-200'
+                  <div key={i} className={`flex items-start justify-between gap-3 p-2.5 rounded text-xs border ${
+                    iss.type === 'critical' ? 'bg-rose-50 border-rose-300 text-rose-900' : iss.type === 'warning' ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-blue-50 border-blue-300 text-blue-900'
                   }`}>
                     <div className="flex items-start gap-2">
-                      {iss.type === 'critical' ? <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" /> : <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />}
+                      {iss.type === 'critical' ? <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" /> : <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />}
                       <span>{iss.text}</span>
                     </div>
                     {iss.fix && (
                       <button
                         type="button"
                         onClick={iss.fix}
-                        className="shrink-0 px-2.5 py-1 rounded bg-white/15 hover:bg-white/25 text-white text-[11px] font-semibold transition-colors"
+                        className="shrink-0 px-2.5 py-1 rounded bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 text-[11px] font-bold transition"
                       >
                         {iss.fixLabel || 'Fix'}
                       </button>
@@ -647,11 +658,11 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
             )}
 
             <div className="space-y-1.5">
-              <div className="text-[10px] uppercase font-semibold text-zinc-500 tracking-wider">Passing Inbox Signals</div>
+              <div className="text-[10px] uppercase font-bold text-gray-700 tracking-wider">Passing Inbox Signals</div>
               <div className="grid md:grid-cols-2 gap-2">
                 {deliverabilityAnalysis.passes.map((pass, i) => (
-                  <div key={i} className="flex items-center gap-2 p-2 rounded bg-[#07090c] border border-[#1b1f28] text-xs text-zinc-300">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <div key={i} className="flex items-center gap-2 p-2 rounded bg-[#F8FAFC] border border-[#CCD2D8] text-xs text-gray-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span className="truncate">{pass}</span>
                   </div>
                 ))}
@@ -663,36 +674,36 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
 
       <form id="email-composer" onSubmit={submit} className="grid xl:grid-cols-[minmax(0,1.35fr)_minmax(420px,.9fr)] gap-5">
         <div className="space-y-4">
-          <section className="bg-[#101216] border border-[#242832] rounded-lg p-5 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold flex items-center gap-2"><UserCheck className="w-4 h-4" />Sender & recipients</h2>
-              <span className="text-[10px] text-zinc-500">Auto-filled from verified domain, fully customizable</span>
+          <section className="bg-white border border-[#CCD2D8] rounded shadow-xs p-5 space-y-4">
+            <div className="flex items-center justify-between gap-3 pb-2 border-b border-[#CCD2D8]">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2"><UserCheck className="w-4 h-4 text-[#8B1A10]" />Sender &amp; recipients</h2>
+              <span className="text-[11px] text-gray-500">Auto-filled from verified domain, fully customizable</span>
             </div>
 
             <div className="grid md:grid-cols-2 gap-3">
-              <label className="text-[11px] text-zinc-500">
+              <label className="text-xs font-semibold text-gray-700">
                 <span>Verified sender profile</span>
-                <select value={senderId} onChange={e => selectSender(e.target.value)} className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-200 focus:border-zinc-500 outline-none">
+                <select value={senderId} onChange={e => selectSender(e.target.value)} className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs text-gray-900 focus:border-[#8B1A10] outline-none">
                   <option value="">Custom identity / None</option>
                   {senders.map(s => <option key={s.id} value={s.id}>{s.name || s.fromEmail} · {s.fromEmail}</option>)}
                 </select>
               </label>
-              <label className="text-[11px] text-zinc-500">
+              <label className="text-xs font-semibold text-gray-700">
                 <span className="flex items-center justify-between">
                   <span>From name (editable)</span>
-                  <span className="text-[10px] text-emerald-400 font-mono">Dynamic</span>
+                  <span className="text-[10px] text-emerald-700 font-mono">Dynamic</span>
                 </span>
                 <input
                   value={fromName}
                   onChange={e => setFromName(e.target.value)}
                   placeholder="e.g. Acme Notifications or John Doe"
-                  className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100 focus:border-zinc-400 outline-none transition-colors"
+                  className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs text-gray-900 focus:border-[#8B1A10] outline-none transition-colors"
                 />
               </label>
-              <label className="text-[11px] text-zinc-500">
+              <label className="text-xs font-semibold text-gray-700">
                 <span className="flex items-center justify-between">
                   <span>From email address (editable)</span>
-                  <span className="text-[10px] text-emerald-400 font-mono">Dynamic</span>
+                  <span className="text-[10px] text-emerald-700 font-mono">Dynamic</span>
                 </span>
                 <input
                   type="email"
@@ -700,55 +711,55 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                   value={fromEmail}
                   onChange={e => setFromEmail(e.target.value)}
                   placeholder="hello@yourdomain.com"
-                  className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100 font-mono focus:border-zinc-400 outline-none transition-colors"
+                  className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs text-gray-900 font-mono focus:border-[#8B1A10] outline-none transition-colors"
                 />
               </label>
-              <label className="text-[11px] text-zinc-500">
+              <label className="text-xs font-semibold text-gray-700">
                 <span>Reply-To address (optional)</span>
                 <input
                   type="email"
                   value={replyTo}
                   onChange={e => setReplyTo(e.target.value)}
                   placeholder="support@yourdomain.com"
-                  className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100 font-mono focus:border-zinc-400 outline-none"
+                  className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs text-gray-900 font-mono focus:border-[#8B1A10] outline-none"
                 />
               </label>
             </div>
 
-            <div className="rounded-md border border-[#252a33] bg-[#0b0d10] p-3 space-y-3">
+            <div className="rounded border border-[#CCD2D8] bg-[#F8FAFC] p-3 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />Audience & Contacts</div>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">Select a contact list or paste an email list directly.</p>
+                  <div className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-[#8B1A10]" />Audience &amp; Contacts</div>
+                  <p className="text-[11px] text-gray-600 mt-0.5">Select a contact list or paste an email list directly.</p>
                 </div>
-                {audienceListId && <span className="text-[10px] font-mono text-zinc-400">{audienceContacts.length} contacts loaded</span>}
+                {audienceListId && <span className="text-[11px] font-mono text-gray-700 font-semibold">{audienceContacts.length} contacts loaded</span>}
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
-                <select value={audienceListId} onChange={e => loadAudience(e.target.value)} disabled={audienceLoading} className="flex-1 bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-300">
+                <select value={audienceListId} onChange={e => loadAudience(e.target.value)} disabled={audienceLoading} className="flex-1 bg-white border border-[#CCD2D8] rounded p-2 text-xs text-gray-900">
                   <option value="">Manual recipients / custom paste</option>
                   {lists.map(l => <option key={l.id} value={l.id}>{l.name} · {l.memberCount} contacts</option>)}
                 </select>
-                <button type="button" onClick={loadLists} className="px-3 py-2 rounded-md border border-[#292e37] bg-[#111419] text-[10px] text-zinc-400 hover:text-white">Refresh lists</button>
+                <button type="button" onClick={loadLists} className="px-3 py-2 rounded border border-[#CCD2D8] bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700">Refresh lists</button>
               </div>
-              {audienceLoading && <p className="text-[10px] text-zinc-500">Loading selected audience…</p>}
-              {audienceError && <p className="text-[10px] text-red-300">{audienceError}</p>}
+              {audienceLoading && <p className="text-xs text-gray-500">Loading selected audience…</p>}
+              {audienceError && <p className="text-xs text-red-600">{audienceError}</p>}
               {audienceListId && !audienceLoading && !audienceError && (
-                <div className="flex flex-wrap gap-2 text-[10px] text-zinc-400">
-                  <span className="px-2 py-1 rounded bg-[#15181e] border border-[#252a33]">{audienceContacts.length} recipients</span>
-                  <span className="px-2 py-1 rounded bg-[#15181e] border border-[#252a33]">Variables available for personalization</span>
+                <div className="flex flex-wrap gap-2 text-xs text-gray-700">
+                  <span className="px-2 py-0.5 rounded bg-white border border-[#CCD2D8]">{audienceContacts.length} recipients</span>
+                  <span className="px-2 py-0.5 rounded bg-white border border-[#CCD2D8]">Variables available for personalization</span>
                 </div>
               )}
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-zinc-400 font-medium">Recipients (To)</span>
+                <span className="text-xs text-gray-800 font-bold">Recipients (To)</span>
                 <button
                   type="button"
                   onClick={() => setShowBatchRecipients(true)}
-                  className="text-[10px] text-zinc-300 hover:text-white flex items-center gap-1 bg-[#181c24] hover:bg-[#222834] px-2 py-0.5 rounded border border-[#2c3240] transition-colors"
+                  className="text-xs font-semibold text-gray-700 hover:text-gray-900 flex items-center gap-1 bg-white hover:bg-gray-50 px-2 py-1 rounded border border-[#CCD2D8] shadow-xs transition"
                 >
-                  <ClipboardList className="w-3 h-3" />
+                  <ClipboardList className="w-3.5 h-3.5 text-[#8B1A10]" />
                   <span>Paste / Copy-Paste bulk emails</span>
                 </button>
               </div>
@@ -757,62 +768,62 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                 value={to}
                 onChange={e => { setAudienceListId(''); setAudienceContacts(contacts); setTo(e.target.value); }}
                 placeholder="recipient1@example.com, recipient2@example.com, user@domain.com"
-                className="w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100 font-mono placeholder:text-zinc-600 focus:border-zinc-400 outline-none"
+                className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2.5 text-xs text-gray-900 font-mono placeholder:text-gray-400 focus:border-[#8B1A10] outline-none"
               />
-              <p className="text-[10px] text-zinc-600 mt-1">Comma-separated emails. You can paste thousands of addresses at once using the bulk paste button.</p>
+              <p className="text-[11px] text-gray-500 mt-1">Comma-separated emails. You can paste thousands of addresses at once using the bulk paste button.</p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-3">
-              <label className="text-[11px] text-zinc-500">
+              <label className="text-xs font-semibold text-gray-700">
                 <span>CC (Optional)</span>
-                <input value={cc} onChange={e => setCc(e.target.value)} placeholder="cc@example.com" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs font-mono" />
+                <input value={cc} onChange={e => setCc(e.target.value)} placeholder="cc@example.com" className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs font-mono text-gray-900" />
               </label>
-              <label className="text-[11px] text-zinc-500">
+              <label className="text-xs font-semibold text-gray-700">
                 <span>BCC (Optional)</span>
-                <input value={bcc} onChange={e => setBcc(e.target.value)} placeholder="bcc@example.com" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs font-mono" />
+                <input value={bcc} onChange={e => setBcc(e.target.value)} placeholder="bcc@example.com" className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs font-mono text-gray-900" />
               </label>
             </div>
           </section>
 
-          <section className="bg-[#101216] border border-[#242832] rounded-lg p-5 space-y-3">
-            <h2 className="text-sm font-semibold flex items-center gap-2"><Mail className="w-4 h-4" />Envelope metadata & Headers</h2>
-            <label className="block text-[11px] text-zinc-500">
+          <section className="bg-white border border-[#CCD2D8] rounded shadow-xs p-5 space-y-3">
+            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2 pb-2 border-b border-[#CCD2D8]"><Mail className="w-4 h-4 text-[#8B1A10]" />Envelope metadata &amp; Headers</h2>
+            <label className="block text-xs font-semibold text-gray-700">
               <span>Subject</span>
-              <input required value={subject} onChange={e => setSubject(e.target.value)} placeholder="Your email subject" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100" />
+              <input required value={subject} onChange={e => setSubject(e.target.value)} placeholder="Your email subject" className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2.5 text-xs text-gray-900 focus:border-[#8B1A10] outline-none" />
             </label>
-            <label className="block text-[11px] text-zinc-500">
+            <label className="block text-xs font-semibold text-gray-700">
               <span>Preheader (Inbox preview text)</span>
-              <input value={preheader} onChange={e => setPreheader(e.target.value)} placeholder="Summary preview shown before opening email" className="mt-1 w-full bg-[#080a0d] border border-[#292e37] rounded-md p-2.5 text-xs text-zinc-100" />
+              <input value={preheader} onChange={e => setPreheader(e.target.value)} placeholder="Summary preview shown before opening email" className="mt-1 w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2.5 text-xs text-gray-900 focus:border-[#8B1A10] outline-none" />
             </label>
 
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <span className="text-[11px] text-zinc-400 font-medium">Custom SMTP / MIME Headers</span>
-                  <p className="text-[10px] text-zinc-600">Extra headers injected into RFC 822 email transmission (e.g. X-Entity-Ref-ID, Reply-To, Priority)</p>
+                  <span className="text-xs font-bold text-gray-800">Custom SMTP / MIME Headers</span>
+                  <p className="text-[11px] text-gray-500">Extra headers injected into RFC 822 email transmission (e.g. X-Entity-Ref-ID, Reply-To, Priority)</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setShowBatchHeaders(true)}
-                    className="text-[10px] text-zinc-300 hover:text-white flex items-center gap-1 bg-[#181c24] hover:bg-[#222834] px-2 py-1 rounded border border-[#2c3240] transition-colors"
+                    className="text-xs font-semibold text-gray-700 hover:text-gray-900 flex items-center gap-1 bg-white hover:bg-gray-50 px-2.5 py-1 rounded border border-[#CCD2D8] shadow-xs transition"
                   >
-                    <ClipboardList className="w-3 h-3" />
+                    <ClipboardList className="w-3.5 h-3.5 text-[#8B1A10]" />
                     <span>Paste Raw Headers</span>
                   </button>
                   <button
                     type="button"
                     onClick={addHeader}
-                    className="text-[10px] text-zinc-300 hover:text-white flex items-center gap-1 bg-[#181c24] hover:bg-[#222834] px-2 py-1 rounded border border-[#2c3240] transition-colors"
+                    className="text-xs font-semibold text-gray-700 hover:text-gray-900 flex items-center gap-1 bg-white hover:bg-gray-50 px-2.5 py-1 rounded border border-[#CCD2D8] shadow-xs transition"
                   >
-                    <Plus className="w-3 h-3" />
+                    <Plus className="w-3.5 h-3.5 text-[#8B1A10]" />
                     <span>Add Header</span>
                   </button>
                 </div>
               </div>
 
               {headers.length === 0 ? (
-                <div className="rounded-md border border-dashed border-[#262a33] p-3 text-center text-[11px] text-zinc-600">
+                <div className="rounded border border-dashed border-[#CCD2D8] bg-[#F8FAFC] p-3 text-center text-xs text-gray-500">
                   No custom headers configured. Click "Add Header" or "Paste Raw Headers" to inject custom headers.
                 </div>
               ) : (
@@ -822,18 +833,18 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                       value={h.key}
                       onChange={e => updateHeader(i, 'key', e.target.value)}
                       placeholder="Header-Name (e.g. X-Campaign-ID)"
-                      className="flex-1 bg-[#080a0d] border border-[#292e37] rounded-md p-2 text-xs font-mono text-zinc-200"
+                      className="flex-1 bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs font-mono text-gray-900"
                     />
                     <input
                       value={h.value}
                       onChange={e => updateHeader(i, 'value', e.target.value)}
                       placeholder="Header Value"
-                      className="flex-[1.5] bg-[#080a0d] border border-[#292e37] rounded-md p-2 text-xs font-mono text-zinc-200"
+                      className="flex-[1.5] bg-[#F8FAFC] border border-[#CCD2D8] rounded p-2 text-xs font-mono text-gray-900"
                     />
                     <button
                       type="button"
                       onClick={() => setHeaders(v => v.filter((_, n) => n !== i))}
-                      className="p-2 text-zinc-600 hover:text-red-300 rounded hover:bg-red-950/30 transition-colors"
+                      className="p-2 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -843,10 +854,10 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
             </div>
           </section>
 
-          <section className="bg-[#101216] border border-[#242832] rounded-lg p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Code2 className="w-4 h-4" />
+          <section className="bg-white border border-[#CCD2D8] rounded shadow-xs p-5">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#CCD2D8]">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Code2 className="w-4 h-4 text-[#8B1A10]" />
                 <span>HTML source editor</span>
               </h2>
               <div className="flex gap-1">
@@ -855,7 +866,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                     key={key}
                     type="button"
                     onClick={() => setEditor(key)}
-                    className={`px-3 py-1.5 rounded text-[10px] font-medium transition-colors ${editor === key ? 'bg-white text-black font-semibold shadow-xs' : 'bg-[#171a20] text-zinc-400 hover:text-zinc-200'}`}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition ${editor === key ? 'bg-[#8B1A10] text-white shadow-xs' : 'bg-[#F1F5F9] text-gray-700 hover:bg-[#E2E8F0]'}`}
                   >
                     {label}
                   </button>
@@ -865,15 +876,15 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
 
             {editor === 'head' && (
               <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0d0f13] border border-[#222731] rounded-md px-3 py-2">
-                  <div className="text-[11px] text-zinc-400">
-                    <span className="font-semibold text-zinc-300">HTML &lt;head&gt; / Terminal Header:</span> Meta tags, styling, font declarations, and document definitions.
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#F8FAFC] border border-[#CCD2D8] rounded px-3 py-2">
+                  <div className="text-xs text-gray-700">
+                    <span className="font-bold text-gray-900">HTML &lt;head&gt; / Terminal Header:</span> Meta tags, styling, font declarations, and document definitions.
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setHeadHtml('<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<meta http-equiv="X-UA-Compatible" content="IE=edge">\n<title></title>\n<style>\n  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }\n  table { border-collapse: collapse; }\n  img { border: 0; outline: none; text-decoration: none; }\n</style>')}
-                      className="text-[10px] text-zinc-300 hover:text-white px-2 py-1 rounded bg-[#1c212a] border border-[#2c3240] transition-colors"
+                      className="text-xs font-semibold text-gray-700 hover:text-gray-900 px-2 py-1 rounded bg-white border border-[#CCD2D8] transition"
                     >
                       Reset Standard &lt;head&gt;
                     </button>
@@ -887,9 +898,9 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                           /* clipboard api fallback */
                         }
                       }}
-                      className="text-[10px] text-zinc-300 hover:text-white flex items-center gap-1 px-2 py-1 rounded bg-[#1c212a] border border-[#2c3240] transition-colors"
+                      className="text-xs font-semibold text-gray-700 hover:text-gray-900 flex items-center gap-1 px-2 py-1 rounded bg-white border border-[#CCD2D8] transition"
                     >
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-3.5 h-3.5" />
                       <span>Paste Clipboard</span>
                     </button>
                   </div>
@@ -899,19 +910,19 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                   onChange={e => setHeadHtml(e.target.value)}
                   spellCheck={false}
                   placeholder={`<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>body { font-family: sans-serif; }</style>`}
-                  className="w-full min-h-[300px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5 text-zinc-200 outline-none focus:border-zinc-500"
+                  className="w-full min-h-[300px] bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 font-mono text-xs leading-5 text-gray-900 outline-none focus:border-[#8B1A10]"
                 />
               </div>
             )}
 
             {editor === 'body' && (
               <>
-                <p className="text-[10px] text-zinc-500 mb-2">HTML Body markup. You can use standard tables, inline styles, or personalizing tags below.</p>
+                <p className="text-xs text-gray-600 mb-2">HTML Body markup. You can use standard tables, inline styles, or personalizing tags below.</p>
                 <textarea
                   value={htmlBody}
                   onChange={e => setHtmlBody(e.target.value)}
                   spellCheck={false}
-                  className="w-full min-h-[430px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5 text-zinc-200 outline-none focus:border-zinc-500"
+                  className="w-full min-h-[430px] bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 font-mono text-xs leading-5 text-gray-900 outline-none focus:border-[#8B1A10]"
                   placeholder="<table>…</table>"
                 />
               </>
@@ -922,19 +933,19 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                 value={plainText}
                 onChange={e => setPlainText(e.target.value)}
                 spellCheck={false}
-                className="w-full min-h-[430px] bg-[#080a0d] border border-[#292e37] rounded-md p-4 font-mono text-xs leading-5 text-zinc-200 outline-none focus:border-zinc-500"
+                className="w-full min-h-[430px] bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 font-mono text-xs leading-5 text-gray-900 outline-none focus:border-[#8B1A10]"
                 placeholder="Plain-text fallback for non-HTML email readers…"
               />
             )}
 
-            <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-[#1e222b]">
-              <span className="text-[10px] text-zinc-500 mr-1">Insert variable:</span>
+            <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-[#CCD2D8]">
+              <span className="text-xs font-bold text-gray-700 mr-1">Insert variable:</span>
               {vars.map(v => (
                 <button
                   type="button"
                   key={v}
                   onClick={() => insert(v)}
-                  className="px-2 py-1 rounded bg-[#171a20] border border-[#292e37] text-[10px] font-mono text-zinc-300 hover:text-white hover:border-zinc-400 transition-colors"
+                  className="px-2 py-0.5 rounded bg-[#F1F5F9] border border-[#CCD2D8] text-xs font-mono text-gray-800 hover:bg-[#E2E8F0] transition"
                 >
                   {'{{' + v + '}}'}
                 </button>
@@ -942,61 +953,99 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
             </div>
           </section>
 
-          <section className="bg-[#101216] border border-[#242832] rounded-lg p-5"><h2 className="text-sm font-semibold mb-3 flex items-center gap-2"><MousePointerClick className="w-4 h-4" />Delivery & tracking</h2><div className="grid md:grid-cols-3 gap-3">{[[marketing, 'Marketing / bulk message', setMarketing], [openTracking, 'Open tracking', setOpenTracking], [clickTracking, 'Click tracking', setClickTracking]].map(([checked, label, setter]: any) => <label key={String(label)} className="flex items-center justify-between p-3 rounded-md bg-[#0a0c0f] border border-[#22262e] text-xs text-zinc-400"><span>{label}</span><input type="checkbox" checked={checked} onChange={e => setter(e.target.checked)} className="w-4 h-4" /></label>)}</div><p className="text-[10px] text-zinc-600 mt-3">Marketing mode triggers server-side unsubscribe/List-Unsubscribe handling and compliance validation.</p></section>
+          <section className="bg-white border border-[#CCD2D8] rounded shadow-xs p-5">
+            <h2 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2 pb-2 border-b border-[#CCD2D8]"><MousePointerClick className="w-4 h-4 text-[#8B1A10]" />Delivery &amp; tracking</h2>
+            <div className="grid md:grid-cols-3 gap-3">
+              {[[marketing, 'Marketing / bulk message', setMarketing], [openTracking, 'Open tracking', setOpenTracking], [clickTracking, 'Click tracking', setClickTracking]].map(([checked, label, setter]: any) => (
+                <label key={String(label)} className="flex items-center justify-between p-3 rounded bg-[#F8FAFC] border border-[#CCD2D8] text-xs font-semibold text-gray-800 cursor-pointer">
+                  <span>{label}</span>
+                  <input type="checkbox" checked={checked} onChange={e => setter(e.target.checked)} className="w-4 h-4 accent-[#8B1A10]" />
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-3">Marketing mode triggers server-side unsubscribe/List-Unsubscribe handling and compliance validation.</p>
+          </section>
         </div>
 
-        <aside><section className="bg-[#101216] border border-[#242832] rounded-lg overflow-hidden sticky top-4"><div className="p-4 border-b border-[#242832] flex items-center justify-between"><div><h2 className="text-sm font-semibold flex items-center gap-2"><Eye className="w-4 h-4" />Live preview</h2><p className="text-[10px] text-zinc-600 mt-1">Rendered with selected contact values</p></div><div className="flex gap-1"><button type="button" onClick={() => setPreview('desktop')} className={`p-2 rounded ${preview === 'desktop' ? 'bg-white text-black' : 'bg-[#171a20] text-zinc-500'}`}><Monitor className="w-3.5 h-3.5" /></button><button type="button" onClick={() => setPreview('mobile')} className={`p-2 rounded ${preview === 'mobile' ? 'bg-white text-black' : 'bg-[#171a20] text-zinc-500'}`}><Smartphone className="w-3.5 h-3.5" /></button></div></div><div className="p-3 bg-[#090b0e]"><select value={contactId} onChange={e => setContactId(e.target.value)} className="w-full bg-[#101318] border border-[#292e37] rounded-md p-2 text-[10px] text-zinc-300 mb-3"><option value="">Preview fallback values</option>{audienceContacts.map(c => <option key={c.id} value={c.id}>{c.email}{c.company ? ` · ${c.company}` : ''}</option>)}</select><div className={`${preview === 'mobile' ? 'max-w-[390px]' : 'w-full'} mx-auto bg-white rounded-sm overflow-hidden`}><div className="px-4 py-3 border-b text-black"><div className="text-[10px] text-zinc-500">{fromName || fromEmail || 'From'} · Preview</div><div className="text-sm font-semibold mt-1">{previewSubject || 'Subject preview'}</div><div className="text-[10px] text-zinc-500 mt-1">{preheader || 'Preheader preview'}</div></div><iframe title="email-preview" sandbox="allow-same-origin" srcDoc={`<!doctype html><html><head>${headHtml}</head><body style="margin:0">${previewBody}</body></html>`} className="w-full h-[600px] border-0" /></div></div></section></aside>
+        <aside>
+          <section className="bg-white border border-[#CCD2D8] rounded shadow-xs overflow-hidden sticky top-4">
+            <div className="p-3.5 bg-[#F2F4F7] border-b border-[#CCD2D8] flex items-center justify-between">
+              <div>
+                <h2 className="text-xs font-bold text-gray-900 flex items-center gap-2"><Eye className="w-3.5 h-3.5 text-[#8B1A10]" />Live preview</h2>
+                <p className="text-[11px] text-gray-500 mt-0.5">Rendered with selected contact values</p>
+              </div>
+              <div className="flex gap-1">
+                <button type="button" onClick={() => setPreview('desktop')} className={`p-1.5 rounded ${preview === 'desktop' ? 'bg-[#8B1A10] text-white' : 'bg-white border border-[#CCD2D8] text-gray-600'}`}><Monitor className="w-3.5 h-3.5" /></button>
+                <button type="button" onClick={() => setPreview('mobile')} className={`p-1.5 rounded ${preview === 'mobile' ? 'bg-[#8B1A10] text-white' : 'bg-white border border-[#CCD2D8] text-gray-600'}`}><Smartphone className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+            <div className="p-3 bg-[#F8FAFC]">
+              <select value={contactId} onChange={e => setContactId(e.target.value)} className="w-full bg-white border border-[#CCD2D8] rounded p-2 text-xs text-gray-800 mb-3">
+                <option value="">Preview fallback values</option>
+                {audienceContacts.map(c => <option key={c.id} value={c.id}>{c.email}{c.company ? ` · ${c.company}` : ''}</option>)}
+              </select>
+              <div className={`${preview === 'mobile' ? 'max-w-[390px]' : 'w-full'} mx-auto bg-white rounded border border-[#CCD2D8] overflow-hidden`}>
+                <div className="px-4 py-3 border-b border-gray-200 text-black">
+                  <div className="text-[11px] text-gray-500">{fromName || fromEmail || 'From'} · Preview</div>
+                  <div className="text-sm font-bold text-gray-900 mt-0.5">{previewSubject || 'Subject preview'}</div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">{preheader || 'Preheader preview'}</div>
+                </div>
+                <iframe title="email-preview" sandbox="allow-same-origin" srcDoc={`<!doctype html><html><head>${headHtml}</head><body style="margin:0">${previewBody}</body></html>`} className="w-full h-[600px] border-0" />
+              </div>
+            </div>
+          </section>
+        </aside>
       </form>
 
       {showTest && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#111318] border border-[#2a2f39] rounded-lg p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold flex items-center gap-2 text-white">
-                <Zap className="w-4 h-4 text-amber-400" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white border border-[#CCD2D8] rounded-lg p-6 space-y-4 shadow-2xl text-gray-900">
+            <div className="flex items-center justify-between pb-2 border-b border-[#CCD2D8]">
+              <h3 className="text-sm font-bold flex items-center gap-2 text-gray-900">
+                <Zap className="w-4 h-4 text-amber-500" />
                 <span>Test Inbox Placement</span>
               </h3>
               <button
                 type="button"
                 onClick={() => { setShowTest(false); setTestFeedback(null); }}
-                className="text-zinc-500 hover:text-white text-xs"
+                className="text-gray-400 hover:text-gray-700 text-xs font-bold"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-gray-600">
               Send a real test email with current SPF/DKIM headers, One-Click List-Unsubscribe, and MIME plain-text to check inbox placement in Gmail, Outlook, or Yahoo.
             </p>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] uppercase tracking-wider text-zinc-500">Recipient Test Address</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-700">Recipient Test Address</label>
               <input
                 autoFocus
                 value={testEmail}
                 onChange={e => setTestEmail(e.target.value)}
                 placeholder="your.inbox@gmail.com or mail-tester address"
-                className="w-full bg-[#080a0d] border border-[#292e37] rounded-md p-3 text-xs text-zinc-100 placeholder:text-zinc-700 outline-none focus:border-zinc-500"
+                className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-3 text-xs text-gray-900 placeholder:text-gray-400 outline-none focus:border-[#8B1A10]"
               />
             </div>
 
-            <div className="rounded-md bg-[#090b0e] border border-[#202530] p-3 text-[11px] text-zinc-400 space-y-1.5">
-              <div className="font-semibold text-zinc-300 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="rounded bg-[#F8FAFC] border border-[#CCD2D8] p-3 text-xs text-gray-700 space-y-1.5">
+              <div className="font-bold text-gray-900 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Deliverability Verification</span>
               </div>
-              <ul className="list-disc pl-4 space-y-0.5 text-zinc-500 text-[10px]">
-                <li>DKIM Signed with selector <code className="text-zinc-300">kumo2026</code></li>
-                <li>Amazon SES Relay & KumoMTA Spool active</li>
+              <ul className="list-disc pl-4 space-y-0.5 text-gray-600 text-[11px]">
+                <li>DKIM Signed with selector <code className="text-gray-900 font-bold">kumo2026</code></li>
+                <li>Amazon SES Relay &amp; KumoMTA Spool active</li>
                 <li>RFC 8058 One-Click List-Unsubscribe headers injected</li>
               </ul>
             </div>
 
             {testFeedback && (
-              <div className={`p-2.5 rounded-md text-xs border ${
+              <div className={`p-2.5 rounded text-xs border font-medium ${
                 testFeedback.type === 'success'
-                  ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
-                  : 'bg-rose-950/40 border-rose-800 text-rose-300'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-rose-50 border-rose-300 text-rose-800'
               }`}>
                 {testFeedback.text}
               </div>
@@ -1006,7 +1055,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
               <button
                 type="button"
                 onClick={() => { setShowTest(false); setTestFeedback(null); }}
-                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -1014,7 +1063,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                 type="button"
                 onClick={dispatchTest}
                 disabled={!testEmail.trim() || testSending}
-                className="px-4 py-2 rounded bg-white hover:bg-zinc-200 text-black text-xs font-bold disabled:opacity-40 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-xs font-bold disabled:opacity-40 transition flex items-center gap-1.5"
               >
                 {testSending ? 'Dispatching…' : <><Send className="w-3 h-3" /><span>Send to Inbox</span></>}
               </button>
@@ -1025,16 +1074,16 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
 
       {/* Batch Recipients Paste Modal */}
       {showBatchRecipients && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#111318] border border-[#2a2f39] rounded-lg p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold flex items-center gap-2 text-white">
-                <ClipboardList className="w-4 h-4 text-emerald-400" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white border border-[#CCD2D8] rounded-lg p-6 space-y-4 shadow-2xl text-gray-900">
+            <div className="flex items-center justify-between pb-2 border-b border-[#CCD2D8]">
+              <h3 className="text-sm font-bold flex items-center gap-2 text-gray-900">
+                <ClipboardList className="w-4 h-4 text-[#8B1A10]" />
                 <span>Paste / Bulk Import Recipients</span>
               </h3>
-              <button type="button" onClick={() => setShowBatchRecipients(false)} className="text-zinc-500 hover:text-white text-xs">✕</button>
+              <button type="button" onClick={() => setShowBatchRecipients(false)} className="text-gray-400 hover:text-gray-700 text-xs font-bold">✕</button>
             </div>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-gray-600">
               Paste email addresses in any format (one per line, comma-separated, semicolon-separated, or mixed with text).
               Our parser will extract all valid addresses automatically without requiring manual typing.
             </p>
@@ -1044,17 +1093,17 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
               value={batchRecipientsText}
               onChange={e => setBatchRecipientsText(e.target.value)}
               placeholder={`user1@domain.com\nuser2@example.org\n"John Doe" <john@company.com>\nalice@test.com, bob@test.com`}
-              className="w-full bg-[#080a0d] border border-[#292e37] rounded-md p-3 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 outline-none focus:border-zinc-500"
+              className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-3 text-xs font-mono text-gray-900 placeholder:text-gray-400 outline-none focus:border-[#8B1A10]"
             />
             <div className="flex items-center justify-between pt-1">
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-xs font-bold text-gray-700 font-mono">
                 Detected: {((batchRecipientsText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [])).length} emails
               </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setShowBatchRecipients(false)}
-                  className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                  className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900"
                 >
                   Cancel
                 </button>
@@ -1062,7 +1111,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                   type="button"
                   onClick={() => applyBatchRecipients(batchRecipientsText)}
                   disabled={!batchRecipientsText.trim()}
-                  className="px-4 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-semibold disabled:opacity-40 transition-colors"
+                  className="px-4 py-1.5 rounded bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-xs font-bold disabled:opacity-40 transition"
                 >
                   Apply Recipients
                 </button>
@@ -1074,17 +1123,17 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
 
       {/* Batch Raw Headers Modal */}
       {showBatchHeaders && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#111318] border border-[#2a2f39] rounded-lg p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold flex items-center gap-2 text-white">
-                <ClipboardList className="w-4 h-4 text-sky-400" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white border border-[#CCD2D8] rounded-lg p-6 space-y-4 shadow-2xl text-gray-900">
+            <div className="flex items-center justify-between pb-2 border-b border-[#CCD2D8]">
+              <h3 className="text-sm font-bold flex items-center gap-2 text-gray-900">
+                <ClipboardList className="w-4 h-4 text-[#8B1A10]" />
                 <span>Paste Raw Headers (RFC 822 / Key: Value)</span>
               </h3>
-              <button type="button" onClick={() => setShowBatchHeaders(false)} className="text-zinc-500 hover:text-white text-xs">✕</button>
+              <button type="button" onClick={() => setShowBatchHeaders(false)} className="text-gray-400 hover:text-gray-700 text-xs font-bold">✕</button>
             </div>
-            <p className="text-xs text-zinc-400">
-              Paste email headers directly (e.g. from an exported draft or terminal template). One header per line formatted as <code className="text-zinc-200 bg-zinc-900 px-1 py-0.5 rounded">Key: Value</code>.
+            <p className="text-xs text-gray-600">
+              Paste email headers directly (e.g. from an exported draft or terminal template). One header per line formatted as <code className="text-gray-900 bg-gray-100 px-1 py-0.5 rounded font-mono font-bold">Key: Value</code>.
             </p>
             <textarea
               autoFocus
@@ -1092,13 +1141,13 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
               value={batchHeadersText}
               onChange={e => setBatchHeadersText(e.target.value)}
               placeholder={`X-Campaign-ID: BlackFriday-2026\nX-Entity-Ref-ID: promo_october\nX-Priority: 1\nReply-To: support@yourdomain.com`}
-              className="w-full bg-[#080a0d] border border-[#292e37] rounded-md p-3 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 outline-none focus:border-zinc-500"
+              className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-3 text-xs font-mono text-gray-900 placeholder:text-gray-400 outline-none focus:border-[#8B1A10]"
             />
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setShowBatchHeaders(false)}
-                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -1106,9 +1155,9 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                 type="button"
                 onClick={() => applyBatchHeaders(batchHeadersText)}
                 disabled={!batchHeadersText.trim()}
-                className="px-4 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black text-xs font-semibold disabled:opacity-40 transition-colors"
+                className="px-4 py-1.5 rounded bg-[#8B1A10] hover:bg-[#73140C] text-white text-xs font-bold disabled:opacity-40 transition"
               >
-                Parse & Inject Headers
+                Parse &amp; Inject Headers
               </button>
             </div>
           </div>

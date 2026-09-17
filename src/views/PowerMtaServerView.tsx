@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, Download, Copy, Play, Pause, RotateCcw, Trash2, Check, Server, Shield, FileText, Activity } from 'lucide-react';
+import { Terminal, Download, Copy, Play, Pause, RotateCcw, Check, Server, FileText, Activity } from 'lucide-react';
 
 interface PowerMtaServerViewProps {
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
@@ -95,195 +95,213 @@ export const PowerMtaServerView: React.FC<PowerMtaServerViewProps> = ({ authFetc
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-gray-200">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#8cc052]" />
-            <h1 className="text-2xl font-bold text-gray-800">PowerMTA Server &amp; Spool Management</h1>
-          </div>
-          <p className="text-sm text-gray-500 mt-1">
-            Daemon runtime status, live queue control, pmta.conf config generator, and management CLI console.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleSpoolCommand(serverStatus?.status === 'PAUSED' ? 'resume' : 'pause')}
-            className={`px-4 py-2 rounded text-sm font-bold flex items-center gap-1.5 transition ${
-              serverStatus?.status === 'PAUSED'
-                ? 'bg-[#8cc052] text-white hover:bg-[#7bb342]'
-                : 'bg-amber-500 text-white hover:bg-amber-600'
-            }`}
-          >
-            {serverStatus?.status === 'PAUSED' ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-            <span>{serverStatus?.status === 'PAUSED' ? 'Resume Outbound Spool' : 'Pause Outbound Spool'}</span>
-          </button>
-          <button
-            onClick={() => handleSpoolCommand('flush')}
-            className="px-4 py-2 border border-gray-300 rounded text-sm font-semibold text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition"
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>Flush Spool</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Daemon Status Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="pmta-card p-5 space-y-2">
-          <span className="text-xs font-bold text-gray-400 uppercase">PowerMTA Engine</span>
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-bold text-gray-800 font-mono">
-              {serverStatus?.version?.split(' ')[1] || '5.0r8'}
-            </span>
-            <span className="px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs font-bold uppercase">
-              {serverStatus?.status || 'ONLINE'}
-            </span>
-          </div>
-          <div className="text-xs text-gray-500 flex items-center gap-1">
-            <Activity className="w-3.5 h-3.5 text-[#8cc052]" />
-            <span>Uptime: {serverStatus?.uptime || '18d 4h'}</span>
-          </div>
-        </div>
-
-        <div className="pmta-card p-5 space-y-2">
-          <span className="text-xs font-bold text-gray-400 uppercase">Inbound SMTP Port</span>
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-bold text-gray-800 font-mono">
-              Port {serverStatus?.smtpPort || 2525}
-            </span>
-            <span className="px-2 py-0.5 rounded bg-[#f4faee] text-[#5b8c25] text-xs font-bold border border-[#c9e89b]">
-              LISTENING
-            </span>
-          </div>
-          <div className="text-xs text-gray-500">Relay binding: 0.0.0.0:2525</div>
-        </div>
-
-        <div className="pmta-card p-5 space-y-2">
-          <span className="text-xs font-bold text-gray-400 uppercase">Spool Queue Depth</span>
-          <div className="flex items-center justify-between">
-            <span className="text-xl font-bold text-gray-800 font-mono">
-              {serverStatus?.spoolCount || 0}
-            </span>
-            <span className="text-xs text-gray-500 font-medium">msgs queued</span>
-          </div>
-          <div className="text-xs text-gray-500">
-            Speed: {serverStatus?.deliveryRatePerSec || 0} msgs/sec
-          </div>
-        </div>
-
-        <div className="pmta-card p-5 space-y-2">
-          <span className="text-xs font-bold text-gray-400 uppercase">License Status</span>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-gray-800">Enterprise Cluster</span>
-            <span className="px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs font-bold">
-              VERIFIED
-            </span>
-          </div>
-          <div className="text-xs text-gray-500">Expires: Dec 31, 2028</div>
-        </div>
-      </div>
-
-      {/* Interactive PowerMTA CLI */}
-      <div className="pmta-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-900 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-[#8cc052]" />
-            <span className="font-mono text-sm font-bold">PowerMTA Command Line Interface (CLI)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setCliCommand('pmta show status');
-                runCliCommand('pmta show status');
-              }}
-              className="text-xs px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 font-mono"
-            >
-              pmta show status
-            </button>
-            <button
-              onClick={() => {
-                setCliCommand('pmta show queues');
-                runCliCommand('pmta show queues');
-              }}
-              className="text-xs px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 font-mono"
-            >
-              pmta show queues
-            </button>
-            <button
-              onClick={() => {
-                setCliCommand('pmta show vmtas');
-                runCliCommand('pmta show vmtas');
-              }}
-              className="text-xs px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 font-mono"
-            >
-              pmta show vmtas
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 bg-gray-950 text-gray-200 font-mono text-xs space-y-3">
-          <div className="flex items-center gap-2 bg-gray-900 px-3 py-2 rounded border border-gray-800">
-            <span className="text-[#8cc052] font-bold select-none">$</span>
-            <input
-              type="text"
-              value={cliCommand}
-              onChange={(e) => setCliCommand(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runCliCommand()}
-              placeholder="Enter PowerMTA command (e.g. pmta show queues)..."
-              className="w-full bg-transparent text-white font-mono focus:outline-none placeholder:text-gray-600"
-            />
-            <button
-              onClick={() => runCliCommand()}
-              disabled={isExecuting}
-              className="px-3 py-1 bg-[#8cc052] hover:bg-[#7bb342] text-white font-bold rounded text-xs transition disabled:opacity-50"
-            >
-              {isExecuting ? 'Running...' : 'Run'}
-            </button>
-          </div>
-
-          <pre className="p-4 rounded bg-black border border-gray-800 text-[#8cc052] overflow-x-auto min-h-[140px] leading-relaxed select-text">
-            {cliOutput}
-          </pre>
-        </div>
-      </div>
-
-      {/* pmta.conf Generator & Exporter */}
-      <div className="pmta-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#8cc052]" />
-              <h3 className="font-bold text-gray-800 text-base">Configuration Generator (/etc/pmta/config)</h3>
+    <div className="p-2 sm:p-4 md:p-6 bg-[#E8ECEF] min-h-[calc(100vh-3.5rem)] font-sans text-gray-800">
+      <div className="max-w-[1240px] mx-auto bg-white rounded-lg shadow-md border border-[#C5CED6] overflow-hidden">
+        
+        {/* PowerMTA Top Crimson Header */}
+        <div className="px-4 py-3 sm:px-6 sm:py-3.5 bg-gradient-to-r from-[#8B1A10] via-[#A81D14] to-[#75110B] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-[#E0A328]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded bg-black/25 flex items-center justify-center text-white border border-white/20 shrink-0">
+              <Server className="w-4 h-4" />
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Production configuration automatically synced with your registered VirtualMTAs, IP pools, and domain policies.
-            </p>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                <span>PowerMTA Server &amp; Spool Management</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/30 border border-white/20 text-[#FFD54F]">
+                  Daemon CLI
+                </span>
+              </h1>
+              <p className="text-[11px] text-gray-200 mt-0.5 hidden sm:block">
+                Daemon runtime status, live queue control, pmta.conf config generator, and management CLI console.
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={handleCopyConfig}
-              className="px-3 py-1.5 border border-gray-300 rounded text-xs font-semibold text-gray-700 hover:bg-white flex items-center gap-1.5 transition"
+              onClick={() => handleSpoolCommand(serverStatus?.status === 'PAUSED' ? 'resume' : 'pause')}
+              className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition shadow-xs ${
+                serverStatus?.status === 'PAUSED'
+                  ? 'bg-[#2E7D32] hover:bg-[#1B5E20] text-white'
+                  : 'bg-amber-600 hover:bg-amber-700 text-white'
+              }`}
             >
-              {isCopied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{isCopied ? 'Copied' : 'Copy Config'}</span>
+              {serverStatus?.status === 'PAUSED' ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+              <span>{serverStatus?.status === 'PAUSED' ? 'Resume Outbound Spool' : 'Pause Outbound Spool'}</span>
             </button>
             <button
-              onClick={handleDownloadConfig}
-              className="px-3 py-1.5 bg-[#2c3e50] hover:bg-[#1e2b37] text-white rounded text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+              onClick={() => handleSpoolCommand('flush')}
+              className="px-3 py-1.5 bg-[#37474F] hover:bg-[#263238] rounded text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-xs"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download pmta.conf</span>
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Flush Spool</span>
             </button>
           </div>
         </div>
 
-        <div className="p-4 bg-gray-900">
-          <pre className="p-4 rounded bg-gray-950 border border-gray-800 text-gray-300 text-xs font-mono overflow-x-auto max-h-[350px] leading-relaxed">
-            {configText}
-          </pre>
+        <div className="p-4 md:p-6 space-y-6">
+          {/* Daemon Status Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 space-y-1 shadow-2xs">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">PowerMTA Engine</span>
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-bold text-gray-900 font-mono">
+                  {serverStatus?.version?.split(' ')[1] || '5.0r8'}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-[#E8F5E9] text-[#2E7D32] text-xs font-bold uppercase border border-[#C8E6C9]">
+                  {serverStatus?.status || 'ONLINE'}
+                </span>
+              </div>
+              <div className="text-[11px] text-gray-600 flex items-center gap-1">
+                <Activity className="w-3.5 h-3.5 text-[#2E7D32]" />
+                <span>Uptime: {serverStatus?.uptime || '18d 4h'}</span>
+              </div>
+            </div>
+
+            <div className="bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 space-y-1 shadow-2xs">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Inbound SMTP Port</span>
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-bold text-gray-900 font-mono">
+                  Port {serverStatus?.smtpPort || 2525}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-[#E8F5E9] text-[#2E7D32] text-xs font-bold border border-[#C8E6C9]">
+                  LISTENING
+                </span>
+              </div>
+              <div className="text-[11px] text-gray-600">Relay binding: 0.0.0.0:2525</div>
+            </div>
+
+            <div className="bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 space-y-1 shadow-2xs">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Spool Queue Depth</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xl font-bold text-gray-900 font-mono">
+                  {serverStatus?.spoolCount || 0}
+                </span>
+                <span className="text-xs text-gray-600 font-medium">msgs queued</span>
+              </div>
+              <div className="text-[11px] text-gray-600">
+                Speed: {serverStatus?.deliveryRatePerSec || 0} msgs/sec
+              </div>
+            </div>
+
+            <div className="bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 space-y-1 shadow-2xs">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">License Status</span>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-900">Enterprise Cluster</span>
+                <span className="px-2 py-0.5 rounded bg-[#E8F5E9] text-[#2E7D32] text-xs font-bold border border-[#C8E6C9]">
+                  VERIFIED
+                </span>
+              </div>
+              <div className="text-[11px] text-gray-600">Expires: Dec 31, 2028</div>
+            </div>
+          </div>
+
+          {/* Interactive PowerMTA CLI (Exact Linux CRT Terminal) */}
+          <div className="rounded-lg bg-black border border-[#1b3d1b] font-mono text-xs overflow-hidden shadow-2xl">
+            {/* Terminal Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 py-2.5 bg-[#050505] border-b border-[#0f2e14] text-[#00FF66] font-mono select-none gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-[#ff5f56] inline-block opacity-80" />
+                  <span className="w-3 h-3 rounded-full bg-[#ffbd2e] inline-block opacity-80" />
+                  <span className="w-3 h-3 rounded-full bg-[#27c93f] inline-block opacity-80" />
+                </div>
+                <span className="text-[11px] font-bold text-[#00FF66] tracking-tight truncate">
+                  [opc@pmta emailin-ops]$ pmta command-line interface
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  onClick={() => {
+                    setCliCommand('pmta show status');
+                    runCliCommand('pmta show status');
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded bg-[#00FF66]/10 hover:bg-[#00FF66]/20 text-[#00FF66] border border-[#00FF66]/30 font-mono transition"
+                >
+                  pmta show status
+                </button>
+                <button
+                  onClick={() => {
+                    setCliCommand('pmta show queues');
+                    runCliCommand('pmta show queues');
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded bg-[#00FF66]/10 hover:bg-[#00FF66]/20 text-[#00FF66] border border-[#00FF66]/30 font-mono transition"
+                >
+                  pmta show queues
+                </button>
+                <button
+                  onClick={() => {
+                    setCliCommand('pmta show vmtas');
+                    runCliCommand('pmta show vmtas');
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded bg-[#00FF66]/10 hover:bg-[#00FF66]/20 text-[#00FF66] border border-[#00FF66]/30 font-mono transition"
+                >
+                  pmta show vmtas
+                </button>
+              </div>
+            </div>
+
+            {/* Terminal Body */}
+            <div className="p-4 bg-black text-[#00FF66] font-mono text-xs space-y-3">
+              <div className="flex items-center gap-2 bg-[#050505] px-3 py-2 rounded border border-[#0f2e14]">
+                <span className="text-[#00FF66] font-bold select-none">[opc@pmta emailin-ops]$</span>
+                <input
+                  type="text"
+                  value={cliCommand}
+                  onChange={(e) => setCliCommand(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && runCliCommand()}
+                  placeholder="Enter PowerMTA command (e.g. pmta show queues)..."
+                  className="w-full bg-transparent text-[#00FF66] font-mono focus:outline-none placeholder:text-[#00FF66]/30 caret-[#00FF66]"
+                />
+                <span className="inline-block w-2 h-4 bg-[#00FF66] animate-pulse"></span>
+                <button
+                  onClick={() => runCliCommand()}
+                  disabled={isExecuting}
+                  className="px-3 py-1 bg-[#00FF66]/20 hover:bg-[#00FF66]/30 text-[#00FF66] border border-[#00FF66]/40 font-bold rounded text-xs transition disabled:opacity-50"
+                >
+                  {isExecuting ? 'Running...' : 'EXEC'}
+                </button>
+              </div>
+
+              <pre className="p-4 rounded bg-black border border-[#0f2e14] text-[#00FF66] font-mono text-[11px] overflow-x-auto min-h-[160px] leading-relaxed select-text selection:bg-[#00FF66] selection:text-black">
+                {cliOutput}
+              </pre>
+            </div>
+          </div>
+
+          {/* pmta.conf Generator & Exporter */}
+          <div className="border border-[#CCD2D8] rounded bg-white shadow-xs overflow-hidden">
+            <div className="px-4 py-3 bg-[#9E9E9E] border-b-2 border-[#8B0000] text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#FFD54F]" />
+                <h3 className="font-bold text-white text-sm">Configuration Generator (/etc/pmta/config)</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyConfig}
+                  className="px-3 py-1 rounded text-xs font-semibold bg-white text-gray-800 hover:bg-gray-100 flex items-center gap-1.5 transition shadow-xs"
+                >
+                  {isCopied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{isCopied ? 'Copied' : 'Copy Config'}</span>
+                </button>
+                <button
+                  onClick={handleDownloadConfig}
+                  className="px-3 py-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded text-xs font-semibold flex items-center gap-1.5 transition shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download pmta.conf</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#F8FAFC]">
+              <pre className="p-4 rounded bg-white border border-[#CCD2D8] text-gray-800 text-xs font-mono overflow-x-auto max-h-[350px] leading-relaxed">
+                {configText}
+              </pre>
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
   );
