@@ -18,15 +18,23 @@ export const get = query({
 });
 
 export const start = mutation({
-  args: { userId: v.string(), name: v.string(), originalFilename: v.string(), listName: v.string(), listDescription: v.optional(v.string()), sourceSizeBytes: v.number(), now: v.string() },
+  args: { userId: v.string(), name: v.string(), originalFilename: v.string(), listName: v.string(), listId: v.optional(v.string()), listDescription: v.optional(v.string()), sourceSizeBytes: v.number(), now: v.string() },
   handler: async (ctx, args) => {
-    const listId = await ctx.db.insert("contact_lists", { userId: args.userId, name: args.listName, description: args.listDescription, contactCount: 0, createdAt: args.now });
+    let targetListId = args.listId;
+
+    if (targetListId) {
+      const existingList = await ctx.db.get(targetListId as any);
+      if (!existingList || existingList.userId !== args.userId) throw new Error("Target audience list not found");
+    } else {
+      targetListId = await ctx.db.insert("contact_lists", { userId: args.userId, name: args.listName, description: args.listDescription, contactCount: 0, createdAt: args.now }) as string;
+    }
+
     const importId = await ctx.db.insert("import_jobs", {
-      userId: args.userId, name: args.name, originalFilename: args.originalFilename, status: "PROCESSING", listId: listId as string,
+      userId: args.userId, name: args.name, originalFilename: args.originalFilename, status: "PROCESSING", listId: targetListId,
       sourceSizeBytes: args.sourceSizeBytes, uploadOffsetBytes: 0, processedRows: 0, totalRows: 0, validRows: 0, invalidRows: 0,
       duplicateRows: 0, suppressedRows: 0, importedRows: 0, parserTail: "", startedAt: args.now, updatedAt: args.now,
     });
-    return { importId, listId };
+    return { importId, listId: targetListId };
   },
 });
 
