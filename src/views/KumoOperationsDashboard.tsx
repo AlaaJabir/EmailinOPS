@@ -530,13 +530,13 @@ export const KumoOperationsDashboard: React.FC<Props> = ({
 
           {tab === 'logs' && (
             <Panel title="Transport Logs">
-              <div className="p-4 space-y-2 font-mono text-xs max-h-[500px] overflow-auto bg-[#F8FAFC]">
+              <div className="p-4 space-y-2 font-mono text-xs max-h-[500px] overflow-auto bg-black text-[#00FF66]">
                 {recentMessages.slice(0, 80).map((m) => (
-                  <div key={m.id} className="border-b border-[#E2E8F0] pb-2 text-gray-800">
-                    <span className="text-gray-500">{m.queuedAt}</span>{' '}
-                    <span className="text-[#8B1A10] font-bold">[{m.status}]</span>{' '}
-                    <span className="font-semibold text-gray-900">{m.fromEmail} → {m.toEmail}</span>{' '}
-                    {m.smtpResponse && <span className="text-gray-500">[{m.smtpResponse}]</span>}
+                  <div key={m.id} className="border-b border-[#0f2e14] pb-2 text-[#00FF66]">
+                    <span className="text-[#00FF66]/60">{m.queuedAt}</span>{' '}
+                    <span className="text-[#00FF66] font-bold">[{m.status}]</span>{' '}
+                    <span className="font-semibold text-[#00FF66]">{m.fromEmail} → {m.toEmail}</span>{' '}
+                    {m.smtpResponse && <span className="text-[#00FF66]/70">[{m.smtpResponse}]</span>}
                   </div>
                 ))}
               </div>

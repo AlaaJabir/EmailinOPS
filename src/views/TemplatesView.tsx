@@ -342,15 +342,16 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
 
               {/* Split Editor: Code on Left, Live Preview on Right */}
               <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 min-h-0">
-                <div className="flex flex-col border-r border-[#CCD2D8] bg-white">
-                  <div className="px-4 py-2 bg-[#F1F4F7] border-b border-[#CCD2D8] text-[11px] font-mono text-gray-700 font-bold uppercase tracking-wider">
-                    HTML Source Code
+                <div className="flex flex-col border-r border-[#CCD2D8] bg-black">
+                  <div className="px-4 py-2 bg-[#050505] border-b border-[#0f2e14] text-[11px] font-mono text-[#00FF66] font-bold uppercase tracking-wider flex items-center justify-between">
+                    <span>HTML Source Code</span>
+                    <span className="text-[10px] text-[#00FF66]/60 font-mono">[Terminal Mode]</span>
                   </div>
                   <textarea
                     value={html}
                     onChange={(e) => setHtml(e.target.value)}
                     spellCheck={false}
-                    className="flex-1 w-full resize-none bg-white text-gray-900 p-4 font-mono text-xs leading-relaxed outline-none border-none"
+                    className="flex-1 w-full resize-none bg-black text-[#00FF66] p-4 font-mono text-xs leading-relaxed outline-none border-none selection:bg-[#00FF66] selection:text-black caret-[#00FF66] placeholder:text-[#00FF66]/30"
                   />
                 </div>
 

@@ -294,8 +294,8 @@ export const PowerMtaServerView: React.FC<PowerMtaServerViewProps> = ({ authFetc
               </div>
             </div>
 
-            <div className="p-4 bg-[#F8FAFC]">
-              <pre className="p-4 rounded bg-white border border-[#CCD2D8] text-gray-800 text-xs font-mono overflow-x-auto max-h-[350px] leading-relaxed">
+            <div className="p-4 bg-[#050505]">
+              <pre className="p-4 rounded bg-black border border-[#0f2e14] text-[#00FF66] text-xs font-mono overflow-x-auto max-h-[350px] leading-relaxed selection:bg-[#00FF66] selection:text-black">
                 {configText}
               </pre>
             </div>

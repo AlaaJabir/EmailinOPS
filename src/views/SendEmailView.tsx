@@ -876,15 +876,15 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
 
             {editor === 'head' && (
               <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#F8FAFC] border border-[#CCD2D8] rounded px-3 py-2">
-                  <div className="text-xs text-gray-700">
-                    <span className="font-bold text-gray-900">HTML &lt;head&gt; / Terminal Header:</span> Meta tags, styling, font declarations, and document definitions.
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#050505] border border-[#0f2e14] rounded px-3 py-2 text-[#00FF66]">
+                  <div className="text-xs text-[#00FF66]">
+                    <span className="font-bold text-[#00FF66]">HTML &lt;head&gt; / Terminal Header:</span> <span className="text-[#00FF66]/80">Meta tags, styling, font declarations, and document definitions.</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setHeadHtml('<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<meta http-equiv="X-UA-Compatible" content="IE=edge">\n<title></title>\n<style>\n  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }\n  table { border-collapse: collapse; }\n  img { border: 0; outline: none; text-decoration: none; }\n</style>')}
-                      className="text-xs font-semibold text-gray-700 hover:text-gray-900 px-2 py-1 rounded bg-white border border-[#CCD2D8] transition"
+                      className="text-xs font-semibold text-[#00FF66] hover:text-white px-2 py-1 rounded bg-[#00FF66]/10 border border-[#00FF66]/30 transition"
                     >
                       Reset Standard &lt;head&gt;
                     </button>
@@ -898,7 +898,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                           /* clipboard api fallback */
                         }
                       }}
-                      className="text-xs font-semibold text-gray-700 hover:text-gray-900 flex items-center gap-1 px-2 py-1 rounded bg-white border border-[#CCD2D8] transition"
+                      className="text-xs font-semibold text-[#00FF66] hover:text-white flex items-center gap-1 px-2 py-1 rounded bg-[#00FF66]/10 border border-[#00FF66]/30 transition"
                     >
                       <Copy className="w-3.5 h-3.5" />
                       <span>Paste Clipboard</span>
@@ -910,7 +910,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                   onChange={e => setHeadHtml(e.target.value)}
                   spellCheck={false}
                   placeholder={`<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>body { font-family: sans-serif; }</style>`}
-                  className="w-full min-h-[300px] bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 font-mono text-xs leading-5 text-gray-900 outline-none focus:border-[#8B1A10]"
+                  className="w-full min-h-[300px] bg-black border border-[#0f2e14] rounded p-4 font-mono text-xs leading-5 text-[#00FF66] selection:bg-[#00FF66] selection:text-black caret-[#00FF66] placeholder:text-[#00FF66]/30 outline-none focus:border-[#00FF66]/60 shadow-inner"
                 />
               </div>
             )}
@@ -922,7 +922,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                   value={htmlBody}
                   onChange={e => setHtmlBody(e.target.value)}
                   spellCheck={false}
-                  className="w-full min-h-[430px] bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 font-mono text-xs leading-5 text-gray-900 outline-none focus:border-[#8B1A10]"
+                  className="w-full min-h-[430px] bg-black border border-[#0f2e14] rounded p-4 font-mono text-xs leading-5 text-[#00FF66] selection:bg-[#00FF66] selection:text-black caret-[#00FF66] placeholder:text-[#00FF66]/30 outline-none focus:border-[#00FF66]/60 shadow-inner"
                   placeholder="<table>…</table>"
                 />
               </>
@@ -933,7 +933,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
                 value={plainText}
                 onChange={e => setPlainText(e.target.value)}
                 spellCheck={false}
-                className="w-full min-h-[430px] bg-[#F8FAFC] border border-[#CCD2D8] rounded p-4 font-mono text-xs leading-5 text-gray-900 outline-none focus:border-[#8B1A10]"
+                className="w-full min-h-[430px] bg-black border border-[#0f2e14] rounded p-4 font-mono text-xs leading-5 text-[#00FF66] selection:bg-[#00FF66] selection:text-black caret-[#00FF66] placeholder:text-[#00FF66]/30 outline-none focus:border-[#00FF66]/60 shadow-inner"
                 placeholder="Plain-text fallback for non-HTML email readers…"
               />
             )}
@@ -1141,7 +1141,7 @@ export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = []
               value={batchHeadersText}
               onChange={e => setBatchHeadersText(e.target.value)}
               placeholder={`X-Campaign-ID: BlackFriday-2026\nX-Entity-Ref-ID: promo_october\nX-Priority: 1\nReply-To: support@yourdomain.com`}
-              className="w-full bg-[#F8FAFC] border border-[#CCD2D8] rounded p-3 text-xs font-mono text-gray-900 placeholder:text-gray-400 outline-none focus:border-[#8B1A10]"
+              className="w-full bg-black border border-[#0f2e14] rounded p-3 text-xs font-mono text-[#00FF66] selection:bg-[#00FF66] selection:text-black caret-[#00FF66] placeholder:text-[#00FF66]/30 outline-none focus:border-[#00FF66]/60 shadow-inner"
             />
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
