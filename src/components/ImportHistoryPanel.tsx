@@ -21,6 +21,13 @@ interface ImportRecord {
   error_message?: string | null;
 }
 
+interface AudienceList {
+  id: string;
+  name: string;
+  description?: string;
+  memberCount?: number;
+}
+
 const resumeKey = (file: File) => `emailops-import:${file.name}:${file.size}`;
 
 const readJson = async <T = any>(response: Response, fallbackMessage: string): Promise<T> => {
@@ -54,9 +61,12 @@ export const ImportHistoryPanel: React.FC<{
   onUseAudience: (listId: string) => void;
 }> = ({ authFetch, onUseAudience }) => {
   const [imports, setImports] = useState<ImportRecord[]>([]);
+  const [lists, setLists] = useState<AudienceList[]>([]);
   const [uploading, setUploading] = useState(false);
   const [current, setCurrent] = useState<ImportRecord | null>(null);
   const [error, setError] = useState('');
+  const [showListPicker, setShowListPicker] = useState(false);
+  const [selectedListId, setSelectedListId] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
@@ -69,15 +79,42 @@ export const ImportHistoryPanel: React.FC<{
     }
   };
 
+  const loadLists = async () => {
+    const r = await authFetch('/api/contacts/lists');
+    const d = await readJson<{ lists?: AudienceList[] }>(r, 'Failed to load audience lists');
+    const available = d.lists || [];
+    setLists(available);
+    if (!selectedListId && available[0]?.id) setSelectedListId(available[0].id);
+    return available;
+  };
+
   useEffect(() => {
     load();
   }, []);
 
   useEffect(() => {
-    const openImportPicker = () => fileRef.current?.click();
+    const openImportPicker = async () => {
+      setError('');
+      try {
+        const available = await loadLists();
+        if (!available.length) {
+          setError('Create an Audience List first, then import your file into that list.');
+          return;
+        }
+        setShowListPicker(true);
+      } catch (e: any) {
+        setError(e.message || 'Failed to load audience lists');
+      }
+    };
     window.addEventListener('emailops:open-import', openImportPicker);
     return () => window.removeEventListener('emailops:open-import', openImportPicker);
-  }, []);
+  }, [selectedListId]);
+
+  const chooseListAndOpenFile = () => {
+    if (!selectedListId) return;
+    setShowListPicker(false);
+    window.setTimeout(() => fileRef.current?.click(), 0);
+  };
 
   const importFile = async (file: File) => {
     setUploading(true);
@@ -100,10 +137,20 @@ export const ImportHistoryPanel: React.FC<{
       }
 
       if (!imp) {
+        if (!selectedListId) throw new Error('Select an audience list before importing.');
+        const selectedList = lists.find((list) => list.id === selectedListId);
+        if (!selectedList) throw new Error('Selected audience list was not found. Refresh and try again.');
+
         const start = await authFetch('/api/imports/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: file.name, filename: file.name, sourceSizeBytes: file.size }),
+          body: JSON.stringify({
+            name: file.name,
+            filename: file.name,
+            sourceSizeBytes: file.size,
+            listId: selectedList.id,
+            listName: selectedList.name,
+          }),
         });
         const sd = await readJson<{ import: ImportRecord }>(start, 'Could not start import');
         imp = sd.import;
@@ -208,6 +255,34 @@ export const ImportHistoryPanel: React.FC<{
           </tbody>
         </table>
       </div>
+
+      {showListPicker && (
+        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#0F0F0F] p-5 shadow-2xl text-white">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold">Import CSV into audience</h3>
+                <p className="text-[11px] text-[#888] mt-1">Choose the existing list that should receive these contacts.</p>
+              </div>
+              <button type="button" onClick={() => setShowListPicker(false)} className="text-[#888] hover:text-white">×</button>
+            </div>
+            <select
+              value={selectedListId}
+              onChange={(e) => setSelectedListId(e.target.value)}
+              className="w-full rounded border border-white/10 bg-[#050505] px-3 py-2 text-xs text-white focus:outline-none focus:border-white/30"
+            >
+              <option value="">Select an audience list…</option>
+              {lists.map((list) => (
+                <option key={list.id} value={list.id}>{list.name}{typeof list.memberCount === 'number' ? ` (${list.memberCount})` : ''}</option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setShowListPicker(false)} className="px-3 py-2 rounded border border-white/10 text-xs text-[#aaa] hover:text-white">Cancel</button>
+              <button type="button" disabled={!selectedListId || uploading} onClick={chooseListAndOpenFile} className="px-4 py-2 rounded bg-white text-black text-xs font-semibold disabled:opacity-40">Choose file</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
