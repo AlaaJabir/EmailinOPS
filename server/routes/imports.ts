@@ -71,8 +71,7 @@ function looksLikeEmail(value: unknown): boolean {
 function findEmailColumn(headers: string[]): number {
   const normalized = headers.map((value) => value.toLowerCase().replace(/[\s_-]+/g, ''));
   const preferred = ['email', 'emailaddress', 'mail', 'emailid', 'e-mail'];
-  const preferredIndex = normalized.findIndex((value) => preferred.includes(value));
-  return preferredIndex;
+  return normalized.findIndex((value) => preferred.includes(value));
 }
 
 function parseRows(text: string, startRow: number): ImportRow[] {
@@ -143,9 +142,11 @@ importsRouter.post('/start', optionalAuth, async (req, res) => {
     const client = getClient();
     const name = String(req.body?.name || req.body?.filename || 'Email import').trim().slice(0, 200);
     const filename = String(req.body?.filename || name).trim().slice(0, 255);
+    const listId = String(req.body?.listId || '').trim() || undefined;
+    const listName = String(req.body?.listName || name).trim().slice(0, 200);
     const sourceSizeBytes = Math.max(0, Number(req.body?.sourceSizeBytes || 0));
     const result = await client.mutation('imports:start' as any, {
-      userId, name, originalFilename: filename, listName: name,
+      userId, name, originalFilename: filename, listId, listName,
       listDescription: `Imported audience · ${filename}`, sourceSizeBytes, now: new Date().toISOString(),
     });
     const record = await client.query('imports:get' as any, { userId, id: result.importId });
