@@ -6,6 +6,7 @@ import { kumoMtaService } from '../services/KumoMtaService.js';
 
 export const campaignsRouter = Router();
 const CONTACT_PAGE_SIZE = 250;
+const SEND_LEASE_MS = 2 * 60 * 1000;
 
 function buildHtml(head: unknown, body: unknown) {
   const h = String(head || '');
@@ -71,46 +72,31 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
   const client = convexService.getClient();
   if (!client || !convexService.isConfigured) return res.status(503).json({ error: 'Convex persistence is required for resumable campaign sending' });
 
-  const campaigns = await convexService.getCampaigns(userId);
-  const campaign = campaigns.find((c) => c.id === req.params.id);
-  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
-  if (campaign.status === 'SENDING' && !campaign.sendCursor && (campaign.sendProcessed || 0) === 0) {
-    // A fresh send is allowed. A second simultaneous request is blocked below by the status guard.
-  } else if (campaign.status === 'SENDING') {
-    // A previous process can have died after a checkpoint. Continue from the durable cursor.
+  const leaseId = `send_${req.params.id}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const now = new Date();
+  const leaseUntil = new Date(now.getTime() + SEND_LEASE_MS).toISOString();
+  const acquired = await client.mutation('campaigns:acquireSend' as any, {
+    id: req.params.id, userId, leaseId, leaseUntil, now: now.toISOString(),
+  });
+  if (!acquired?.acquired) {
+    if (acquired?.reason === 'NOT_FOUND') return res.status(404).json({ error: 'Campaign not found' });
+    return res.status(409).json({ error: 'Campaign is already being sent by another worker' });
   }
 
+  const current = acquired.campaign;
   const senders = await convexService.getSenders(userId);
-  const sender = senders.find((s) => s.id === campaign.senderId) || senders[0];
-  if (!sender) return res.status(400).json({ error: 'Campaign sender is not available' });
-
-  const current = await client.query('campaigns:get' as any, { id: campaign.id, userId });
-  if (!current) return res.status(404).json({ error: 'Campaign not found' });
-  const existingCursor = current.sendCursor || undefined;
-  const alreadyProcessed = Number(current.sendProcessed || 0);
-  const alreadyFailed = Number(current.sendFailed || 0);
-  const alreadySuppressed = Number(current.sendSuppressed || 0);
-
-  if (current.status !== 'SENDING') {
-    await convexService.updateCampaign(campaign.id, {
-      status: 'SENDING',
-      startedAt: current.startedAt || new Date().toISOString(),
-      sendCursor: undefined,
-      sendProcessed: 0,
-      sendFailed: 0,
-      sendSuppressed: 0,
-      sentCount: 0,
-      totalRecipients: 0,
-      completedAt: undefined,
-    }, userId);
+  const sender = senders.find((s) => s.id === current.senderId) || senders[0];
+  if (!sender) {
+    await client.mutation('campaigns:releaseSend' as any, { id: current._id || current.id, userId, leaseId, now: new Date().toISOString() });
+    return res.status(400).json({ error: 'Campaign sender is not available' });
   }
 
   const baseUrl = personalizationService.getBaseUrl(req.get('host'));
   const senderDomain = String(sender.fromEmail).split('@')[1] || 'kumo.internal';
-  let cursor: string | undefined = existingCursor;
-  let processed = alreadyProcessed;
-  let failed = alreadyFailed;
-  let suppressedCount = alreadySuppressed;
+  let cursor: string | undefined = current.sendCursor || undefined;
+  let processed = Number(current.sendProcessed || 0);
+  let failed = Number(current.sendFailed || 0);
+  let suppressedCount = Number(current.sendSuppressed || 0);
   let sentCount = Number(current.sentCount || 0);
   let totalRecipients = Number(current.totalRecipients || 0);
   let pages = 0;
@@ -125,15 +111,11 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
       });
       const contacts = Array.isArray(page?.page) ? page.page : [];
       if (!contacts.length) {
-        await convexService.updateCampaign(campaign.id, {
+        await convexService.updateCampaign(current._id || current.id, {
           status: failed && !sentCount ? 'FAILED' : 'COMPLETED',
-          sentCount,
-          totalRecipients,
-          sendCursor: undefined,
-          sendProcessed: processed,
-          sendFailed: failed,
-          sendSuppressed: suppressedCount,
-          completedAt: new Date().toISOString(),
+          sentCount, totalRecipients, sendCursor: undefined, sendProcessed: processed,
+          sendFailed: failed, sendSuppressed: suppressedCount, completedAt: new Date().toISOString(),
+          sendLeaseId: undefined, sendLeaseUntil: undefined,
         }, userId);
         break;
       }
@@ -145,105 +127,82 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
       totalRecipients += candidateContacts.length;
       suppressedCount += candidateContacts.filter((c: any) => suppressedEmails.has(String(c.email).trim().toLowerCase())).length;
 
-      const deterministicIds = candidateContacts.map((contact: any) => `cmp_${campaign.id}_cnt_${contact.id}`);
+      const deterministicIds = candidateContacts.map((contact: any) => `cmp_${current._id || current.id}_cnt_${contact.id}`);
       const existingIds = new Set<string>(await client.query('messages:getManyByInternalIds' as any, { userId, ids: deterministicIds }));
 
       for (const contact of candidateContacts) {
         const email = String(contact.email).trim().toLowerCase();
         if (suppressedEmails.has(email)) continue;
-        const internalId = `cmp_${campaign.id}_cnt_${contact.id}`;
+        const internalId = `cmp_${current._id || current.id}_cnt_${contact.id}`;
         if (existingIds.has(internalId)) {
           processed += 1;
           continue;
         }
         try {
-          const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({ email, contactId: contact.id, messageId: internalId, campaignId: campaign.id, userId, baseUrl });
-          let html = personalizationService.personalizeContent(buildHtml(campaign.headHtml, campaign.htmlBody), { contact, email, unsubscribeUrl });
-          const subj = personalizationService.personalizeContent(campaign.subject, { contact, email, unsubscribeUrl });
-          if (campaign.trackClicks) html = personalizationService.rewriteLinksForClickTracking(html, internalId, baseUrl);
-          if (campaign.trackOpens) html = personalizationService.injectOpenTrackingPixel(html, internalId, baseUrl);
+          const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({ email, contactId: contact.id, messageId: internalId, campaignId: current._id || current.id, userId, baseUrl });
+          let html = personalizationService.personalizeContent(buildHtml(current.headHtml, current.htmlBody), { contact, email, unsubscribeUrl });
+          const subj = personalizationService.personalizeContent(current.subject, { contact, email, unsubscribeUrl });
+          if (current.trackClicks) html = personalizationService.rewriteLinksForClickTracking(html, internalId, baseUrl);
+          if (current.trackOpens) html = personalizationService.injectOpenTrackingPixel(html, internalId, baseUrl);
           const headers = personalizationService.generateUnsubscribeHeaders(unsubscribeUrl, senderDomain);
 
           await kumoMtaService.submitEmail({
-            internalId,
-            contactId: contact.id,
-            fromName: sender.name,
-            fromEmail: sender.fromEmail,
-            replyTo: sender.replyTo,
-            to: email,
-            subject: subj,
-            htmlBody: html,
-            plainText: campaign.plainText || undefined,
-            customHeaders: headers,
-            campaignId: campaign.id,
-            userId,
+            internalId, contactId: contact.id, fromName: sender.name, fromEmail: sender.fromEmail, replyTo: sender.replyTo,
+            to: email, subject: subj, htmlBody: html, plainText: current.plainText || undefined,
+            customHeaders: headers, campaignId: current._id || current.id, userId,
           });
           sentCount += 1;
-        } catch (err) {
+        } catch (_err) {
           failed += 1;
         }
         processed += 1;
       }
 
       cursor = page.continueCursor || undefined;
-      await convexService.updateCampaign(campaign.id, {
-        status: 'SENDING',
-        totalRecipients,
-        sentCount,
-        sendCursor: cursor,
-        sendProcessed: processed,
-        sendFailed: failed,
-        sendSuppressed: suppressedCount,
+      const renewed = await client.mutation('campaigns:renewSend' as any, {
+        id: current._id || current.id, userId, leaseId,
+        leaseUntil: new Date(Date.now() + SEND_LEASE_MS).toISOString(), now: new Date().toISOString(),
+      });
+      if (!renewed) throw new Error('CAMPAIGN_SEND_LEASE_LOST');
+
+      await convexService.updateCampaign(current._id || current.id, {
+        status: 'SENDING', totalRecipients, sentCount, sendCursor: cursor,
+        sendProcessed: processed, sendFailed: failed, sendSuppressed: suppressedCount,
       }, userId);
 
       if (!page.isDone && !cursor) throw new Error('Convex pagination returned no cursor for an unfinished campaign page');
       if (page.isDone) {
-        await convexService.updateCampaign(campaign.id, {
-          status: failed && !sentCount ? 'FAILED' : 'COMPLETED',
-          totalRecipients,
-          sentCount,
-          sendCursor: undefined,
-          sendProcessed: processed,
-          sendFailed: failed,
-          sendSuppressed: suppressedCount,
-          completedAt: new Date().toISOString(),
+        await convexService.updateCampaign(current._id || current.id, {
+          status: failed && !sentCount ? 'FAILED' : 'COMPLETED', totalRecipients, sentCount,
+          sendCursor: undefined, sendProcessed: processed, sendFailed: failed, sendSuppressed: suppressedCount,
+          completedAt: new Date().toISOString(), sendLeaseId: undefined, sendLeaseUntil: undefined,
         }, userId);
         break;
       }
     }
   } catch (err: any) {
-    await convexService.updateCampaign(campaign.id, {
-      status: 'SENDING',
-      totalRecipients,
-      sentCount,
-      sendCursor: cursor,
-      sendProcessed: processed,
-      sendFailed: failed,
-      sendSuppressed: suppressedCount,
-    }, userId);
+    const renewedLease = await client.mutation('campaigns:renewSend' as any, {
+      id: current._id || current.id, userId, leaseId,
+      leaseUntil: new Date(Date.now() + SEND_LEASE_MS).toISOString(), now: new Date().toISOString(),
+    });
+    if (renewedLease) {
+      await convexService.updateCampaign(current._id || current.id, {
+        status: 'SENDING', totalRecipients, sentCount, sendCursor: cursor,
+        sendProcessed: processed, sendFailed: failed, sendSuppressed: suppressedCount,
+      }, userId);
+    }
     return res.status(202).json({
-      success: false,
-      resumable: true,
-      message: err?.message || String(err),
-      campaign: { id: campaign.id, status: 'SENDING', sentCount, totalRecipients, processed, failed, suppressedCount, cursor },
-      pages,
+      success: false, resumable: true, message: err?.message || String(err),
+      campaign: { id: current._id || current.id, status: 'SENDING', sentCount, totalRecipients, processed, failed, suppressedCount, cursor }, pages,
     });
   }
 
-  const final = await client.query('campaigns:get' as any, { id: campaign.id, userId });
+  const final = await client.query('campaigns:get' as any, { id: current._id || current.id, userId });
   await convexService.saveTechnicalLog({
-    id: `cmp_send_${campaign.id}_${Date.now()}`,
-    service: 'Application',
-    event: 'CAMPAIGN_DISPATCH_COMPLETED',
-    severity: failed ? 'WARN' : 'INFO',
-    response: `${sentCount} queued, ${failed} failed, ${suppressedCount} suppressed`,
-    details: { campaignId: campaign.id, sentCount, failed, suppressedCount, totalRecipients, pages },
+    id: `cmp_send_${current._id || current.id}_${Date.now()}`, service: 'Application', event: 'CAMPAIGN_DISPATCH_COMPLETED',
+    severity: failed ? 'WARN' : 'INFO', response: `${sentCount} queued, ${failed} failed, ${suppressedCount} suppressed`,
+    details: { campaignId: current._id || current.id, sentCount, failed, suppressedCount, totalRecipients, pages },
   }, userId);
 
-  return res.json({
-    success: true,
-    resumable: true,
-    campaign: final,
-    summary: { totalRecipients, sentCount, suppressedCount, failedCount: failed, processed, pages },
-  });
+  return res.json({ success: true, resumable: true, campaign: final, summary: { totalRecipients, sentCount, suppressedCount, failedCount: failed, processed, pages } });
 });
