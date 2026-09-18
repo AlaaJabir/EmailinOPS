@@ -133,6 +133,18 @@ describe('Convex Functions & Imports Verification Suite', () => {
     // 17-char ID in GET /api/imports/:id
     const getRes = await fetch(`${API_URL}/api/imports/12345678901234567`);
     assert.strictEqual(getRes.status, 404, 'Returns 404 gracefully instead of 503 error');
+
+    // Direct Convex query imports:get with 17-character ID should return null, not throw
+    const directJob = await convexClient.query('imports:get' as any, { userId, id: '12345678901234567' });
+    assert.strictEqual(directJob, null, 'Direct imports:get returns null for 17-char ID');
+
+    // Direct Convex query campaigns:get with invalid ID should return null, not throw
+    const directCampaign = await convexClient.query('campaigns:get' as any, { userId, id: '12345678901234567' });
+    assert.strictEqual(directCampaign, null, 'Direct campaigns:get returns null for invalid ID');
+
+    // Direct Convex query templates:get with invalid ID should return null, not throw
+    const directTemplate = await convexClient.query('templates:get' as any, { userId, id: '12345678901234567' });
+    assert.strictEqual(directTemplate, null, 'Direct templates:get returns null for invalid ID');
   });
 
   it('4. API Health & Database verification', async () => {
@@ -142,5 +154,15 @@ describe('Convex Functions & Imports Verification Suite', () => {
     assert.strictEqual(healthData.services?.database?.healthy, true, 'Database is healthy');
     assert.strictEqual(healthData.services?.database?.configured, true, 'Database is configured');
     assert.strictEqual(healthData.services?.database?.url, CONVEX_URL, 'Convex URL matches');
+  });
+
+  it('5. ConvexService rejects unconfigured environment without silent fallback', async () => {
+    const { ConvexService } = await import('../server/services/ConvexService.js');
+    const customService = new ConvexService();
+    // When no URL is given, it should NOT fall back to any hardcoded URL
+    customService.setUrl('');
+    assert.strictEqual(customService.isConfigured, false, 'isConfigured is false when URL is empty');
+    assert.strictEqual(customService.getClient(), null, 'getClient() is null when URL is empty');
+    assert.strictEqual(customService.getUrl(), '', 'url is empty');
   });
 });

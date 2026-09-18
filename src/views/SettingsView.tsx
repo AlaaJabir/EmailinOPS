@@ -54,7 +54,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [activeTab, setActiveTab] = useState<'kumomta' | 'ses' | 'convex' | 'prometheus' | 'compliance' | 'apikeys'>('kumomta');
 
   // Convex form state
-  const [convexUrl, setConvexUrl] = useState(settings?.convex?.url || 'https://clean-badger-123.convex.cloud');
+  const [convexUrl, setConvexUrl] = useState(settings?.convex?.url || '');
   const [convexTesting, setConvexTesting] = useState(false);
   const [convexTestResult, setConvexTestResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
   const [convexFiles, setConvexFiles] = useState<any[]>([]);

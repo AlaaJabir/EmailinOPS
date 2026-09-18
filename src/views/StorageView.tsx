@@ -26,7 +26,7 @@ export const StorageView: React.FC<StorageViewProps> = ({
   authFetch,
 }) => {
   const [convexUrl, setConvexUrl] = useState(
-    settings?.convex?.url || 'https://clean-badger-123.convex.cloud'
+    settings?.convex?.url || ''
   );
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);

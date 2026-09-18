@@ -15,9 +15,16 @@ export const list = query({
 export const get = query({
   args: { id: v.string(), userId: v.string() },
   handler: async (ctx, args) => {
-    const t = await ctx.db.get(args.id as any);
-    if (t && (t as any).userId === args.userId) return t;
-    return null;
+    const normId = ctx.db.normalizeId("templates", args.id);
+    if (!normId) return null;
+    try {
+      const t = await ctx.db.get(normId);
+      if (t && (t as any).userId === args.userId) return t;
+      return null;
+    } catch (e) {
+      console.error("[templates.get] Failed to fetch template:", e);
+      return null;
+    }
   },
 });
 

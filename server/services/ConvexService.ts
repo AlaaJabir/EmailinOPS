@@ -32,11 +32,12 @@ export class ConvexService {
   }
 
   public initFromEnv() {
-    this.url =
+    this.url = (
       process.env.CONVEX_URL ||
       process.env.VITE_CONVEX_URL ||
       db.settings?.convex?.url ||
-      'https://knowing-pheasant-974.convex.cloud';
+      ''
+    ).trim();
 
     if (this.url && this.url.startsWith('https://') && !this.url.includes('placeholder')) {
       try {
@@ -50,6 +51,7 @@ export class ConvexService {
     } else {
       this.client = null;
       this.isConfigured = false;
+      console.warn('[ConvexService] CONVEX_URL is not set — Convex persistence disabled');
     }
   }
 
@@ -415,10 +417,6 @@ export class ConvexService {
       updatedAt: now,
     };
 
-    const idx = db.contacts.findIndex((c) => c.email.toLowerCase() === clean.email);
-    if (idx >= 0) db.contacts[idx] = clean;
-    else db.contacts.unshift(clean);
-
     if (this.isConfigured && this.client) {
       try {
         const id = await this.client.mutation('contacts:create' as any, {
@@ -435,22 +433,29 @@ export class ConvexService {
           updatedAt: clean.updatedAt,
         });
         if (id) clean.id = String(id);
-      } catch (e) {
-        console.warn('[ConvexService] saveContact mutation warning:', e);
+      } catch (e: any) {
+        console.error('[ConvexService] saveContact mutation failed:', e);
+        throw new Error(`Failed to save contact in Convex: ${e?.message || e}`);
       }
     }
+
+    const idx = db.contacts.findIndex((c) => c.email.toLowerCase() === clean.email);
+    if (idx >= 0) db.contacts[idx] = clean;
+    else db.contacts.unshift(clean);
+
     return clean;
   }
 
   async deleteContact(id: string, userId: string): Promise<void> {
-    db.contacts = db.contacts.filter((c) => c.id !== id);
     if (this.isConfigured && this.client) {
       try {
         await this.client.mutation('contacts:remove' as any, { id, userId });
-      } catch (e) {
-        console.warn('[ConvexService] deleteContact mutation warning:', e);
+      } catch (e: any) {
+        console.error('[ConvexService] deleteContact mutation failed:', e);
+        throw new Error(`Failed to delete contact in Convex: ${e?.message || e}`);
       }
     }
+    db.contacts = db.contacts.filter((c) => c.id !== id);
   }
 
   // Contact Lists
@@ -479,14 +484,7 @@ export class ConvexService {
     userId: string
   ): Promise<ContactList> {
     const now = new Date().toISOString();
-    const clean: ContactList = {
-      id: `lst_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      name: list.name,
-      description: list.description || '',
-      memberCount: list.contactCount || 0,
-      createdAt: now,
-    };
-    db.contactLists.unshift(clean);
+    let listId = `lst_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
     if (this.isConfigured && this.client) {
       try {
@@ -497,11 +495,21 @@ export class ConvexService {
           contactCount: list.contactCount || 0,
           createdAt: now,
         });
-        if (id) clean.id = String(id);
-      } catch (e) {
-        console.warn('[ConvexService] createContactList mutation warning:', e);
+        if (id) listId = String(id);
+      } catch (e: any) {
+        console.error('[ConvexService] createContactList mutation failed:', e);
+        throw new Error(`Failed to create contact list in Convex: ${e?.message || e}`);
       }
     }
+
+    const clean: ContactList = {
+      id: listId,
+      name: list.name,
+      description: list.description || '',
+      memberCount: list.contactCount || 0,
+      createdAt: now,
+    };
+    db.contactLists.unshift(clean);
     return clean;
   }
 

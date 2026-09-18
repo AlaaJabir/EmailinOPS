@@ -4,10 +4,12 @@ import { convexService } from '../services/ConvexService.js';
 
 export const importsRouter = Router();
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i;
-const CONVEX_ID_REGEX = /^[a-z0-9]{32}$/;
+const CONVEX_ID_REGEX = /^[a-z0-9]{32}$/i;
 
 export function isValidConvexId(id?: string | null): boolean {
-  return typeof id === 'string' && CONVEX_ID_REGEX.test(id.trim());
+  if (typeof id !== 'string') return false;
+  const trimmed = id.trim();
+  return CONVEX_ID_REGEX.test(trimmed);
 }
 
 type ImportRow = {

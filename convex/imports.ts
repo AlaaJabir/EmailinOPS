@@ -23,9 +23,14 @@ export const get = query({
   handler: async (ctx, args) => {
     const normId = ctx.db.normalizeId("import_jobs", args.id);
     if (!normId) return null;
-    const job = await ctx.db.get(normId);
-    if (!job || job.userId !== args.userId) return null;
-    return job;
+    try {
+      const job = await ctx.db.get(normId);
+      if (!job || job.userId !== args.userId) return null;
+      return job;
+    } catch (e) {
+      console.error("[imports.get] Failed to fetch import job:", e);
+      return null;
+    }
   },
 });
 
@@ -47,7 +52,12 @@ export const start = mutation({
     if (targetListId) {
       const normId = ctx.db.normalizeId("contact_lists", targetListId);
       if (normId) {
-        existingList = await ctx.db.get(normId);
+        try {
+          existingList = await ctx.db.get(normId);
+        } catch (e) {
+          console.warn("[imports.start] Failed to fetch list:", e);
+          existingList = null;
+        }
       }
       if (!existingList) {
         // Check if there is an existing list with this name for this user
@@ -117,7 +127,13 @@ export const processChunk = mutation({
   handler: async (ctx, args) => {
     const normJobId = ctx.db.normalizeId("import_jobs", args.importId);
     if (!normJobId) throw new Error("Import job not found");
-    const job = await ctx.db.get(normJobId);
+    let job: any = null;
+    try {
+      job = await ctx.db.get(normJobId);
+    } catch (e) {
+      console.error("[imports.processChunk] Failed to get job:", e);
+      throw new Error("Import job not found");
+    }
     if (!job || job.userId !== args.userId) throw new Error("Import job not found");
     if (job.status === "COMPLETED" || job.status === "CANCELLED") {
       throw new Error(`Import is ${job.status.toLowerCase()}`);
@@ -195,11 +211,15 @@ export const processChunk = mutation({
     }
 
     if (normListId && newMembersAdded > 0) {
-      const list = await ctx.db.get(normListId);
-      if (list) {
-        await ctx.db.patch(list._id, {
-          contactCount: (list.contactCount || 0) + newMembersAdded,
-        });
+      try {
+        const list = await ctx.db.get(normListId);
+        if (list) {
+          await ctx.db.patch(list._id, {
+            contactCount: (list.contactCount || 0) + newMembersAdded,
+          });
+        }
+      } catch (e) {
+        console.warn("[imports.processChunk] Failed to update list count:", e);
       }
     }
 
@@ -232,7 +252,13 @@ export const complete = mutation({
   handler: async (ctx, args) => {
     const normJobId = ctx.db.normalizeId("import_jobs", args.importId);
     if (!normJobId) throw new Error("Import job not found");
-    const job = await ctx.db.get(normJobId);
+    let job: any = null;
+    try {
+      job = await ctx.db.get(normJobId);
+    } catch (e) {
+      console.error("[imports.complete] Failed to get job:", e);
+      throw new Error("Import job not found");
+    }
     if (!job || job.userId !== args.userId) throw new Error("Import job not found");
     if (args.parserTail && args.parserTail.trim()) {
       // If there's an email in the parser tail, we can also insert it or ignore
@@ -253,7 +279,13 @@ export const cancel = mutation({
   handler: async (ctx, args) => {
     const normJobId = ctx.db.normalizeId("import_jobs", args.importId);
     if (!normJobId) throw new Error("Import job not found");
-    const job = await ctx.db.get(normJobId);
+    let job: any = null;
+    try {
+      job = await ctx.db.get(normJobId);
+    } catch (e) {
+      console.error("[imports.cancel] Failed to get job:", e);
+      throw new Error("Import job not found");
+    }
     if (!job || job.userId !== args.userId) throw new Error("Import job not found");
     await ctx.db.patch(job._id, {
       status: "CANCELLED",
