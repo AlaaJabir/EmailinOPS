@@ -113,7 +113,7 @@ export const ImportHistoryPanel: React.FC<{
     }
   };
 
-  const startPasteImport = async () =>
+  const startPasteImport = async () => {
     if (!selectedListId || !pasteValue.trim()) return;
     const file = new File([pasteValue], 'pasted-contacts.csv', { type: 'text/csv' });
     setShowImportPicker(false);
