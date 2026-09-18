@@ -1,7 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Archive, CheckCircle2, ClipboardPaste, Loader2, Play, Upload, XCircle } from 'lucide-react';
 
-interface AudienceList {\n  id: string;\n  name: string;\n  description?: string;\n  memberCount?: number;\n}\n\ninterface ImportRecord {
+interface AudienceList {
+  id: string;
+  name: string;
+  description?: string;
+  memberCount?: number;
+}
+
+interface ImportRecord {
   id: string;
   name: string;
   original_filename?: string;
@@ -140,7 +147,8 @@ export const ImportHistoryPanel: React.FC<{
         let end = Math.min(offset + chunkSize, file.size);
         if (end < file.size) {
           const probe = await file.slice(offset, end).text();
-          const cut = probe.lastIndexOf('\n');
+          const cut = probe.lastIndexOf('
+');
           if (cut > 0) end = offset + cut + 1;
         }
 
@@ -241,7 +249,9 @@ export const ImportHistoryPanel: React.FC<{
             </div>
             {importMethod === 'paste' && (
               <div className="mt-4">
-                <textarea value={pasteValue} onChange={(e) => setPasteValue(e.target.value)} placeholder={"email,name\ncontact@example.com,John\nother@example.com,Jane"} className="w-full min-h-36 resize-y rounded border border-white/10 bg-[#050505] px-3 py-2 text-xs text-white placeholder:text-[#555] focus:outline-none focus:border-white/30 font-mono" autoFocus />
+                <textarea value={pasteValue} onChange={(e) => setPasteValue(e.target.value)} placeholder={"email,name
+contact@example.com,John
+other@example.com,Jane"} className="w-full min-h-36 resize-y rounded border border-white/10 bg-[#050505] px-3 py-2 text-xs text-white placeholder:text-[#555] focus:outline-none focus:border-white/30 font-mono" autoFocus />
                 <div className="flex justify-end gap-2 mt-3">
                   <button type="button" onClick={() => setShowImportPicker(false)} className="px-3 py-2 rounded border border-white/10 text-xs text-[#aaa] hover:text-white">Cancel</button>
                   <button type="button" disabled={!selectedListId || !pasteValue.trim() || uploading} onClick={startPasteImport} className="px-3 py-2 rounded bg-white text-black text-xs font-semibold disabled:opacity-40">Import Pasted Contacts</button>
