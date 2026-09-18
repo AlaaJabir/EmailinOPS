@@ -193,7 +193,7 @@ export const ImportHistoryPanel: React.FC<{
       localStorage.setItem(resumeKey(file), imp.id);
       setCurrent(imp);
 
-      const chunkSize = 512 * 1024;
+      const chunkSize = 64 * 1024;
       let offset = Math.max(0, Number(imp.upload_offset_bytes || 0));
       if (offset > file.size) throw new Error('Stored import offset is larger than the selected file. Start a fresh import.');
 
