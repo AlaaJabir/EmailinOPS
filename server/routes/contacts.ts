@@ -8,15 +8,11 @@ export const contactsRouter = Router();
 contactsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id || await convexService.getDefaultUserId();
-    let contacts = await convexService.getContacts(userId);
     const { search, status, listId } = req.query;
-
-    if (listId && typeof listId === 'string') {
-      const contactIds = new Set(
-        db.listMemberships.filter((m) => m.listId === listId).map((m) => m.contactId)
-      );
-      contacts = contacts.filter((c) => contactIds.has(c.id));
-    }
+    let contacts = await convexService.getContacts(
+      userId,
+      typeof listId === 'string' ? listId : undefined
+    );
 
     if (search && typeof search === 'string') {
       const q = search.toLowerCase();
@@ -59,11 +55,12 @@ contactsRouter.post('/', optionalAuth, async (req: Request, res: Response) => {
   );
 
   if (listId) {
-    db.listMemberships.push({
-      listId: String(listId),
-      contactId: contact.id,
-      joinedAt: new Date().toISOString(),
-    });
+    await convexService.addContactToList(
+      userId,
+      String(listId),
+      contact.id,
+      new Date().toISOString()
+    );
   }
 
   return res.status(201).json({ success: true, contact });
@@ -98,7 +95,7 @@ contactsRouter.post('/import', optionalAuth, async (req: Request, res: Response)
       skippedDuplicates++;
       if (listId) {
         const contactId = existingMap.get(email)!;
-        db.listMemberships.push({ listId: String(listId), contactId, joinedAt: new Date().toISOString() });
+        await convexService.addContactToList(userId, String(listId), contactId, new Date().toISOString());
         assignedToList++;
       }
       continue;
@@ -119,7 +116,7 @@ contactsRouter.post('/import', optionalAuth, async (req: Request, res: Response)
     imported++;
 
     if (listId) {
-      db.listMemberships.push({ listId: String(listId), contactId: saved.id, joinedAt: new Date().toISOString() });
+      await convexService.addContactToList(userId, String(listId), saved.id, new Date().toISOString());
       assignedToList++;
     }
   }
@@ -137,16 +134,7 @@ contactsRouter.post('/import', optionalAuth, async (req: Request, res: Response)
 contactsRouter.get('/lists', optionalAuth, async (req: Request, res: Response) => {
   const userId = req.user?.id || await convexService.getDefaultUserId();
   const lists = await convexService.getContactLists(userId);
-  return res.json({
-    lists: lists.map((l) => ({
-      id: l.id,
-      name: l.name,
-      description: l.description,
-      memberCount: db.listMemberships.filter((m) => m.listId === l.id).length,
-      createdAt: l.createdAt,
-      updatedAt: l.createdAt,
-    })),
-  });
+  return res.json({ lists });
 });
 
 contactsRouter.post('/lists', optionalAuth, async (req: Request, res: Response) => {
@@ -154,24 +142,12 @@ contactsRouter.post('/lists', optionalAuth, async (req: Request, res: Response) 
   if (!name) return res.status(400).json({ error: 'Name is required' });
 
   const now = new Date().toISOString();
-  const newList = {
-    id: `lst_${Date.now()}`,
-    name: String(name).trim(),
-    description: description || undefined,
-    memberCount: 0,
-    createdAt: now,
-  };
-  db.contactLists.push(newList);
+  const list = await convexService.createContactList(
+    userId,
+    String(name).trim(),
+    description ? String(description).trim() : undefined,
+    now
+  );
 
-  return res.status(201).json({
-    success: true,
-    list: {
-      id: newList.id,
-      name: newList.name,
-      description: newList.description,
-      memberCount: 0,
-      createdAt: now,
-      updatedAt: now,
-    },
-  });
+  return res.status(201).json({ success: true, list });
 });
