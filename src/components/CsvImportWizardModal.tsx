@@ -228,6 +228,10 @@ export const CsvImportWizardModal: React.FC<CsvImportWizardModalProps> = ({
     const listName = getEffectiveListName();
     setTargetListName(listName);
 
+    // Tracked outside the try block (not `const` inside it) so the catch
+    // handler below can still reach it to mark the job FAILED server-side.
+    let currentImportId = '';
+
     try {
       // 1. Start durable import job in Convex
       const startRes = await authFetch('/api/imports/start', {
@@ -248,11 +252,14 @@ export const CsvImportWizardModal: React.FC<CsvImportWizardModalProps> = ({
         throw new Error(startData?.error || 'Failed to initialize durable import job.');
       }
 
-      const currentImportId = startData.import.id;
+      currentImportId = startData.import.id;
       setImportId(currentImportId);
 
-      // 2. Stream chunk loop (4MB chunk size)
-      const chunkSize = 2 * 1024 * 1024; // 2MB chunk
+      // 2. Stream chunk loop. Chunk size is intentionally small (150KB) so a
+      // plain email-only list (very short lines) can never balloon a single
+      // chunk into tens of thousands of rows — that used to overload the
+      // backend mutation on large files.
+      const chunkSize = 150 * 1024; // 150KB chunk
       let offset = 0;
       let chunkIndex = 0;
       let tail = '';
@@ -309,22 +316,46 @@ export const CsvImportWizardModal: React.FC<CsvImportWizardModalProps> = ({
         }
 
         const chunkId = `chk_${chunkIndex}_${offset}`;
-        const chunkRes = await authFetch(`/api/imports/${currentImportId}/chunk`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chunkId,
-            offset,
-            nextOffset: end,
-            parserTail: tail,
-            invalidRows: chunkInvalid,
-            rows: chunkRows,
-          }),
+        const chunkPayload = JSON.stringify({
+          chunkId,
+          offset,
+          nextOffset: end,
+          parserTail: tail,
+          invalidRows: chunkInvalid,
+          rows: chunkRows,
         });
 
-        const chunkData = await chunkRes.json();
-        if (!chunkRes.ok) {
-          throw new Error(chunkData?.error || `Chunk ${chunkIndex} import failed`);
+        // Retry a chunk a few times on transient/network/server errors before
+        // giving up — a single flaky request should not fail a multi-hundred
+        // chunk import. Permanent errors (bad request, offset desync, import
+        // not found) are surfaced immediately instead of retried.
+        let chunkData: any = null;
+        let chunkErr: any = null;
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            const chunkRes = await authFetch(`/api/imports/${currentImportId}/chunk`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: chunkPayload,
+            });
+            const data = await chunkRes.json().catch(() => ({}));
+            if (!chunkRes.ok) {
+              const httpErr: any = new Error(data?.error || `Chunk ${chunkIndex} import failed (HTTP ${chunkRes.status})`);
+              httpErr.status = chunkRes.status;
+              throw httpErr;
+            }
+            chunkData = data;
+            break;
+          } catch (err: any) {
+            chunkErr = err;
+            const isRetryable = !err.status || err.status >= 500;
+            if (!isRetryable || attempt >= maxAttempts) break;
+            await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+          }
+        }
+        if (!chunkData) {
+          throw chunkErr || new Error(`Chunk ${chunkIndex} import failed`);
         }
 
         const imp = chunkData.import;
@@ -372,6 +403,15 @@ export const CsvImportWizardModal: React.FC<CsvImportWizardModalProps> = ({
       console.error('[CSV Import Error]', err);
       setStatus('failed');
       setErrorMessage(err.message || 'Import process encountered an error.');
+      // Mark the job FAILED server-side so it doesn't sit stuck at
+      // "PROCESSING" forever in the Audience Lists / Import History panel.
+      if (currentImportId) {
+        try {
+          await authFetch(`/api/imports/${currentImportId}/fail`, { method: 'POST' });
+        } catch (e) {
+          // best-effort — the import can still be manually cancelled
+        }
+      }
     }
   };
 
