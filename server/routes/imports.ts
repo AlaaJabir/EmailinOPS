@@ -4,8 +4,6 @@ import { convexService } from '../services/ConvexService.js';
 
 export const importsRouter = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_ROWS_PER_CHUNK = 100;
-
 type ImportRow = {
   rowNumber: number;
   email: string;
@@ -120,7 +118,6 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
     const rows = parseRows(parts.join('\n'), Number(job.processedRows || 0));
     const invalidRows = rows.filter((row) => !row.valid).length;
     const validRows = rows.filter((row) => row.valid);
-    if (validRows.length > MAX_ROWS_PER_CHUNK) return res.status(413).json({ error: `Chunk contains too many rows. Maximum is ${MAX_ROWS_PER_CHUNK}.` });
 
     const emails = validRows.map((row) => row.normalizedEmail);
     const suppressedEmails = await client.query('suppressions:findMany' as any, { userId, emails });
