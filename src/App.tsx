@@ -582,16 +582,22 @@ export function App() {
           )}
 
           {(currentTab === 'contacts' || currentTab === 'contacts-import') && (
-            <>
+            <div className="space-y-6">
               <ContactsView
                 contacts={contacts}
                 lists={lists}
                 onAddContact={handleAddContact}
                 onCreateList={handleCreateList}
                 onImportCsv={handleImportCsv}
+                authFetch={authFetch}
+                onUseAudience={useAudience}
+                onRefreshContacts={fetchContactsAndLists}
+                initialTab={currentTab === 'contacts-import' ? 'import' : 'contacts'}
               />
-              <ImportHistoryPanel authFetch={authFetch} onUseAudience={useAudience} />
-            </>
+              <div className="max-w-7xl mx-auto px-4 md:px-8">
+                <ImportHistoryPanel authFetch={authFetch} onUseAudience={useAudience} />
+              </div>
+            </div>
           )}
 
           {(currentTab === 'suppression' || currentTab === 'optimization') && (

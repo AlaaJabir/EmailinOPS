@@ -135,43 +135,26 @@ contactsRouter.post('/import', optionalAuth, async (req: Request, res: Response)
 });
 
 contactsRouter.get('/lists', optionalAuth, async (req: Request, res: Response) => {
-  const userId = req.user?.id || await convexService.getDefaultUserId();
-  const lists = await convexService.getContactLists(userId);
-  return res.json({
-    lists: lists.map((l) => ({
-      id: l.id,
-      name: l.name,
-      description: l.description,
-      memberCount: db.listMemberships.filter((m) => m.listId === l.id).length,
-      createdAt: l.createdAt,
-      updatedAt: l.createdAt,
-    })),
-  });
+  try {
+    const userId = req.user?.id || (await convexService.getDefaultUserId());
+    const lists = await convexService.getContactLists(userId);
+    return res.json({ lists });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 contactsRouter.post('/lists', optionalAuth, async (req: Request, res: Response) => {
-  const { name, description } = req.body;
-  if (!name) return res.status(400).json({ error: 'Name is required' });
-
-  const now = new Date().toISOString();
-  const newList = {
-    id: `lst_${Date.now()}`,
-    name: String(name).trim(),
-    description: description || undefined,
-    memberCount: 0,
-    createdAt: now,
-  };
-  db.contactLists.push(newList);
-
-  return res.status(201).json({
-    success: true,
-    list: {
-      id: newList.id,
-      name: newList.name,
-      description: newList.description,
-      memberCount: 0,
-      createdAt: now,
-      updatedAt: now,
-    },
-  });
+  try {
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+    const userId = req.user?.id || (await convexService.getDefaultUserId());
+    const list = await convexService.createContactList(
+      { name: String(name).trim(), description: description ? String(description).trim() : undefined },
+      userId
+    );
+    return res.status(201).json({ success: true, list });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });

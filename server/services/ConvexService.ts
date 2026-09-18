@@ -6,6 +6,7 @@ import {
   Sender,
   Campaign,
   Contact,
+  ContactList,
   SuppressionItem,
   TechnicalLog,
   Domain,
@@ -35,7 +36,7 @@ export class ConvexService {
       process.env.CONVEX_URL ||
       process.env.VITE_CONVEX_URL ||
       db.settings?.convex?.url ||
-      '';
+      'https://knowing-pheasant-974.convex.cloud';
 
     if (this.url && this.url.startsWith('https://') && !this.url.includes('placeholder')) {
       try {
@@ -364,10 +365,16 @@ export class ConvexService {
   }
 
   // Contacts
-  async getContacts(userId: string, listId?: string): Promise<Contact[]> {
+  async getContacts(userId: string, listId?: string, limit: number = 500): Promise<Contact[]> {
     if (this.isConfigured && this.client) {
       try {
-        const remote = await this.client.query('contacts:list' as any, { userId });
+        let remote: any[] = [];
+        if (listId && listId !== 'ALL') {
+          const res = await this.client.query('contacts:listPage' as any, { userId, listId, numItems: limit });
+          remote = res?.page || [];
+        } else {
+          remote = await this.client.query('contacts:list' as any, { userId, limit });
+        }
         if (Array.isArray(remote) && remote.length > 0) {
           return remote.map((c: any) => ({
             id: c._id || c.id,
@@ -386,14 +393,14 @@ export class ConvexService {
         console.warn('[ConvexService] getContacts query warning:', e);
       }
     }
-    if (listId) {
+    if (listId && listId !== 'ALL') {
       const contactIds = new Set(db.listMemberships.filter((m) => m.listId === listId).map((m) => m.contactId));
       return db.contacts.filter((c) => contactIds.has(c.id));
     }
     return db.contacts;
   }
 
-  async saveContact(contact: Partial<Contact>, userId: string): Promise<Contact> {
+  async saveContact(contact: Partial<Contact>, userId: string, listId?: string): Promise<Contact> {
     const now = new Date().toISOString();
     const clean: Contact = {
       id: contact.id || `cnt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -414,7 +421,7 @@ export class ConvexService {
 
     if (this.isConfigured && this.client) {
       try {
-        await this.client.mutation('contacts:create' as any, {
+        const id = await this.client.mutation('contacts:create' as any, {
           userId,
           email: clean.email,
           firstName: clean.firstName,
@@ -422,10 +429,12 @@ export class ConvexService {
           company: clean.company,
           status: clean.status,
           tags: clean.tags,
+          listId: listId || undefined,
           customFields: clean.customFields,
           createdAt: clean.createdAt,
           updatedAt: clean.updatedAt,
         });
+        if (id) clean.id = String(id);
       } catch (e) {
         console.warn('[ConvexService] saveContact mutation warning:', e);
       }
@@ -445,8 +454,265 @@ export class ConvexService {
   }
 
   // Contact Lists
-  async getContactLists(userId: string) {
+  async getContactLists(userId: string): Promise<ContactList[]> {
+    if (this.isConfigured && this.client) {
+      try {
+        const remote = await this.client.query('contacts:listLists' as any, { userId });
+        if (Array.isArray(remote)) {
+          return remote.map((l: any) => ({
+            id: l._id || l.id,
+            name: l.name,
+            description: l.description || '',
+            memberCount: l.contactCount || 0,
+            createdAt: l.createdAt,
+          }));
+        }
+      } catch (e) {
+        console.warn('[ConvexService] getContactLists query warning:', e);
+      }
+    }
     return db.contactLists;
+  }
+
+  async createContactList(
+    list: { name: string; description?: string; contactCount?: number },
+    userId: string
+  ): Promise<ContactList> {
+    const now = new Date().toISOString();
+    const clean: ContactList = {
+      id: `lst_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: list.name,
+      description: list.description || '',
+      memberCount: list.contactCount || 0,
+      createdAt: now,
+    };
+    db.contactLists.unshift(clean);
+
+    if (this.isConfigured && this.client) {
+      try {
+        const id = await this.client.mutation('contacts:createList' as any, {
+          userId,
+          name: list.name,
+          description: list.description,
+          contactCount: list.contactCount || 0,
+          createdAt: now,
+        });
+        if (id) clean.id = String(id);
+      } catch (e) {
+        console.warn('[ConvexService] createContactList mutation warning:', e);
+      }
+    }
+    return clean;
+  }
+
+  // Import Jobs (Durable Convex Imports)
+  async getImportJobs(userId: string) {
+    if (this.isConfigured && this.client) {
+      try {
+        const remote = await this.client.query('imports:list' as any, { userId });
+        if (Array.isArray(remote)) {
+          return remote.map((j: any) => ({
+            id: j._id || j.id,
+            user_id: j.userId,
+            name: j.name,
+            original_filename: j.originalFilename,
+            list_id: j.listId,
+            list_name: j.listName,
+            status: j.status,
+            source_size_bytes: j.sourceSizeBytes || 0,
+            upload_offset_bytes: j.uploadOffsetBytes || 0,
+            processed_rows: j.processedRows || 0,
+            total_rows: j.totalRows || 0,
+            valid_rows: j.validRows || 0,
+            invalid_rows: j.invalidRows || 0,
+            duplicate_rows: j.duplicateRows || 0,
+            suppressed_rows: j.suppressedRows || 0,
+            imported_rows: j.importedRows || 0,
+            last_chunk_id: j.lastChunkId,
+            started_at: j.startedAt,
+            completed_at: j.completedAt,
+            updated_at: j.updatedAt,
+          }));
+        }
+      } catch (e) {
+        console.warn('[ConvexService] getImportJobs query warning:', e);
+      }
+    }
+    return [];
+  }
+
+  async getImportJob(id: string, userId: string) {
+    if (this.isConfigured && this.client) {
+      try {
+        const j = await this.client.query('imports:get' as any, { id, userId });
+        if (j) {
+          return {
+            id: j._id || j.id,
+            user_id: j.userId,
+            name: j.name,
+            original_filename: j.originalFilename,
+            list_id: j.listId,
+            list_name: j.listName,
+            status: j.status,
+            source_size_bytes: j.sourceSizeBytes || 0,
+            upload_offset_bytes: j.uploadOffsetBytes || 0,
+            processed_rows: j.processedRows || 0,
+            total_rows: j.totalRows || 0,
+            valid_rows: j.validRows || 0,
+            invalid_rows: j.invalidRows || 0,
+            duplicate_rows: j.duplicateRows || 0,
+            suppressed_rows: j.suppressedRows || 0,
+            imported_rows: j.importedRows || 0,
+            last_chunk_id: j.lastChunkId,
+            started_at: j.startedAt,
+            completed_at: j.completedAt,
+            updated_at: j.updatedAt,
+          };
+        }
+      } catch (e) {
+        console.warn('[ConvexService] getImportJob query warning:', e);
+      }
+    }
+    return null;
+  }
+
+  async startImportJob(params: {
+    userId: string;
+    name: string;
+    originalFilename: string;
+    sourceSizeBytes: number;
+    listId?: string;
+    listName: string;
+    listDescription?: string;
+  }) {
+    const now = new Date().toISOString();
+    if (this.isConfigured && this.client) {
+      try {
+        const res = await this.client.mutation('imports:start' as any, {
+          userId: params.userId,
+          name: params.name,
+          originalFilename: params.originalFilename,
+          sourceSizeBytes: params.sourceSizeBytes,
+          listId: params.listId || undefined,
+          listName: params.listName,
+          listDescription: params.listDescription,
+          now,
+        });
+        return {
+          id: res.importId,
+          list_id: res.listId,
+          status: 'PROCESSING',
+          processed_rows: 0,
+          total_rows: 0,
+          valid_rows: 0,
+          invalid_rows: 0,
+          duplicate_rows: 0,
+          suppressed_rows: 0,
+          imported_rows: 0,
+          started_at: now,
+        };
+      } catch (e) {
+        console.warn('[ConvexService] startImportJob mutation warning:', e);
+        throw e;
+      }
+    }
+    throw new Error('Convex is not configured');
+  }
+
+  async processImportJobChunk(params: {
+    userId: string;
+    importId: string;
+    chunkId: string;
+    offset: number;
+    nextOffset: number;
+    parserTail: string;
+    invalidRows: number;
+    suppressedEmails: string[];
+    rows: Array<{ email: string; firstName?: string; lastName?: string; company?: string }>;
+  }) {
+    const now = new Date().toISOString();
+    if (this.isConfigured && this.client) {
+      try {
+        const j = await this.client.mutation('imports:processChunk' as any, {
+          userId: params.userId,
+          importId: params.importId,
+          chunkId: params.chunkId,
+          offset: params.offset,
+          nextOffset: params.nextOffset,
+          parserTail: params.parserTail,
+          invalidRows: params.invalidRows,
+          suppressedEmails: params.suppressedEmails,
+          rows: params.rows,
+          now,
+        });
+        return {
+          id: j._id || j.id,
+          status: j.status,
+          processed_rows: j.processedRows,
+          total_rows: j.totalRows,
+          valid_rows: j.validRows,
+          invalid_rows: j.invalidRows,
+          duplicate_rows: j.duplicateRows,
+          suppressed_rows: j.suppressedRows,
+          imported_rows: j.importedRows,
+          upload_offset_bytes: j.uploadOffsetBytes,
+        };
+      } catch (e) {
+        console.warn('[ConvexService] processImportJobChunk mutation warning:', e);
+        throw e;
+      }
+    }
+    throw new Error('Convex is not configured');
+  }
+
+  async completeImportJob(params: { userId: string; importId: string; finalOffset: number; parserTail?: string }) {
+    const now = new Date().toISOString();
+    if (this.isConfigured && this.client) {
+      try {
+        const j = await this.client.mutation('imports:complete' as any, {
+          userId: params.userId,
+          importId: params.importId,
+          finalOffset: params.finalOffset,
+          parserTail: params.parserTail || '',
+          now,
+        });
+        return {
+          id: j._id || j.id,
+          status: j.status,
+          processed_rows: j.processedRows,
+          imported_rows: j.importedRows,
+          duplicate_rows: j.duplicateRows,
+          invalid_rows: j.invalidRows,
+          completed_at: j.completedAt,
+        };
+      } catch (e) {
+        console.warn('[ConvexService] completeImportJob mutation warning:', e);
+        throw e;
+      }
+    }
+    throw new Error('Convex is not configured');
+  }
+
+  async cancelImportJob(id: string, userId: string) {
+    const now = new Date().toISOString();
+    if (this.isConfigured && this.client) {
+      try {
+        const j = await this.client.mutation('imports:cancel' as any, {
+          userId,
+          importId: id,
+          now,
+        });
+        return {
+          id: j._id || j.id,
+          status: j.status,
+          completed_at: j.completedAt,
+        };
+      } catch (e) {
+        console.warn('[ConvexService] cancelImportJob mutation warning:', e);
+        throw e;
+      }
+    }
+    return null;
   }
 
   // Campaigns
