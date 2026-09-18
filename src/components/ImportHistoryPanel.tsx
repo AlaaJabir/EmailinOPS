@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Archive, CheckCircle2, Loader2, Play, Upload, XCircle } from 'lucide-react';
+import { Archive, CheckCircle2, ClipboardPaste, Loader2, Play, Upload, XCircle } from 'lucide-react';
 
-interface ImportRecord {
+interface AudienceList {\n  id: string;\n  name: string;\n  description?: string;\n  memberCount?: number;\n}\n\ninterface ImportRecord {
   id: string;
   name: string;
   original_filename?: string;
@@ -122,7 +122,7 @@ export const ImportHistoryPanel: React.FC<{
         const start = await authFetch('/api/imports/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: file.name, filename: file.name, sourceSizeBytes: file.size }),
+          body: JSON.stringify({ name: file.name, filename: file.name, sourceSizeBytes: file.size, listId: selectedListId, listName: lists.find((list) => list.id === selectedListId)?.name }),
         });
         const sd = await readJson<{ import: ImportRecord }>(start, 'Could not start import');
         imp = normalizeImportRecord(sd.import);
@@ -189,10 +189,10 @@ export const ImportHistoryPanel: React.FC<{
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-white flex items-center gap-2"><Archive className="w-4 h-4" />Import History & Reusable Audiences</h2>
-          <p className="text-xs text-[#888888] mt-1">Imported files stay available as reusable audiences. Large files are streamed in chunks and interrupted uploads can resume from the saved offset.</p>
+          <p className="text-xs text-[#888888] mt-1">Import contacts into an existing audience. Upload a CSV/TXT file or paste contacts directly.</p>
         </div>
-        <button disabled={uploading} onClick={() => fileRef.current?.click()} className="flex items-center gap-2 px-4 py-2 rounded-sm bg-white text-black text-xs font-semibold disabled:opacity-50">
-          <Upload className="w-3.5 h-3.5" />{uploading ? 'Importing…' : 'Import CSV / TXT'}
+        <button disabled={uploading} onClick={openImportPicker} className="flex items-center gap-2 px-4 py-2 rounded-sm bg-white text-black text-xs font-semibold disabled:opacity-50">
+          <Upload className="w-3.5 h-3.5" />{uploading ? 'Importing…' : 'Import Contacts'}
         </button>
         <input ref={fileRef} hidden type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); }} />
       </div>
@@ -214,6 +214,48 @@ export const ImportHistoryPanel: React.FC<{
       )}
 
       {error && <div className="text-xs text-red-400 flex items-center gap-2"><XCircle className="w-3.5 h-3.5" />{error}</div>}
+
+      {showImportPicker && (<div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#0F0F0F] p-5 shadow-2xl text-white">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold">Import Contacts</h3>
+                <p className="text-[11px] text-[#888] mt-1">Choose the audience that should receive these contacts.</p>
+              </div>
+              <button type="button" onClick={() => setShowImportPicker(false)} className="text-[#888] hover:text-white">×</button>
+            </div>
+            <label className="block text-[10px] uppercase tracking-[0.12em] text-[#777] mb-2">Audience List</label>
+            <select value={selectedListId} onChange={(e) => setSelectedListId(e.target.value)} className="w-full rounded border border-white/10 bg-[#050505] px-3 py-2 text-xs text-white focus:outline-none focus:border-white/30">
+              <option value="">Select an audience list…</option>
+              {lists.map((list) => (
+                <option key={list.id} value={list.id}>{list.name}{typeof list.memberCount === 'number' ? ' (' + list.memberCount + ')' : ''}</option>
+              ))}
+            </select>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button type="button" disabled={!selectedListId} onClick={chooseFile} className="flex flex-col items-center justify-center gap-2 rounded border border-white/10 bg-[#050505] px-3 py-4 text-xs text-white hover:border-white/30 disabled:opacity-40">
+                <Upload className="w-4 h-4" /><span className="font-semibold">Upload File</span><span className="text-[10px] text-[#666]">CSV / TXT</span>
+              </button>
+              <button type="button" disabled={!selectedListId} onClick={() => setImportMethod('paste')} className="flex flex-col items-center justify-center gap-2 rounded border border-white/10 bg-[#050505] px-3 py-4 text-xs text-white hover:border-white/30 disabled:opacity-40">
+                <ClipboardPaste className="w-4 h-4" /><span className="font-semibold">Paste Contacts</span><span className="text-[10px] text-[#666]">CSV / email list</span>
+              </button>
+            </div>
+            {importMethod === 'paste' && (
+              <div className="mt-4">
+                <textarea value={pasteValue} onChange={(e) => setPasteValue(e.target.value)} placeholder={"email,name\ncontact@example.com,John\nother@example.com,Jane"} className="w-full min-h-36 resize-y rounded border border-white/10 bg-[#050505] px-3 py-2 text-xs text-white placeholder:text-[#555] focus:outline-none focus:border-white/30 font-mono" autoFocus />
+                <div className="flex justify-end gap-2 mt-3">
+                  <button type="button" onClick={() => setShowImportPicker(false)} className="px-3 py-2 rounded border border-white/10 text-xs text-[#aaa] hover:text-white">Cancel</button>
+                  <button type="button" disabled={!selectedListId || !pasteValue.trim() || uploading} onClick={startPasteImport} className="px-3 py-2 rounded bg-white text-black text-xs font-semibold disabled:opacity-40">Import Pasted Contacts</button>
+                </div>
+              </div>
+            )}
+            {importMethod === 'file' && (
+              <div className="flex justify-end gap-2 mt-4">
+                <button type="button" onClick={() => setShowImportPicker(false)} className="px-3 py-2 rounded border border-white/10 text-xs text-[#aaa] hover:text-white">Cancel</button>
+                <button type="button" disabled={!selectedListId} onClick={chooseFile} className="px-3 py-2 rounded bg-white text-black text-xs font-semibold disabled:opacity-40">Choose CSV / TXT</button>
+              </div>
+            )}
+          </div>
+        </div>)}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
