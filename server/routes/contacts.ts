@@ -141,6 +141,7 @@ contactsRouter.post('/lists', optionalAuth, async (req: Request, res: Response) 
   const { name, description } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
 
+  const userId = req.user?.id || await convexService.getDefaultUserId();
   const now = new Date().toISOString();
   const list = await convexService.createContactList(
     userId,
