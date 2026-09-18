@@ -147,8 +147,7 @@ export const ImportHistoryPanel: React.FC<{
         let end = Math.min(offset + chunkSize, file.size);
         if (end < file.size) {
           const probe = await file.slice(offset, end).text();
-          const cut = probe.lastIndexOf('
-');
+          const cut = probe.lastIndexOf('\\n');
           if (cut > 0) end = offset + cut + 1;
         }
 
