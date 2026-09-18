@@ -367,9 +367,16 @@ export class ConvexService {
   async getContacts(userId: string, listId?: string): Promise<Contact[]> {
     if (this.isConfigured && this.client) {
       try {
-        const remote = await this.client.query('contacts:list' as any, { userId });
-        if (Array.isArray(remote) && remote.length > 0) {
-          return remote.map((c: any) => ({
+        const remote = listId
+          ? await this.client.query('contacts:listPage' as any, {
+              userId,
+              listId,
+              numItems: 500,
+            })
+          : await this.client.query('contacts:list' as any, { userId });
+        const remoteContacts = listId ? remote?.page : remote;
+        if (Array.isArray(remoteContacts)) {
+          return remoteContacts.map((c: any) => ({
             id: c._id || c.id,
             email: c.email,
             firstName: c.firstName,
@@ -387,8 +394,7 @@ export class ConvexService {
       }
     }
     if (listId) {
-      const contactIds = new Set(db.listMemberships.filter((m) => m.listId === listId).map((m) => m.contactId));
-      return db.contacts.filter((c) => contactIds.has(c.id));
+      return [];
     }
     return db.contacts;
   }
@@ -446,7 +452,83 @@ export class ConvexService {
 
   // Contact Lists
   async getContactLists(userId: string) {
+    if (this.isConfigured && this.client) {
+      try {
+        const remote = await this.client.query('contacts:listLists' as any, { userId });
+        if (Array.isArray(remote)) {
+          return remote.map((l: any) => ({
+            id: l._id || l.id,
+            name: l.name,
+            description: l.description,
+            memberCount: l.contactCount ?? l.memberCount ?? 0,
+            createdAt: l.createdAt,
+            updatedAt: l.createdAt,
+          }));
+        }
+      } catch (e) {
+        console.warn('[ConvexService] getContactLists query warning:', e);
+      }
+    }
     return db.contactLists;
+  }
+
+  async addContactToList(
+    userId: string,
+    listId: string,
+    contactId: string,
+    joinedAt: string
+  ): Promise<void> {
+    if (this.isConfigured && this.client) {
+      await this.client.mutation('contacts:addToList' as any, {
+        userId,
+        listId,
+        contactId,
+        joinedAt,
+      });
+      return;
+    }
+
+    const exists = db.listMemberships.some(
+      (m) => m.listId === listId && m.contactId === contactId
+    );
+    if (!exists) {
+      db.listMemberships.push({ listId, contactId, joinedAt });
+    }
+  }
+
+  async createContactList(
+    userId: string,
+    name: string,
+    description: string | undefined,
+    createdAt: string
+  ) {
+    if (this.isConfigured && this.client) {
+      const id = await this.client.mutation('contacts:createList' as any, {
+        userId,
+        name,
+        description,
+        contactCount: 0,
+        createdAt,
+      });
+      return {
+        id: String(id),
+        name,
+        description,
+        memberCount: 0,
+        createdAt,
+        updatedAt: createdAt,
+      };
+    }
+
+    const list = {
+      id: `lst_${Date.now()}`,
+      name,
+      description,
+      memberCount: 0,
+      createdAt,
+    };
+    db.contactLists.unshift(list);
+    return { ...list, updatedAt: createdAt };
   }
 
   // Campaigns
