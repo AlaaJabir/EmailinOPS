@@ -76,6 +76,11 @@ function findEmailColumn(headers: string[]): number {
   return normalized.findIndex((value) => preferred.includes(value));
 }
 
+// NOTE: parseRows/detectDelimiter/parseCsvLine/findEmailColumn are kept for
+// potential future server-side parsing needs, but the /:id/chunk route below
+// no longer uses them — the client (CsvImportWizardModal) already parses CSV
+// rows before sending them, and the route previously re-parsed a `chunk`
+// field the client never sent, which made every chunk request fail.
 function parseRows(text: string, startRow: number): ImportRow[] {
   const rows: ImportRow[] = [];
   const lines = text.replace(/\r/g, '').split('\n').filter((line) => line.trim().length > 0);
@@ -281,30 +286,39 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
       return res.status(409).json({ error: `Import is ${job.status.toLowerCase()}` });
     }
 
-    const chunk = String(req.body?.chunk || '');
     const chunkId = String(req.body?.chunkId || '');
     const offset = Math.max(0, Number(req.body?.offset || 0));
-    const sourceSizeBytes = Math.max(0, Number(req.body?.sourceSizeBytes || job.sourceSizeBytes || 0));
-    if (!chunk) return res.status(400).json({ error: 'Chunk is required' });
+    const nextOffsetRaw = req.body?.nextOffset;
+    const nextOffset = nextOffsetRaw !== undefined && nextOffsetRaw !== null
+      ? Math.max(0, Number(nextOffsetRaw))
+      : offset;
+    const parserTail = String(req.body?.parserTail || '');
+    const invalidRows = Math.max(0, Number(req.body?.invalidRows || 0));
+
+    // The client (CsvImportWizardModal) parses CSV rows in the browser and
+    // sends the already-structured `rows` array — it does NOT send a raw
+    // `chunk` text field. This route must consume `rows` directly.
     if (!chunkId) return res.status(400).json({ error: 'chunkId is required' });
+    if (!Array.isArray(req.body?.rows)) {
+      return res.status(400).json({ error: 'rows array is required' });
+    }
     if (offset !== Number(job.uploadOffsetBytes || 0)) {
       return res.status(409).json({ error: 'OFFSET_MISMATCH', expectedOffset: job.uploadOffsetBytes || 0 });
     }
 
-    const combined = String(job.parserTail || '') + chunk;
-    const parts = combined.replace(/\r/g, '').split('\n');
-    const tail = parts.pop() || '';
-    const rows = parseRows(parts.join('\n'), Number(job.processedRows || 0));
-    const invalidRows = rows.filter((row) => !row.valid).length;
-    const validRows = rows.filter((row) => row.valid);
+    const normalizedRows = (req.body.rows as any[])
+      .map((row) => ({
+        email: String(row?.email || '').trim().toLowerCase(),
+        firstName: row?.firstName ? String(row.firstName).slice(0, 200) : undefined,
+        lastName: row?.lastName ? String(row.lastName).slice(0, 200) : undefined,
+        company: row?.company ? String(row.company).slice(0, 200) : undefined,
+      }))
+      .filter((row) => EMAIL_REGEX.test(row.email));
 
-    const emails = validRows.map((row) => row.normalizedEmail);
+    const emails = normalizedRows.map((row) => row.email);
     const suppressedEmails = emails.length > 0
       ? await client.query('suppressions:findMany' as any, { userId, emails })
       : [];
-
-    const receivedBytes = Buffer.byteLength(chunk, 'utf8');
-    const nextOffset = offset + receivedBytes;
 
     const updated = await client.mutation('imports:processChunk' as any, {
       userId,
@@ -312,13 +326,8 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
       chunkId,
       offset,
       nextOffset,
-      parserTail: tail,
-      rows: validRows.map((row) => ({
-        email: row.normalizedEmail,
-        firstName: row.firstName || undefined,
-        lastName: row.lastName || undefined,
-        company: row.company || undefined,
-      })),
+      parserTail,
+      rows: normalizedRows,
       invalidRows,
       suppressedEmails,
       now: new Date().toISOString(),
@@ -330,7 +339,6 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
       import: formatted,
       processedRows: formatted?.processed_rows,
       nextOffset: formatted?.upload_offset_bytes,
-      completeBytes: sourceSizeBytes > 0 && (formatted?.upload_offset_bytes || 0) >= sourceSizeBytes,
     });
   } catch (err: any) {
     const message = err?.message || String(err);
@@ -371,6 +379,24 @@ importsRouter.post('/:id/cancel', optionalAuth, async (req, res) => {
     }
     const userId = req.user?.id || await convexService.getDefaultUserId();
     const record = await getClient().mutation('imports:cancel' as any, {
+      userId,
+      importId,
+      now: new Date().toISOString(),
+    });
+    return res.json({ success: true, import: formatImportJob(record) });
+  } catch (err: any) {
+    return res.status(409).json({ error: err?.message || String(err) });
+  }
+});
+
+importsRouter.post('/:id/fail', optionalAuth, async (req, res) => {
+  try {
+    const importId = req.params.id?.trim();
+    if (!isValidConvexId(importId)) {
+      return res.status(404).json({ error: 'Import not found' });
+    }
+    const userId = req.user?.id || await convexService.getDefaultUserId();
+    const record = await getClient().mutation('imports:fail' as any, {
       userId,
       importId,
       now: new Date().toISOString(),

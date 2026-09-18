@@ -144,39 +144,67 @@ export const processChunk = mutation({
     }
 
     const suppressed = new Set(args.suppressedEmails.map((email) => email.toLowerCase()));
-    let importedRows = 0;
-    let duplicateRows = 0;
-    let suppressedRows = 0;
 
-    const normListId = job.listId ? ctx.db.normalizeId("contact_lists", job.listId) : null;
-    let newMembersAdded = 0;
-
+    // De-duplicate rows within this chunk (case-insensitive), keeping the first
+    // occurrence. This is required because rows are now looked up/written
+    // concurrently below — two rows sharing the same email in one chunk would
+    // otherwise race each other and create two separate contacts.
+    const seen = new Map<string, (typeof args.rows)[number]>();
+    let intraChunkDuplicates = 0;
     for (const row of args.rows) {
       const email = row.email.trim().toLowerCase();
       if (!email) continue;
+      if (seen.has(email)) {
+        intraChunkDuplicates += 1;
+      } else {
+        seen.set(email, row);
+      }
+    }
+
+    let importedRows = 0;
+    let duplicateRows = intraChunkDuplicates;
+    let suppressedRows = 0;
+    let newMembersAdded = 0;
+
+    const normListId = job.listId ? ctx.db.normalizeId("contact_lists", job.listId) : null;
+
+    const workingRows: Array<[string, (typeof args.rows)[number]]> = [];
+    for (const [email, row] of seen) {
       if (suppressed.has(email)) {
         suppressedRows += 1;
         continue;
       }
+      workingRows.push([email, row]);
+    }
 
-      const existing = await ctx.db
-        .query("contacts")
-        .withIndex("by_userId_email", (q) => q.eq("userId", args.userId).eq("email", email))
-        .first();
+    // Phase 1: look up existing contacts concurrently instead of one row at a
+    // time — this is what previously made large chunks (tens of thousands of
+    // rows for plain email lists) exceed a single mutation's execution budget.
+    const existingLookups = await Promise.all(
+      workingRows.map(([email]) =>
+        ctx.db
+          .query("contacts")
+          .withIndex("by_userId_email", (q) => q.eq("userId", args.userId).eq("email", email))
+          .first()
+      )
+    );
 
-      let contactId: any;
-      if (existing) {
-        duplicateRows += 1;
-        contactId = existing._id;
-        await ctx.db.patch(existing._id, {
-          firstName: row.firstName || existing.firstName,
-          lastName: row.lastName || existing.lastName,
-          company: row.company || existing.company,
-          updatedAt: args.now,
-          tags: Array.from(new Set([...existing.tags, "import"])),
-        });
-      } else {
-        contactId = await ctx.db.insert("contacts", {
+    // Phase 2: insert/patch contacts concurrently and collect their ids.
+    const contactIds = await Promise.all(
+      workingRows.map(async ([email, row], idx) => {
+        const existing = existingLookups[idx];
+        if (existing) {
+          duplicateRows += 1;
+          await ctx.db.patch(existing._id, {
+            firstName: row.firstName || existing.firstName,
+            lastName: row.lastName || existing.lastName,
+            company: row.company || existing.company,
+            updatedAt: args.now,
+            tags: Array.from(new Set([...(existing.tags || []), "import"])),
+          });
+          return existing._id as any;
+        }
+        const id = await ctx.db.insert("contacts", {
           userId: args.userId,
           email,
           firstName: row.firstName,
@@ -188,38 +216,48 @@ export const processChunk = mutation({
           updatedAt: args.now,
         });
         importedRows += 1;
-      }
+        return id;
+      })
+    );
 
-      if (normListId) {
-        const membership = await ctx.db
-          .query("contact_list_memberships")
-          .withIndex("by_userId_listId_contactId", (q) =>
-            q.eq("userId", args.userId).eq("listId", normListId).eq("contactId", contactId)
-          )
-          .first();
+    // Phase 3: audience-list memberships, also concurrently.
+    if (normListId) {
+      const membershipChecks = await Promise.all(
+        contactIds.map((contactId) =>
+          ctx.db
+            .query("contact_list_memberships")
+            .withIndex("by_userId_listId_contactId", (q) =>
+              q.eq("userId", args.userId).eq("listId", normListId).eq("contactId", contactId)
+            )
+            .first()
+        )
+      );
 
-        if (!membership) {
-          await ctx.db.insert("contact_list_memberships", {
-            userId: args.userId,
-            listId: normListId,
-            contactId: contactId as string,
-            joinedAt: args.now,
-          });
-          newMembersAdded += 1;
+      await Promise.all(
+        contactIds.map(async (contactId, idx) => {
+          if (!membershipChecks[idx]) {
+            await ctx.db.insert("contact_list_memberships", {
+              userId: args.userId,
+              listId: normListId,
+              contactId: contactId as string,
+              joinedAt: args.now,
+            });
+            newMembersAdded += 1;
+          }
+        })
+      );
+
+      if (newMembersAdded > 0) {
+        try {
+          const list = await ctx.db.get(normListId);
+          if (list) {
+            await ctx.db.patch(list._id, {
+              contactCount: (list.contactCount || 0) + newMembersAdded,
+            });
+          }
+        } catch (e) {
+          console.warn("[imports.processChunk] Failed to update list count:", e);
         }
-      }
-    }
-
-    if (normListId && newMembersAdded > 0) {
-      try {
-        const list = await ctx.db.get(normListId);
-        if (list) {
-          await ctx.db.patch(list._id, {
-            contactCount: (list.contactCount || 0) + newMembersAdded,
-          });
-        }
-      } catch (e) {
-        console.warn("[imports.processChunk] Failed to update list count:", e);
       }
     }
 
@@ -293,5 +331,30 @@ export const cancel = mutation({
       updatedAt: args.now,
     });
     return { ...job, status: "CANCELLED", completedAt: args.now };
+  },
+});
+
+export const fail = mutation({
+  args: { userId: v.string(), importId: v.string(), now: v.string() },
+  handler: async (ctx, args) => {
+    const normJobId = ctx.db.normalizeId("import_jobs", args.importId);
+    if (!normJobId) throw new Error("Import job not found");
+    let job: any = null;
+    try {
+      job = await ctx.db.get(normJobId);
+    } catch (e) {
+      console.error("[imports.fail] Failed to get job:", e);
+      throw new Error("Import job not found");
+    }
+    if (!job || job.userId !== args.userId) throw new Error("Import job not found");
+    if (job.status === "COMPLETED" || job.status === "CANCELLED") {
+      return job;
+    }
+    await ctx.db.patch(job._id, {
+      status: "FAILED",
+      completedAt: args.now,
+      updatedAt: args.now,
+    });
+    return { ...job, status: "FAILED", completedAt: args.now };
   },
 });
