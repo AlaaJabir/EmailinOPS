@@ -84,9 +84,11 @@ importsRouter.post('/start', optionalAuth, async (req, res) => {
     const name = String(req.body?.name || req.body?.filename || 'Email import').trim().slice(0, 200);
     const filename = String(req.body?.filename || name).trim().slice(0, 255);
     const sourceSizeBytes = Math.max(0, Number(req.body?.sourceSizeBytes || 0));
+    const requestedListId = typeof req.body?.listId === 'string' && req.body.listId.trim() ? req.body.listId.trim() : undefined;
+    const requestedListName = typeof req.body?.listName === 'string' && req.body.listName.trim() ? req.body.listName.trim() : undefined;
     const result = await client.mutation('imports:start' as any, {
-      userId, name, originalFilename: filename, listName: name,
-      listDescription: `Imported audience · ${filename}`, sourceSizeBytes, now: new Date().toISOString(),
+      userId, name, originalFilename: filename, listId: requestedListId, listName: requestedListName || name,
+      listDescription: requestedListName ? undefined : `Imported audience · ${filename}`, sourceSizeBytes, now: new Date().toISOString(),
     });
     const record = await client.query('imports:get' as any, { userId, id: result.importId });
     return res.status(201).json({ success: true, import: record });
@@ -115,7 +117,7 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
     const combined = String(job.parserTail || '') + chunk;
     const parts = combined.replace(/\r/g, '').split('\n');
     const tail = parts.pop() || '';
-    const rows = parseRows(parts.join('\n'), Number(job.processedRows || 0));
+    const rows = parseRows(parts.join('\n'), Number(job.processedRows || 0)).filter((row) => !/^email$/i.test(row.email) && !/^e-?mail$/i.test(row.email));
     const invalidRows = rows.filter((row) => !row.valid).length;
     const validRows = rows.filter((row) => row.valid);
 
