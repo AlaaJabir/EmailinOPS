@@ -583,6 +583,7 @@ export function App() {
 
           {(currentTab === 'contacts' || currentTab === 'contacts-import') && (
             <>
+              <ImportHistoryPanel authFetch={authFetch} onUseAudience={useAudience} />
               <ContactsView
                 contacts={contacts}
                 lists={lists}
@@ -590,7 +591,6 @@ export function App() {
                 onCreateList={handleCreateList}
                 onImportCsv={handleImportCsv}
               />
-              <ImportHistoryPanel authFetch={authFetch} onUseAudience={useAudience} />
             </>
           )}
 
