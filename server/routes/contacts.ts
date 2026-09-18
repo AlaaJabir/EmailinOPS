@@ -9,146 +9,67 @@ contactsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id || await convexService.getDefaultUserId();
     const { search, status, listId } = req.query;
-    let contacts = await convexService.getContacts(
-      userId,
-      typeof listId === 'string' ? listId : undefined
-    );
-
-    if (search && typeof search === 'string') {
-      const q = search.toLowerCase();
-      contacts = contacts.filter(
-        (c) =>
-          c.email.toLowerCase().includes(q) ||
-          c.firstName?.toLowerCase().includes(q) ||
-          c.lastName?.toLowerCase().includes(q) ||
-          c.company?.toLowerCase().includes(q)
-      );
-    }
-    if (status && typeof status === 'string' && status !== 'ALL') {
-      contacts = contacts.filter((c) => c.status === status);
-    }
+    let contacts = await convexService.getContacts(userId, typeof listId === 'string' ? listId : undefined);
+    if (search && typeof search === 'string') { const q = search.toLowerCase(); contacts = contacts.filter((c) => c.email.toLowerCase().includes(q) || c.firstName?.toLowerCase().includes(q) || c.lastName?.toLowerCase().includes(q) || c.company?.toLowerCase().includes(q)); }
+    if (status && typeof status === 'string' && status !== 'ALL') contacts = contacts.filter((c) => c.status === status);
     return res.json({ contacts });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
 
 contactsRouter.post('/', optionalAuth, async (req: Request, res: Response) => {
   const { email, firstName, lastName, company, tags, listId } = req.body;
   const normalized = String(email || '').trim().toLowerCase();
   if (!normalized || !normalized.includes('@')) return res.status(400).json({ error: 'Valid email is required' });
-
   const userId = req.user?.id || await convexService.getDefaultUserId();
   const existing = (await convexService.getContacts(userId)).find((c) => c.email.toLowerCase() === normalized);
   if (existing) return res.status(409).json({ error: 'Contact already exists' });
-
-  const contact = await convexService.saveContact(
-    {
-      email: normalized,
-      firstName: firstName || undefined,
-      lastName: lastName || undefined,
-      company: company || undefined,
-      tags: Array.isArray(tags) ? tags : tags ? [tags] : [],
-      status: 'ACTIVE',
-    },
-    userId
-  );
-
-  if (listId) {
-    await convexService.addContactToList(
-      userId,
-      String(listId),
-      contact.id,
-      new Date().toISOString()
-    );
-  }
-
+  const contact = await convexService.saveContact({ email: normalized, firstName: firstName || undefined, lastName: lastName || undefined, company: company || undefined, tags: Array.isArray(tags) ? tags : tags ? [tags] : [], status: 'ACTIVE' }, userId);
+  if (listId) await convexService.addContactToList(userId, String(listId), contact.id, new Date().toISOString());
   return res.status(201).json({ success: true, contact });
 });
 
 contactsRouter.post('/import', optionalAuth, async (req: Request, res: Response) => {
   const { contacts, listId } = req.body;
   if (!Array.isArray(contacts) || !contacts.length) return res.status(400).json({ error: 'Valid array of contacts required' });
-
   const userId = req.user?.id || await convexService.getDefaultUserId();
   const suppressions = await convexService.getSuppressions(userId);
   const suppressedSet = new Set(suppressions.map((s) => s.email.toLowerCase()));
-
   const existingContacts = await convexService.getContacts(userId);
   const existingMap = new Map(existingContacts.map((c) => [c.email.toLowerCase(), c.id]));
-
-  let imported = 0;
-  let skippedSuppressed = 0;
-  let skippedDuplicates = 0;
-  let assignedToList = 0;
-
+  let imported = 0, skippedSuppressed = 0, skippedDuplicates = 0, assignedToList = 0;
   for (const item of contacts) {
     const email = String(item?.email || '').trim().toLowerCase();
     if (!email || !email.includes('@')) continue;
-
-    if (suppressedSet.has(email)) {
-      skippedSuppressed++;
-      continue;
-    }
-
-    if (existingMap.has(email)) {
-      skippedDuplicates++;
-      if (listId) {
-        const contactId = existingMap.get(email)!;
-        await convexService.addContactToList(userId, String(listId), contactId, new Date().toISOString());
-        assignedToList++;
-      }
-      continue;
-    }
-
-    const saved = await convexService.saveContact(
-      {
-        email,
-        firstName: item.firstName || item.name?.split(' ')[0] || undefined,
-        lastName: item.lastName || item.name?.split(' ').slice(1).join(' ') || undefined,
-        company: item.company || undefined,
-        tags: item.tags ? (Array.isArray(item.tags) ? item.tags : [item.tags]) : ['csv-import'],
-        status: 'ACTIVE',
-      },
-      userId
-    );
-    existingMap.set(email, saved.id);
-    imported++;
-
-    if (listId) {
-      await convexService.addContactToList(userId, String(listId), saved.id, new Date().toISOString());
-      assignedToList++;
-    }
+    if (suppressedSet.has(email)) { skippedSuppressed++; continue; }
+    if (existingMap.has(email)) { skippedDuplicates++; if (listId) { await convexService.addContactToList(userId, String(listId), existingMap.get(email)!, new Date().toISOString()); assignedToList++; } continue; }
+    const saved = await convexService.saveContact({ email, firstName: item.firstName || item.name?.split(' ')[0] || undefined, lastName: item.lastName || item.name?.split(' ').slice(1).join(' ') || undefined, company: item.company || undefined, tags: item.tags ? (Array.isArray(item.tags) ? item.tags : [item.tags]) : ['csv-import'], status: 'ACTIVE' }, userId);
+    existingMap.set(email, saved.id); imported++;
+    if (listId) { await convexService.addContactToList(userId, String(listId), saved.id, new Date().toISOString()); assignedToList++; }
   }
-
-  return res.json({
-    success: true,
-    imported,
-    assignedToList,
-    skippedSuppressed,
-    skippedDuplicates,
-    totalReceived: contacts.length,
-  });
+  return res.json({ success: true, imported, assignedToList, skippedSuppressed, skippedDuplicates, totalReceived: contacts.length });
 });
 
 contactsRouter.get('/lists', optionalAuth, async (req: Request, res: Response) => {
   const userId = req.user?.id || await convexService.getDefaultUserId();
-  const lists = await convexService.getContactLists(userId);
-  return res.json({ lists });
+  return res.json({ lists: await convexService.getContactLists(userId) });
+});
+
+contactsRouter.delete('/lists/:id', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id || await convexService.getDefaultUserId();
+    const client = convexService.getClient();
+    if (!client || !convexService.isConfigured) return res.status(503).json({ error: 'Convex persistence is not configured' });
+    const deleted = await client.mutation('contacts:deleteList' as any, { userId, listId: req.params.id });
+    if (!deleted) return res.status(404).json({ error: 'Audience list not found' });
+    return res.json({ success: true });
+  } catch (err: any) { return res.status(500).json({ error: err?.message || String(err) }); }
 });
 
 contactsRouter.post('/lists', optionalAuth, async (req: Request, res: Response) => {
   const { name, description } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
-
   const userId = req.user?.id || await convexService.getDefaultUserId();
   const now = new Date().toISOString();
-  const list = await convexService.createContactList(
-    userId,
-    String(name).trim(),
-    description ? String(description).trim() : undefined,
-    now
-  );
-
+  const list = await convexService.createContactList(userId, String(name).trim(), description ? String(description).trim() : undefined, now);
   return res.status(201).json({ success: true, list });
 });
