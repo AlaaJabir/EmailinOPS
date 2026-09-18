@@ -3,8 +3,7 @@ import { optionalAuth } from '../middleware/auth.js';
 import { convexService } from '../services/ConvexService.js';
 
 export const importsRouter = Router();
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_ROWS_PER_CHUNK = 100;
+const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i;
 
 type ImportRow = {
   rowNumber: number;
@@ -64,50 +63,122 @@ function parseCsvLine(line: string, delimiter: string): string[] {
   return out.map((value) => value.replace(/^['"]|['"]$/g, '').trim());
 }
 
-function looksLikeEmail(value: unknown): boolean {
-  return EMAIL_RE.test(String(value || '').trim().toLowerCase());
-}
-
 function findEmailColumn(headers: string[]): number {
   const normalized = headers.map((value) => value.toLowerCase().replace(/[\s_-]+/g, ''));
-  const preferred = ['email', 'emailaddress', 'mail', 'emailid', 'e-mail'];
+  const preferred = ['email', 'emailaddress', 'mail', 'emailid', 'e-mail', 'recipient', 'contact'];
   return normalized.findIndex((value) => preferred.includes(value));
 }
 
 function parseRows(text: string, startRow: number): ImportRow[] {
   const rows: ImportRow[] = [];
-  const lines = text.replace(/\r/g, '').split('\n').filter((line) => line.trim());
+  const lines = text.replace(/\r/g, '').split('\n').filter((line) => line.trim().length > 0);
   if (!lines.length) return rows;
 
-  const delimiter = detectDelimiter(lines[0]);
-  const firstCols = parseCsvLine(lines[0], delimiter);
+  const firstLine = lines[0];
+  const delimiter = detectDelimiter(firstLine);
+  const firstCols = parseCsvLine(firstLine, delimiter);
   const headerEmailColumn = findEmailColumn(firstCols);
-  const hasHeader = headerEmailColumn >= 0;
-  const emailColumn = hasHeader ? headerEmailColumn : -1;
+
+  // A line is considered a header row ONLY if it has a header name AND has no valid email address
+  const firstLineHasEmail = EMAIL_REGEX.test(firstLine);
+  const hasHeader = headerEmailColumn >= 0 && !firstLineHasEmail;
   const dataLines = hasHeader ? lines.slice(1) : lines;
 
   let rowNumber = startRow;
   for (const line of dataLines) {
-    const cols = parseCsvLine(line, delimiter);
     rowNumber += 1;
+    const trimmed = line.trim();
+    if (!trimmed) continue;
 
-    let emailIndex = emailColumn;
-    if (emailIndex < 0 || !looksLikeEmail(cols[emailIndex])) {
-      emailIndex = cols.findIndex((value) => looksLikeEmail(value));
+    const match = trimmed.match(EMAIL_REGEX);
+    if (!match) {
+      rows.push({
+        rowNumber,
+        email: '',
+        normalizedEmail: '',
+        firstName: null,
+        lastName: null,
+        company: null,
+        valid: false,
+      });
+      continue;
     }
 
-    const email = emailIndex >= 0 ? String(cols[emailIndex] || '').trim().toLowerCase() : '';
+    const email = match[0].toLowerCase();
+    let firstName: string | null = null;
+    let lastName: string | null = null;
+    let company: string | null = null;
+
+    if (delimiter && trimmed.includes(delimiter)) {
+      const cols = parseCsvLine(trimmed, delimiter);
+      const emailIdx = cols.findIndex((c) => c.toLowerCase().includes(email));
+      const otherCols = cols.filter((_, idx) => idx !== emailIdx);
+      if (otherCols.length >= 1 && otherCols[0]) firstName = otherCols[0];
+      if (otherCols.length >= 2 && otherCols[1]) lastName = otherCols[1];
+      if (otherCols.length >= 3 && otherCols[2]) company = otherCols[2];
+    } else if (trimmed.includes('<') && trimmed.includes('>')) {
+      const namePart = trimmed.split('<')[0].replace(/['"]/g, '').trim();
+      if (namePart) {
+        const parts = namePart.split(/\s+/);
+        firstName = parts[0] || null;
+        if (parts.length > 1) lastName = parts.slice(1).join(' ') || null;
+      }
+    }
+
     rows.push({
       rowNumber,
       email,
       normalizedEmail: email,
-      firstName: null,
-      lastName: null,
-      company: null,
-      valid: EMAIL_RE.test(email),
+      firstName,
+      lastName,
+      company,
+      valid: true,
     });
   }
   return rows;
+}
+
+function formatImportJob(j: any) {
+  if (!j) return null;
+  const startedAt = j.startedAt || j.createdAt || j.created_at || new Date().toISOString();
+  return {
+    id: j._id || j.id,
+    user_id: j.userId,
+    name: j.name,
+    original_filename: j.originalFilename || j.original_filename || j.name,
+    list_id: j.listId || j.list_id,
+    list_name: j.listName || j.list_name || j.name,
+    status: j.status,
+    source_size_bytes: j.sourceSizeBytes ?? j.source_size_bytes ?? 0,
+    upload_offset_bytes: j.uploadOffsetBytes ?? j.upload_offset_bytes ?? 0,
+    processed_rows: j.processedRows ?? j.processed_rows ?? 0,
+    total_rows: j.totalRows ?? j.total_rows ?? j.processedRows ?? 0,
+    valid_rows: j.validRows ?? j.valid_rows ?? 0,
+    invalid_rows: j.invalidRows ?? j.invalid_rows ?? 0,
+    duplicate_rows: j.duplicateRows ?? j.duplicate_rows ?? 0,
+    suppressed_rows: j.suppressedRows ?? j.suppressed_rows ?? 0,
+    imported_rows: j.importedRows ?? j.imported_rows ?? 0,
+    created_at: startedAt,
+    started_at: startedAt,
+    completed_at: j.completedAt || j.completed_at || null,
+    updated_at: j.updatedAt || j.updated_at || new Date().toISOString(),
+    // Also include camelCase fields so both styles are completely satisfied
+    userId: j.userId,
+    originalFilename: j.originalFilename || j.original_filename || j.name,
+    listId: j.listId || j.list_id,
+    listName: j.listName || j.list_name || j.name,
+    sourceSizeBytes: j.sourceSizeBytes ?? j.source_size_bytes ?? 0,
+    uploadOffsetBytes: j.uploadOffsetBytes ?? j.upload_offset_bytes ?? 0,
+    processedRows: j.processedRows ?? j.processed_rows ?? 0,
+    totalRows: j.totalRows ?? j.total_rows ?? j.processedRows ?? 0,
+    validRows: j.validRows ?? j.valid_rows ?? 0,
+    invalidRows: j.invalidRows ?? j.invalid_rows ?? 0,
+    duplicateRows: j.duplicateRows ?? j.duplicate_rows ?? 0,
+    suppressedRows: j.suppressedRows ?? j.suppressed_rows ?? 0,
+    importedRows: j.importedRows ?? j.imported_rows ?? 0,
+    startedAt: startedAt,
+    completedAt: j.completedAt || j.completed_at || null,
+  };
 }
 
 function getClient() {
@@ -119,7 +190,9 @@ function getClient() {
 importsRouter.get('/', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.id || await convexService.getDefaultUserId();
-    return res.json({ imports: await getClient().query('imports:list' as any, { userId }) });
+    const rawList = await getClient().query('imports:list' as any, { userId });
+    const formatted = Array.isArray(rawList) ? rawList.map(formatImportJob) : [];
+    return res.json({ imports: formatted });
   } catch (err: any) {
     return res.status(503).json({ error: err?.message || String(err) });
   }
@@ -130,7 +203,7 @@ importsRouter.get('/:id', optionalAuth, async (req, res) => {
     const userId = req.user?.id || await convexService.getDefaultUserId();
     const record = await getClient().query('imports:get' as any, { userId, id: req.params.id });
     if (!record) return res.status(404).json({ error: 'Import not found' });
-    return res.json({ import: record });
+    return res.json({ import: formatImportJob(record) });
   } catch (err: any) {
     return res.status(503).json({ error: err?.message || String(err) });
   }
@@ -140,17 +213,23 @@ importsRouter.post('/start', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.id || await convexService.getDefaultUserId();
     const client = getClient();
-    const name = String(req.body?.name || req.body?.filename || 'Email import').trim().slice(0, 200);
+    const name = String(req.body?.name || req.body?.filename || 'Contact import').trim().slice(0, 200);
     const filename = String(req.body?.filename || name).trim().slice(0, 255);
     const listId = String(req.body?.listId || '').trim() || undefined;
     const listName = String(req.body?.listName || name).trim().slice(0, 200);
     const sourceSizeBytes = Math.max(0, Number(req.body?.sourceSizeBytes || 0));
     const result = await client.mutation('imports:start' as any, {
-      userId, name, originalFilename: filename, listId, listName,
-      listDescription: `Imported audience · ${filename}`, sourceSizeBytes, now: new Date().toISOString(),
+      userId,
+      name,
+      originalFilename: filename,
+      listId,
+      listName,
+      listDescription: `Imported audience · ${filename}`,
+      sourceSizeBytes,
+      now: new Date().toISOString(),
     });
     const record = await client.query('imports:get' as any, { userId, id: result.importId });
-    return res.status(201).json({ success: true, import: record });
+    return res.status(201).json({ success: true, import: formatImportJob(record) });
   } catch (err: any) {
     return res.status(503).json({ error: err?.message || String(err) });
   }
@@ -163,7 +242,9 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
     const importId = req.params.id;
     const job = await client.query('imports:get' as any, { userId, id: importId });
     if (!job) return res.status(404).json({ error: 'Import not found' });
-    if (['COMPLETED', 'CANCELLED'].includes(job.status)) return res.status(409).json({ error: `Import is ${job.status.toLowerCase()}` });
+    if (['COMPLETED', 'CANCELLED'].includes(job.status)) {
+      return res.status(409).json({ error: `Import is ${job.status.toLowerCase()}` });
+    }
 
     const chunk = String(req.body?.chunk || '');
     const chunkId = String(req.body?.chunkId || '');
@@ -171,7 +252,9 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
     const sourceSizeBytes = Math.max(0, Number(req.body?.sourceSizeBytes || job.sourceSizeBytes || 0));
     if (!chunk) return res.status(400).json({ error: 'Chunk is required' });
     if (!chunkId) return res.status(400).json({ error: 'chunkId is required' });
-    if (offset !== Number(job.uploadOffsetBytes || 0)) return res.status(409).json({ error: 'OFFSET_MISMATCH', expectedOffset: job.uploadOffsetBytes || 0 });
+    if (offset !== Number(job.uploadOffsetBytes || 0)) {
+      return res.status(409).json({ error: 'OFFSET_MISMATCH', expectedOffset: job.uploadOffsetBytes || 0 });
+    }
 
     const combined = String(job.parserTail || '') + chunk;
     const parts = combined.replace(/\r/g, '').split('\n');
@@ -179,19 +262,41 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
     const rows = parseRows(parts.join('\n'), Number(job.processedRows || 0));
     const invalidRows = rows.filter((row) => !row.valid).length;
     const validRows = rows.filter((row) => row.valid);
-    if (validRows.length > MAX_ROWS_PER_CHUNK) return res.status(413).json({ error: `Chunk contains too many rows. Maximum is ${MAX_ROWS_PER_CHUNK}.` });
 
     const emails = validRows.map((row) => row.normalizedEmail);
-    const suppressedEmails = await client.query('suppressions:findMany' as any, { userId, emails });
+    const suppressedEmails = emails.length > 0
+      ? await client.query('suppressions:findMany' as any, { userId, emails })
+      : [];
+
     const receivedBytes = Buffer.byteLength(chunk, 'utf8');
     const nextOffset = offset + receivedBytes;
+
     const updated = await client.mutation('imports:processChunk' as any, {
-      userId, importId, chunkId, offset, nextOffset, parserTail: tail,
-      rows: validRows.map((row) => ({ email: row.normalizedEmail })),
-      invalidRows, suppressedEmails, now: new Date().toISOString(),
+      userId,
+      importId,
+      chunkId,
+      offset,
+      nextOffset,
+      parserTail: tail,
+      rows: validRows.map((row) => ({
+        email: row.normalizedEmail,
+        firstName: row.firstName || undefined,
+        lastName: row.lastName || undefined,
+        company: row.company || undefined,
+      })),
+      invalidRows,
+      suppressedEmails,
+      now: new Date().toISOString(),
     });
 
-    return res.json({ success: true, import: updated, processedRows: updated.processedRows, nextOffset: updated.uploadOffsetBytes, completeBytes: sourceSizeBytes > 0 && updated.uploadOffsetBytes >= sourceSizeBytes });
+    const formatted = formatImportJob(updated);
+    return res.json({
+      success: true,
+      import: formatted,
+      processedRows: formatted?.processed_rows,
+      nextOffset: formatted?.upload_offset_bytes,
+      completeBytes: sourceSizeBytes > 0 && (formatted?.upload_offset_bytes || 0) >= sourceSizeBytes,
+    });
   } catch (err: any) {
     const message = err?.message || String(err);
     const offsetMatch = message.match(/^OFFSET_MISMATCH:(\d+)$/);
@@ -207,9 +312,13 @@ importsRouter.post('/:id/complete', optionalAuth, async (req, res) => {
     const job = await client.query('imports:get' as any, { userId, id: req.params.id });
     if (!job) return res.status(404).json({ error: 'Import not found' });
     const record = await client.mutation('imports:complete' as any, {
-      userId, importId: req.params.id, now: new Date().toISOString(), finalOffset: Number(job.uploadOffsetBytes || 0), parserTail: String(job.parserTail || ''),
+      userId,
+      importId: req.params.id,
+      now: new Date().toISOString(),
+      finalOffset: Number(job.uploadOffsetBytes || 0),
+      parserTail: String(job.parserTail || ''),
     });
-    return res.json({ success: true, import: record });
+    return res.json({ success: true, import: formatImportJob(record) });
   } catch (err: any) {
     return res.status(409).json({ error: err?.message || String(err) });
   }
@@ -218,8 +327,12 @@ importsRouter.post('/:id/complete', optionalAuth, async (req, res) => {
 importsRouter.post('/:id/cancel', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.id || await convexService.getDefaultUserId();
-    const record = await getClient().mutation('imports:cancel' as any, { userId, importId: req.params.id, now: new Date().toISOString() });
-    return res.json({ success: true, import: record });
+    const record = await getClient().mutation('imports:cancel' as any, {
+      userId,
+      importId: req.params.id,
+      now: new Date().toISOString(),
+    });
+    return res.json({ success: true, import: formatImportJob(record) });
   } catch (err: any) {
     return res.status(409).json({ error: err?.message || String(err) });
   }

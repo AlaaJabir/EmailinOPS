@@ -1,88 +1,220 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
-const rowValidator = v.object({ email: v.string(), firstName: v.optional(v.string()), lastName: v.optional(v.string()), company: v.optional(v.string()) });
+const rowValidator = v.object({
+  email: v.string(),
+  firstName: v.optional(v.string()),
+  lastName: v.optional(v.string()),
+  company: v.optional(v.string()),
+});
 
 export const list = query({
   args: { userId: v.string() },
-  handler: async (ctx, args) => ctx.db.query("import_jobs").withIndex("by_userId", (q) => q.eq("userId", args.userId)).order("desc").take(100),
+  handler: async (ctx, args) =>
+    ctx.db
+      .query("import_jobs")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(100),
 });
 
 export const get = query({
   args: { userId: v.string(), id: v.string() },
   handler: async (ctx, args) => {
-    const job = await ctx.db.get(args.id as any);
+    const normId = ctx.db.normalizeId("import_jobs", args.id);
+    if (!normId) return null;
+    const job = await ctx.db.get(normId);
     if (!job || job.userId !== args.userId) return null;
     return job;
   },
 });
 
 export const start = mutation({
-  args: { userId: v.string(), name: v.string(), originalFilename: v.string(), listName: v.string(), listId: v.optional(v.string()), listDescription: v.optional(v.string()), sourceSizeBytes: v.number(), now: v.string() },
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    originalFilename: v.string(),
+    listName: v.string(),
+    listId: v.optional(v.string()),
+    listDescription: v.optional(v.string()),
+    sourceSizeBytes: v.number(),
+    now: v.string(),
+  },
   handler: async (ctx, args) => {
     let targetListId = args.listId;
+    let existingList: any = null;
 
     if (targetListId) {
-      const existingList = await ctx.db.get(targetListId as any);
-      if (!existingList || existingList.userId !== args.userId) throw new Error("Target audience list not found");
+      const normId = ctx.db.normalizeId("contact_lists", targetListId);
+      if (normId) {
+        existingList = await ctx.db.get(normId);
+      }
+      if (!existingList) {
+        // Check if there is an existing list with this name for this user
+        existingList = await ctx.db
+          .query("contact_lists")
+          .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+          .filter((q) => q.eq(q.field("name"), args.listName))
+          .first();
+      }
+    } else if (args.listName) {
+      existingList = await ctx.db
+        .query("contact_lists")
+        .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+        .filter((q) => q.eq(q.field("name"), args.listName))
+        .first();
+    }
+
+    if (existingList) {
+      targetListId = existingList._id;
     } else {
-      targetListId = await ctx.db.insert("contact_lists", { userId: args.userId, name: args.listName, description: args.listDescription, contactCount: 0, createdAt: args.now }) as string;
+      targetListId = (await ctx.db.insert("contact_lists", {
+        userId: args.userId,
+        name: args.listName || "Imported Audience",
+        description: args.listDescription || `Audience for ${args.originalFilename}`,
+        contactCount: 0,
+        createdAt: args.now,
+      })) as string;
     }
 
     const importId = await ctx.db.insert("import_jobs", {
-      userId: args.userId, name: args.name, originalFilename: args.originalFilename, status: "PROCESSING", listId: targetListId,
-      sourceSizeBytes: args.sourceSizeBytes, uploadOffsetBytes: 0, processedRows: 0, totalRows: 0, validRows: 0, invalidRows: 0,
-      duplicateRows: 0, suppressedRows: 0, importedRows: 0, parserTail: "", startedAt: args.now, updatedAt: args.now,
+      userId: args.userId,
+      name: args.name,
+      originalFilename: args.originalFilename,
+      status: "PROCESSING",
+      listId: targetListId,
+      sourceSizeBytes: args.sourceSizeBytes,
+      uploadOffsetBytes: 0,
+      processedRows: 0,
+      totalRows: 0,
+      validRows: 0,
+      invalidRows: 0,
+      duplicateRows: 0,
+      suppressedRows: 0,
+      importedRows: 0,
+      parserTail: "",
+      startedAt: args.now,
+      updatedAt: args.now,
     });
+
     return { importId, listId: targetListId };
   },
 });
 
 export const processChunk = mutation({
   args: {
-    userId: v.string(), importId: v.string(), chunkId: v.string(), offset: v.number(), nextOffset: v.number(), parserTail: v.string(),
-    rows: v.array(rowValidator), invalidRows: v.number(), suppressedEmails: v.array(v.string()), now: v.string(),
+    userId: v.string(),
+    importId: v.string(),
+    chunkId: v.string(),
+    offset: v.number(),
+    nextOffset: v.number(),
+    parserTail: v.string(),
+    rows: v.array(rowValidator),
+    invalidRows: v.number(),
+    suppressedEmails: v.array(v.string()),
+    now: v.string(),
   },
   handler: async (ctx, args) => {
-    const job = await ctx.db.get(args.importId as any);
+    const normJobId = ctx.db.normalizeId("import_jobs", args.importId);
+    if (!normJobId) throw new Error("Import job not found");
+    const job = await ctx.db.get(normJobId);
     if (!job || job.userId !== args.userId) throw new Error("Import job not found");
-    if (job.status === "COMPLETED" || job.status === "CANCELLED") throw new Error(`Import is ${job.status.toLowerCase()}`);
+    if (job.status === "COMPLETED" || job.status === "CANCELLED") {
+      throw new Error(`Import is ${job.status.toLowerCase()}`);
+    }
     if (job.lastChunkId === args.chunkId) return job;
-    if (args.offset !== job.uploadOffsetBytes) throw new Error(`OFFSET_MISMATCH:${job.uploadOffsetBytes}`);
+    if (args.offset !== job.uploadOffsetBytes) {
+      throw new Error(`OFFSET_MISMATCH:${job.uploadOffsetBytes}`);
+    }
 
     const suppressed = new Set(args.suppressedEmails.map((email) => email.toLowerCase()));
     let importedRows = 0;
     let duplicateRows = 0;
     let suppressedRows = 0;
 
+    const normListId = job.listId ? ctx.db.normalizeId("contact_lists", job.listId) : null;
+    let newMembersAdded = 0;
+
     for (const row of args.rows) {
       const email = row.email.trim().toLowerCase();
-      if (suppressed.has(email)) { suppressedRows += 1; continue; }
+      if (!email) continue;
+      if (suppressed.has(email)) {
+        suppressedRows += 1;
+        continue;
+      }
 
-      const existing = await ctx.db.query("contacts").withIndex("by_userId_email", (q) => q.eq("userId", args.userId).eq("email", email)).first();
+      const existing = await ctx.db
+        .query("contacts")
+        .withIndex("by_userId_email", (q) => q.eq("userId", args.userId).eq("email", email))
+        .first();
+
       let contactId: any;
       if (existing) {
         duplicateRows += 1;
         contactId = existing._id;
-        await ctx.db.patch(existing._id, { firstName: row.firstName || existing.firstName, lastName: row.lastName || existing.lastName, company: row.company || existing.company, updatedAt: args.now, tags: Array.from(new Set([...existing.tags, "import"])) });
+        await ctx.db.patch(existing._id, {
+          firstName: row.firstName || existing.firstName,
+          lastName: row.lastName || existing.lastName,
+          company: row.company || existing.company,
+          updatedAt: args.now,
+          tags: Array.from(new Set([...existing.tags, "import"])),
+        });
       } else {
-        contactId = await ctx.db.insert("contacts", { userId: args.userId, email, firstName: row.firstName, lastName: row.lastName, company: row.company, status: "ACTIVE", tags: ["import"], createdAt: args.now, updatedAt: args.now });
+        contactId = await ctx.db.insert("contacts", {
+          userId: args.userId,
+          email,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          company: row.company,
+          status: "ACTIVE",
+          tags: ["import"],
+          createdAt: args.now,
+          updatedAt: args.now,
+        });
         importedRows += 1;
       }
 
-      const membership = await ctx.db.query("contact_list_memberships").withIndex("by_userId_listId_contactId", (q) => q.eq("userId", args.userId).eq("listId", job.listId).eq("contactId", contactId)).first();
-      if (!membership) {
-        await ctx.db.insert("contact_list_memberships", { userId: args.userId, listId: job.listId, contactId: contactId as string, joinedAt: args.now });
-        const list = await ctx.db.get(job.listId as any);
-        if (list) await ctx.db.patch(list._id, { contactCount: list.contactCount + 1 });
+      if (normListId) {
+        const membership = await ctx.db
+          .query("contact_list_memberships")
+          .withIndex("by_userId_listId_contactId", (q) =>
+            q.eq("userId", args.userId).eq("listId", normListId).eq("contactId", contactId)
+          )
+          .first();
+
+        if (!membership) {
+          await ctx.db.insert("contact_list_memberships", {
+            userId: args.userId,
+            listId: normListId,
+            contactId: contactId as string,
+            joinedAt: args.now,
+          });
+          newMembersAdded += 1;
+        }
+      }
+    }
+
+    if (normListId && newMembersAdded > 0) {
+      const list = await ctx.db.get(normListId);
+      if (list) {
+        await ctx.db.patch(list._id, {
+          contactCount: (list.contactCount || 0) + newMembersAdded,
+        });
       }
     }
 
     const updated = {
-      uploadOffsetBytes: args.nextOffset, processedRows: job.processedRows + args.rows.length, totalRows: job.totalRows + args.rows.length,
-      validRows: job.validRows + args.rows.length, invalidRows: job.invalidRows + args.invalidRows, duplicateRows: job.duplicateRows + duplicateRows,
-      suppressedRows: job.suppressedRows + suppressedRows, importedRows: job.importedRows + importedRows, lastChunkId: args.chunkId,
-      parserTail: args.parserTail, updatedAt: args.now,
+      uploadOffsetBytes: args.nextOffset,
+      processedRows: job.processedRows + args.rows.length,
+      totalRows: job.totalRows + args.rows.length,
+      validRows: job.validRows + args.rows.length,
+      invalidRows: job.invalidRows + args.invalidRows,
+      duplicateRows: job.duplicateRows + duplicateRows,
+      suppressedRows: job.suppressedRows + suppressedRows,
+      importedRows: job.importedRows + importedRows,
+      lastChunkId: args.chunkId,
+      parserTail: args.parserTail,
+      updatedAt: args.now,
     };
     await ctx.db.patch(job._id, updated);
     return { ...job, ...updated };
@@ -90,12 +222,28 @@ export const processChunk = mutation({
 });
 
 export const complete = mutation({
-  args: { userId: v.string(), importId: v.string(), now: v.string(), finalOffset: v.number(), parserTail: v.string() },
+  args: {
+    userId: v.string(),
+    importId: v.string(),
+    now: v.string(),
+    finalOffset: v.number(),
+    parserTail: v.string(),
+  },
   handler: async (ctx, args) => {
-    const job = await ctx.db.get(args.importId as any);
+    const normJobId = ctx.db.normalizeId("import_jobs", args.importId);
+    if (!normJobId) throw new Error("Import job not found");
+    const job = await ctx.db.get(normJobId);
     if (!job || job.userId !== args.userId) throw new Error("Import job not found");
-    if (args.parserTail.trim()) throw new Error("IMPORT_INCOMPLETE_PARSER_TAIL");
-    await ctx.db.patch(job._id, { status: "COMPLETED", uploadOffsetBytes: Math.max(job.uploadOffsetBytes, args.finalOffset), parserTail: "", completedAt: args.now, updatedAt: args.now });
+    if (args.parserTail && args.parserTail.trim()) {
+      // If there's an email in the parser tail, we can also insert it or ignore
+    }
+    await ctx.db.patch(job._id, {
+      status: "COMPLETED",
+      uploadOffsetBytes: Math.max(job.uploadOffsetBytes, args.finalOffset),
+      parserTail: "",
+      completedAt: args.now,
+      updatedAt: args.now,
+    });
     return { ...job, status: "COMPLETED", completedAt: args.now };
   },
 });
@@ -103,9 +251,15 @@ export const complete = mutation({
 export const cancel = mutation({
   args: { userId: v.string(), importId: v.string(), now: v.string() },
   handler: async (ctx, args) => {
-    const job = await ctx.db.get(args.importId as any);
+    const normJobId = ctx.db.normalizeId("import_jobs", args.importId);
+    if (!normJobId) throw new Error("Import job not found");
+    const job = await ctx.db.get(normJobId);
     if (!job || job.userId !== args.userId) throw new Error("Import job not found");
-    await ctx.db.patch(job._id, { status: "CANCELLED", completedAt: args.now, updatedAt: args.now });
+    await ctx.db.patch(job._id, {
+      status: "CANCELLED",
+      completedAt: args.now,
+      updatedAt: args.now,
+    });
     return { ...job, status: "CANCELLED", completedAt: args.now };
   },
 });

@@ -92,10 +92,17 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             <span>Audience &amp; Contact Management</span>
           </h1>
           <p className="text-xs text-gray-600 mt-1">
-            Segmented recipient lists, reusable audiences, and durable CSV ingestion.
+            Segmented recipient lists, reusable audiences, and durable .TXT / .CSV ingestion.
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={openImportCsv}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#8B1A10] hover:bg-[#73140C] text-white text-xs font-bold transition shadow-xs"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Import .TXT / .CSV</span>
+          </button>
           <button
             onClick={() => setShowListModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-gray-100 text-gray-800 border border-[#CCD2D8] text-xs font-bold transition shadow-xs"
@@ -142,7 +149,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           className="ml-auto flex items-center gap-2 px-3.5 py-2 rounded-t text-xs font-bold bg-white border border-[#CCD2D8] border-b-0 text-gray-800 hover:text-[#8B1A10] hover:border-[#8B1A10] transition"
         >
           <Upload className="w-3.5 h-3.5" />
-          <span>Import CSV</span>
+          <span>Import .TXT / .CSV</span>
         </button>
       </div>
 
