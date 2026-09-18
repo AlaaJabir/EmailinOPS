@@ -59,11 +59,36 @@ export const ImportHistoryPanel: React.FC<{
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const normalizeImportRecord = (raw: any): ImportRecord => ({
+    id: String(raw?.id ?? raw?._id ?? ''),
+    name: String(raw?.name ?? ''),
+    original_filename: raw?.original_filename ?? raw?.originalFilename ?? '',
+    status: String(raw?.status ?? 'PROCESSING'),
+    total_rows: Number(raw?.total_rows ?? raw?.totalRows ?? 0),
+    valid_rows: Number(raw?.valid_rows ?? raw?.validRows ?? 0),
+    invalid_rows: Number(raw?.invalid_rows ?? raw?.invalidRows ?? 0),
+    duplicate_rows: Number(raw?.duplicate_rows ?? raw?.duplicateRows ?? 0),
+    suppressed_rows: Number(raw?.suppressed_rows ?? raw?.suppressedRows ?? 0),
+    imported_rows: Number(raw?.imported_rows ?? raw?.importedRows ?? 0),
+    processed_rows: Number(raw?.processed_rows ?? raw?.processedRows ?? 0),
+    list_id: raw?.list_id ?? raw?.listId ?? null,
+    source_size_bytes: Number(raw?.source_size_bytes ?? raw?.sourceSizeBytes ?? 0),
+    upload_offset_bytes: Number(raw?.upload_offset_bytes ?? raw?.uploadOffsetBytes ?? 0),
+    created_at:
+      raw?.created_at ??
+      raw?.createdAt ??
+      (raw?._creationTime
+        ? new Date(Number(raw._creationTime)).toISOString()
+        : new Date().toISOString()),
+    completed_at: raw?.completed_at ?? raw?.completedAt ?? null,
+    error_message: raw?.error_message ?? raw?.errorMessage ?? null,
+  });
+
   const load = async () => {
     try {
       const r = await authFetch('/api/imports');
       const d = await readJson<{ imports?: ImportRecord[] }>(r, 'Failed to load import history');
-      setImports(d.imports || []);
+      setImports((d.imports || []).map(normalizeImportRecord));
     } catch (e: any) {
       setError(e.message || 'Failed to load import history');
     }
@@ -80,7 +105,7 @@ export const ImportHistoryPanel: React.FC<{
     try {
       const historyResponse = await authFetch('/api/imports');
       const historyData = await readJson<{ imports?: ImportRecord[] }>(historyResponse, 'Failed to load import history');
-      const history: ImportRecord[] = historyData.imports || [];
+      const history: ImportRecord[] = (historyData.imports || []).map(normalizeImportRecord);
 
       const savedId = localStorage.getItem(resumeKey(file));
       let imp = savedId ? history.find((item) => item.id === savedId) : undefined;
@@ -100,13 +125,14 @@ export const ImportHistoryPanel: React.FC<{
           body: JSON.stringify({ name: file.name, filename: file.name, sourceSizeBytes: file.size }),
         });
         const sd = await readJson<{ import: ImportRecord }>(start, 'Could not start import');
-        imp = sd.import;
+        imp = normalizeImportRecord(sd.import);
+        if (!imp.id) throw new Error('Import API returned no import id.');
       }
 
       localStorage.setItem(resumeKey(file), imp.id);
       setCurrent(imp);
 
-      const chunkSize = 4 * 1024 * 1024;
+      const chunkSize = 512 * 1024;
       let offset = Math.max(0, Number(imp.upload_offset_bytes || 0));
       if (offset > file.size) throw new Error('Stored import offset is larger than the selected file. Start a fresh import.');
 
@@ -127,7 +153,8 @@ export const ImportHistoryPanel: React.FC<{
         });
         const d = await readJson<{ import: ImportRecord; nextOffset?: number }>(r, 'Import chunk failed');
 
-        imp = d.import;
+        imp = normalizeImportRecord(d.import);
+        if (!imp.id) throw new Error('Import chunk response returned no import id.');
         setCurrent(imp);
         offset = Number(d.nextOffset ?? imp.upload_offset_bytes ?? end);
       }
@@ -140,7 +167,7 @@ export const ImportHistoryPanel: React.FC<{
       const dd = await readJson<{ import: ImportRecord }>(done, 'Import completion failed');
 
       localStorage.removeItem(resumeKey(file));
-      setCurrent(dd.import);
+      setCurrent(normalizeImportRecord(dd.import));
       await load();
     } catch (e: any) {
       setError(e.message || 'Import failed');
