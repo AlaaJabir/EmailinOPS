@@ -420,7 +420,7 @@ export class ConvexService {
 
     if (this.isConfigured && this.client) {
       try {
-        await this.client.mutation('contacts:create' as any, {
+        const remoteId = await this.client.mutation('contacts:create' as any, {
           userId,
           email: clean.email,
           firstName: clean.firstName,
@@ -432,6 +432,7 @@ export class ConvexService {
           createdAt: clean.createdAt,
           updatedAt: clean.updatedAt,
         });
+        clean.id = String(remoteId);
       } catch (e) {
         console.warn('[ConvexService] saveContact mutation warning:', e);
       }
