@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Convex generated client files
+convex/_generated/
