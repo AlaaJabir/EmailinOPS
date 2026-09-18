@@ -4,6 +4,11 @@ import { convexService } from '../services/ConvexService.js';
 
 export const importsRouter = Router();
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i;
+const CONVEX_ID_REGEX = /^[a-z0-9]{32}$/;
+
+export function isValidConvexId(id?: string | null): boolean {
+  return typeof id === 'string' && CONVEX_ID_REGEX.test(id.trim());
+}
 
 type ImportRow = {
   rowNumber: number;
@@ -200,8 +205,12 @@ importsRouter.get('/', optionalAuth, async (req, res) => {
 
 importsRouter.get('/:id', optionalAuth, async (req, res) => {
   try {
+    const importId = req.params.id?.trim();
+    if (!isValidConvexId(importId)) {
+      return res.status(404).json({ error: 'Import not found' });
+    }
     const userId = req.user?.id || await convexService.getDefaultUserId();
-    const record = await getClient().query('imports:get' as any, { userId, id: req.params.id });
+    const record = await getClient().query('imports:get' as any, { userId, id: importId });
     if (!record) return res.status(404).json({ error: 'Import not found' });
     return res.json({ import: formatImportJob(record) });
   } catch (err: any) {
@@ -215,14 +224,35 @@ importsRouter.post('/start', optionalAuth, async (req, res) => {
     const client = getClient();
     const name = String(req.body?.name || req.body?.filename || 'Contact import').trim().slice(0, 200);
     const filename = String(req.body?.filename || name).trim().slice(0, 255);
-    const listId = String(req.body?.listId || '').trim() || undefined;
+    const rawListId = String(req.body?.listId || '').trim();
     const listName = String(req.body?.listName || name).trim().slice(0, 200);
     const sourceSizeBytes = Math.max(0, Number(req.body?.sourceSizeBytes || 0));
+
+    // Defensively resolve listId: ensure only valid 32-char Convex IDs are passed to Convex db.get
+    let resolvedListId: string | undefined = undefined;
+    if (isValidConvexId(rawListId)) {
+      resolvedListId = rawListId;
+    } else if (rawListId) {
+      try {
+        const existingLists = await client.query('contacts:listLists' as any, { userId });
+        if (Array.isArray(existingLists)) {
+          const match = existingLists.find(
+            (l: any) => l._id === rawListId || (listName && l.name?.toLowerCase() === listName.toLowerCase())
+          );
+          if (match?._id && isValidConvexId(match._id)) {
+            resolvedListId = match._id;
+          }
+        }
+      } catch (e) {
+        console.warn('[importsRouter] listId lookup warning:', e);
+      }
+    }
+
     const result = await client.mutation('imports:start' as any, {
       userId,
       name,
       originalFilename: filename,
-      listId,
+      listId: resolvedListId,
       listName,
       listDescription: `Imported audience · ${filename}`,
       sourceSizeBytes,
@@ -237,9 +267,12 @@ importsRouter.post('/start', optionalAuth, async (req, res) => {
 
 importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
   try {
+    const importId = req.params.id?.trim();
+    if (!isValidConvexId(importId)) {
+      return res.status(404).json({ error: 'Import not found' });
+    }
     const userId = req.user?.id || await convexService.getDefaultUserId();
     const client = getClient();
-    const importId = req.params.id;
     const job = await client.query('imports:get' as any, { userId, id: importId });
     if (!job) return res.status(404).json({ error: 'Import not found' });
     if (['COMPLETED', 'CANCELLED'].includes(job.status)) {
@@ -307,13 +340,17 @@ importsRouter.post('/:id/chunk', optionalAuth, async (req, res) => {
 
 importsRouter.post('/:id/complete', optionalAuth, async (req, res) => {
   try {
+    const importId = req.params.id?.trim();
+    if (!isValidConvexId(importId)) {
+      return res.status(404).json({ error: 'Import not found' });
+    }
     const userId = req.user?.id || await convexService.getDefaultUserId();
     const client = getClient();
-    const job = await client.query('imports:get' as any, { userId, id: req.params.id });
+    const job = await client.query('imports:get' as any, { userId, id: importId });
     if (!job) return res.status(404).json({ error: 'Import not found' });
     const record = await client.mutation('imports:complete' as any, {
       userId,
-      importId: req.params.id,
+      importId,
       now: new Date().toISOString(),
       finalOffset: Number(job.uploadOffsetBytes || 0),
       parserTail: String(job.parserTail || ''),
@@ -326,10 +363,14 @@ importsRouter.post('/:id/complete', optionalAuth, async (req, res) => {
 
 importsRouter.post('/:id/cancel', optionalAuth, async (req, res) => {
   try {
+    const importId = req.params.id?.trim();
+    if (!isValidConvexId(importId)) {
+      return res.status(404).json({ error: 'Import not found' });
+    }
     const userId = req.user?.id || await convexService.getDefaultUserId();
     const record = await getClient().mutation('imports:cancel' as any, {
       userId,
-      importId: req.params.id,
+      importId,
       now: new Date().toISOString(),
     });
     return res.json({ success: true, import: formatImportJob(record) });
