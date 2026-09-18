@@ -65,6 +65,43 @@ export const ImportHistoryPanel: React.FC<{
   const [current, setCurrent] = useState<ImportRecord | null>(null);
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [lists, setLists] = useState<AudienceList[]>([]);
+  const [showImportPicker, setShowImportPicker] = useState(false);
+  const [selectedListId, setSelectedListId] = useState('');
+  const [importMethod, setImportMethod] = useState<'file' | 'paste'>('file');
+  const [pasteValue, setPasteValue] = useState('');
+
+  const loadLists = async () => {
+    try {
+      const r = await authFetch('/api/contacts/lists');
+      const d = await readJson<{ lists?: AudienceList[] }>(r, 'Failed to load audience lists');
+      setLists(d.lists || []);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load audience lists');
+    }
+  };
+
+  const openImportPicker = async () => {
+    setError('');
+    setImportMethod('file');
+    setPasteValue('');
+    await loadLists();
+    setShowImportPicker(true);
+  };
+
+  const chooseFile = () => {
+    setImportMethod('file');
+    setShowImportPicker(false);
+    setTimeout(() => fileRef.current?.click(), 0);
+  };
+
+  const startPasteImport = async () => {
+    if (!selectedListId || !pasteValue.trim()) return;
+    const file = new File([pasteValue], 'pasted-contacts.csv', { type: 'text/csv' });
+    setShowImportPicker(false);
+    await importFile(file);
+  };
+
 
   const normalizeImportRecord = (raw: any): ImportRecord => ({
     id: String(raw?.id ?? raw?._id ?? ''),
