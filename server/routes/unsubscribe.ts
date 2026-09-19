@@ -157,23 +157,36 @@ async function processUnsubscribe(tokenStr: string, req: Request) {
   }
 
   const email = token.email;
+  const userId = token.userId || await convexService.getDefaultUserId();
+  const unsubscribedAt = new Date().toISOString();
 
-  // 1. Mark in in-memory store and suppression list
+  // 1. Mark in-memory store and suppression list
   const result = db.unsubscribeContact(email, {
     reason: 'User clicked unsubscribe link',
     source: 'unsubscribe_link',
     contactId: token.contactId,
   });
 
-  token.unsubscribedAt = new Date().toISOString();
+  token.unsubscribedAt = unsubscribedAt;
 
-  // 2. Persist to Convex if configured
+  // 2. Persist the suppression in Convex and mark the token as consumed.
   await convexService.addSuppression({
     email,
     type: 'UNSUBSCRIBED',
     reason: 'User clicked unsubscribe link',
     source: 'unsubscribe_link',
-  }, token.userId).catch(() => {});
+  }, userId).catch((error) => {
+    console.warn('[unsubscribe] Convex suppression persistence warning:', error);
+  });
+
+  if (convexService.isConfigured && convexService.getClient()) {
+    await convexService.getClient()!.mutation('unsubscribeTokens:markUnsubscribed' as any, {
+      token: tokenStr,
+      unsubscribedAt,
+    }).catch((error) => {
+      console.warn('[unsubscribe] Convex token persistence warning:', error);
+    });
+  }
 
   // 3. Record event if messageId exists
   if (token.messageId) {
