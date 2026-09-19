@@ -28,6 +28,7 @@ export const getCampaignRecipientEmails = query({
       .filter((row) => row.userId === args.userId)
       .map((row) => String(row.toEmail || "").trim().toLowerCase())
       .filter(Boolean);
+  },
 });
 
 export const getManyByInternalIds = query({
