@@ -17,6 +17,19 @@ export const get = query({
   },
 });
 
+export const getCampaignRecipientEmails = query({
+  args: { userId: v.string(), campaignId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("messages")
+      .withIndex("by_campaignId", (q) => q.eq("campaignId", args.campaignId))
+      .collect();
+    return rows
+      .filter((row) => row.userId === args.userId)
+      .map((row) => String(row.toEmail || "").trim().toLowerCase())
+      .filter(Boolean);
+});
+
 export const getManyByInternalIds = query({
   args: { userId: v.string(), ids: v.array(v.string()) },
   handler: async (ctx, args) => {
