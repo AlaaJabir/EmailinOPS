@@ -75,7 +75,12 @@ export const acquireSend = mutation({
       return { acquired: false, reason: "LEASE_ACTIVE" };
     }
 
-    const freshStart = campaign.status !== "SENDING";
+    const hasProgress = Boolean(
+      campaign.sendCursor ||
+      Number(campaign.sendProcessed || 0) > 0 ||
+      Number(campaign.sentCount || 0) > 0
+    );
+    const freshStart = !hasProgress && campaign.status !== "SENDING";
     const patch: any = {
       status: "SENDING",
       sendLeaseId: args.leaseId,
