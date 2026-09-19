@@ -11,13 +11,20 @@ interface Props {
   authFetch?: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-const replaceVars = (v: string, c?: Contact | null, email = '') =>
-  v
-    .replace(/\{\{\s*first_name\s*\}\}/gi, c?.firstName || 'there')
-    .replace(/\{\{\s*last_name\s*\}\}/gi, c?.lastName || '')
-    .replace(/\{\{\s*company\s*\}\}/gi, c?.company || 'your organization')
-    .replace(/\{\{\s*email\s*\}\}/gi, email || c?.email || 'recipient@example.com')
-    .replace(/\{\{\s*(unsubscribe_url|unsubscribe_link)\s*\}\}/gi, `${window.location.origin}/unsubscribe/preview`);
+const replaceVars = (v: string, c?: Contact | null, email = '') => {
+  const firstName = c?.firstName?.trim() || 'Amira';
+  const lastName = c?.lastName?.trim() || 'Lucia';
+  const company = c?.company?.trim() || 'AMIRALUCIA';
+  const recipientEmail = email?.trim() || c?.email?.trim() || 'service@amiralucia.com';
+  const unsubscribeUrl = `${window.location.origin}/unsubscribe/preview`;
+
+  return v
+    .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
+    .replace(/\{\{\s*last_name\s*\}\}/gi, lastName)
+    .replace(/\{\{\s*company\s*\}\}/gi, company)
+    .replace(/\{\{\s*email\s*\}\}/gi, recipientEmail)
+    .replace(/\{\{\s*(unsubscribe_url|unsubscribe_link)\s*\}\}/gi, unsubscribeUrl);
+};
 
 export const SendEmailView: React.FC<Props> = ({ senders, domains, contacts = [], onSendEmail, onSendTest, authFetch }) => {
   const [senderId, setSenderId] = useState('');

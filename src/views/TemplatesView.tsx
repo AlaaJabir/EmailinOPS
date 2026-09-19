@@ -44,10 +44,11 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
   const previewHtml = useMemo(
     () =>
       html
-        .replace(/\{\{\s*first_name\s*\}\}/gi, 'Alex')
-        .replace(/\{\{\s*last_name\s*\}\}/gi, 'Vance')
-        .replace(/\{\{\s*email\s*\}\}/gi, 'alex@example.com')
-        .replace(/\{\{\s*(unsubscribe_url|unsubscribe_link)\s*\}\}/gi, '#unsubscribe'),
+        .replace(/\{\{\s*first_name\s*\}\}/gi, 'Amira')
+        .replace(/\{\{\s*last_name\s*\}\}/gi, 'Lucia')
+        .replace(/\{\{\s*company\s*\}\}/gi, 'AMIRALUCIA')
+        .replace(/\{\{\s*email\s*\}\}/gi, 'service@amiralucia.com')
+        .replace(/\{\{\s*(unsubscribe_url|unsubscribe_link)\s*\}\}/gi, `${window.location.origin}/unsubscribe/preview`),
     [html]
   );
 
