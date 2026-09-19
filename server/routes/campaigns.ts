@@ -99,6 +99,8 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
   let suppressedCount = Number(current.sendSuppressed || 0);
   let sentCount = Number(current.sentCount || 0);
   let totalRecipients = Number(current.totalRecipients || 0);
+  const existingCampaignEmails = new Set<string>(await client.query('messages:getCampaignRecipientEmails' as any, { userId, campaignId: current._id || current.id }));
+  if (existingCampaignEmails.size > sentCount) sentCount = existingCampaignEmails.size;
   let pages = 0;
   const freshCampaignRun =
     totalRecipients === 0 &&
@@ -136,7 +138,7 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
       }
       suppressedCount += candidateContacts.filter((c: any) => suppressedEmails.has(String(c.email).trim().toLowerCase())).length;
 
-      const deterministicIds = candidateContacts.map((contact: any) => `cmp_${current._id || current.id}_cnt_${contact.id}`);
+      const deterministicIds = candidateContacts.map((contact: any) => `cmp_${current._id || current.id}_cnt_${String(contact._id || contact.id || contact.email)}`);
       const existingIds = new Set<string>(await client.query('messages:getManyByInternalIds' as any, { userId, ids: deterministicIds }));
 
       for (const contact of candidateContacts) {
@@ -158,8 +160,10 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
 
         const email = String(contact.email).trim().toLowerCase();
         if (suppressedEmails.has(email)) continue;
-        const internalId = `cmp_${current._id || current.id}_cnt_${contact.id}`;
-        if (existingIds.has(internalId)) {
+        const contactKey = String(contact._id || contact.id || contact.email);
+        const internalId = `cmp_${current._id || current.id}_cnt_${contactKey}`;
+        if (existingIds.has(internalId) || existingCampaignEmails.has(email)) {
+          existingCampaignEmails.add(email);
           processed += 1;
           continue;
         }
@@ -177,6 +181,7 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
             customHeaders: headers, campaignId: current._id || current.id, userId,
           });
           sentCount += 1;
+          existingCampaignEmails.add(email);
         } catch (_err) {
           failed += 1;
         }
