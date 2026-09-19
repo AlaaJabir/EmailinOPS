@@ -82,11 +82,29 @@ export class PersonalizationService {
       createdAt: new Date().toISOString(),
     };
 
-    // Store in-memory
+    // Keep a local copy for fast access, but persist the token in Convex so
+    // unsubscribe links continue to work after API restarts or redeploys.
     db.unsubscribeTokens = db.unsubscribeTokens || [];
     db.unsubscribeTokens.unshift(record);
 
-    const unsubscribeUrl = `${baseUrl}/unsubscribe/${rawToken}`;
+    try {
+      const { convexService } = await import('./ConvexService.js');
+      if (convexService.isConfigured && convexService.getClient()) {
+        await convexService.getClient()!.mutation('unsubscribeTokens:create' as any, {
+          token: record.token,
+          email: record.email,
+          contactId: record.contactId,
+          messageId: record.messageId,
+          campaignId: record.campaignId,
+          userId: record.userId,
+          createdAt: record.createdAt,
+        });
+      }
+    } catch (error) {
+      console.warn('[PersonalizationService] durable unsubscribe token save warning:', error);
+    }
+
+    const unsubscribeUrl = baseUrl + '/unsubscribe/' + rawToken;
 
     return {
       token: rawToken,
@@ -101,10 +119,35 @@ export class PersonalizationService {
     if (!token || typeof token !== 'string') return null;
     const cleanToken = token.trim();
 
-    // Check in-memory store
+    // Check memory first for the common path.
     const local = (db.unsubscribeTokens || []).find((t) => t.token === cleanToken);
-    if (local) {
-      return local;
+    if (local) return local;
+
+    // Fall back to durable Convex storage after restart/redeploy.
+    try {
+      const { convexService } = await import('./ConvexService.js');
+      if (convexService.isConfigured && convexService.getClient()) {
+        const remote: any = await convexService.getClient()!.query('unsubscribeTokens:get' as any, {
+          token: cleanToken,
+        });
+        if (remote) {
+          const record: UnsubscribeToken = {
+            token: remote.token,
+            email: remote.email,
+            contactId: remote.contactId,
+            messageId: remote.messageId,
+            campaignId: remote.campaignId,
+            userId: remote.userId,
+            createdAt: remote.createdAt,
+            unsubscribedAt: remote.unsubscribedAt,
+          };
+          db.unsubscribeTokens = db.unsubscribeTokens || [];
+          db.unsubscribeTokens.unshift(record);
+          return record;
+        }
+      }
+    } catch (error) {
+      console.warn('[PersonalizationService] durable unsubscribe token lookup warning:', error);
     }
 
     return null;
