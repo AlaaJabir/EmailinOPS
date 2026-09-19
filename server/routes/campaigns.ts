@@ -6,7 +6,7 @@ import { kumoMtaService } from '../services/KumoMtaService.js';
 
 export const campaignsRouter = Router();
 const CONTACT_PAGE_SIZE = 250;
-const SEND_LEASE_MS = 2 * 60 * 1000;
+const SEND_LEASE_MS = 15 * 60 * 1000;
 
 function buildHtml(head: unknown, body: unknown) {
   const h = String(head || '');
@@ -100,6 +100,13 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
   let sentCount = Number(current.sentCount || 0);
   let totalRecipients = Number(current.totalRecipients || 0);
   let pages = 0;
+  const freshCampaignRun =
+    totalRecipients === 0 &&
+    processed === 0 &&
+    sentCount === 0 &&
+    !cursor;
+  let lastLeaseRenewAt = Date.now();
+  let lastLeaseRenewProcessed = processed;
 
   try {
     while (true) {
@@ -124,13 +131,31 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
       const emails = contacts.map((c: any) => String(c.email || '').trim().toLowerCase()).filter(Boolean);
       const suppressedEmails = new Set<string>(await client.query('suppressions:findMany' as any, { userId, emails }));
       const candidateContacts = contacts.filter((c: any) => c.status === 'ACTIVE');
-      totalRecipients += candidateContacts.length;
+      if (freshCampaignRun) {
+        totalRecipients += candidateContacts.length;
+      }
       suppressedCount += candidateContacts.filter((c: any) => suppressedEmails.has(String(c.email).trim().toLowerCase())).length;
 
       const deterministicIds = candidateContacts.map((contact: any) => `cmp_${current._id || current.id}_cnt_${contact.id}`);
       const existingIds = new Set<string>(await client.query('messages:getManyByInternalIds' as any, { userId, ids: deterministicIds }));
 
       for (const contact of candidateContacts) {
+        if (
+          processed - lastLeaseRenewProcessed >= 25 ||
+          Date.now() - lastLeaseRenewAt >= 30_000
+        ) {
+          const renewed = await client.mutation('campaigns:renewSend' as any, {
+            id: current._id || current.id,
+            userId,
+            leaseId,
+            leaseUntil: new Date(Date.now() + SEND_LEASE_MS).toISOString(),
+            now: new Date().toISOString(),
+          });
+          if (!renewed) throw new Error('CAMPAIGN_SEND_LEASE_LOST');
+          lastLeaseRenewAt = Date.now();
+          lastLeaseRenewProcessed = processed;
+        }
+
         const email = String(contact.email).trim().toLowerCase();
         if (suppressedEmails.has(email)) continue;
         const internalId = `cmp_${current._id || current.id}_cnt_${contact.id}`;
