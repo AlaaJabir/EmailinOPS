@@ -158,33 +158,89 @@ campaignsRouter.post('/:id/send', optionalAuth, async (req, res) => {
           lastLeaseRenewProcessed = processed;
         }
 
-        const email = String(contact.email).trim().toLowerCase();
-        if (suppressedEmails.has(email)) continue;
-        const contactKey = String(contact._id || contact.id || contact.email);
-        const internalId = `cmp_${current._id || current.id}_cnt_${contactKey}`;
+        const email = String(contact.email || '').trim().toLowerCase();
+        if (!email) {
+          processed += 1;
+          failed += 1;
+          continue;
+        }
+
+        if (suppressedEmails.has(email)) {
+          processed += 1;
+          continue;
+        }
+
+        // Convex contacts use _id; older/local contact objects may use id.
+        // Resolve once and use the same stable ID everywhere in the send pipeline.
+        const contactId = String(contact._id || contact.id || '').trim();
+        if (!contactId) {
+          processed += 1;
+          failed += 1;
+          continue;
+        }
+
+        const internalId = `cmp_${current._id || current.id}_cnt_${contactId}`;
+
         if (existingIds.has(internalId) || existingCampaignEmails.has(email)) {
           existingCampaignEmails.add(email);
           processed += 1;
           continue;
         }
+
         try {
-          const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({ email, contactId: contact.id, messageId: internalId, campaignId: current._id || current.id, userId, baseUrl });
-          let html = personalizationService.personalizeContent(buildHtml(current.headHtml, current.htmlBody), { contact, email, unsubscribeUrl });
-          const subj = personalizationService.personalizeContent(current.subject, { contact, email, unsubscribeUrl });
-          if (current.trackClicks) html = personalizationService.rewriteLinksForClickTracking(html, internalId, baseUrl);
-          if (current.trackOpens) html = personalizationService.injectOpenTrackingPixel(html, internalId, baseUrl);
-          const headers = personalizationService.generateUnsubscribeHeaders(unsubscribeUrl, senderDomain);
+          const { unsubscribeUrl } = await personalizationService.generateUnsubscribeToken({
+            email,
+            contactId,
+            messageId: internalId,
+            campaignId: current._id || current.id,
+            userId,
+            baseUrl,
+          });
+
+          let html = personalizationService.personalizeContent(
+            buildHtml(current.headHtml, current.htmlBody),
+            { contact, email, unsubscribeUrl }
+          );
+
+          const subj = personalizationService.personalizeContent(
+            current.subject,
+            { contact, email, unsubscribeUrl }
+          );
+
+          if (current.trackClicks) {
+            html = personalizationService.rewriteLinksForClickTracking(html, internalId, baseUrl);
+          }
+
+          if (current.trackOpens) {
+            html = personalizationService.injectOpenTrackingPixel(html, internalId, baseUrl);
+          }
+
+          const headers = personalizationService.generateUnsubscribeHeaders(
+            unsubscribeUrl,
+            senderDomain
+          );
 
           await kumoMtaService.submitEmail({
-            internalId, contactId: contact.id, fromName: sender.name, fromEmail: sender.fromEmail, replyTo: sender.replyTo,
-            to: email, subject: subj, htmlBody: html, plainText: current.plainText || undefined,
-            customHeaders: headers, campaignId: current._id || current.id, userId,
+            internalId,
+            contactId,
+            fromName: sender.name,
+            fromEmail: sender.fromEmail,
+            replyTo: sender.replyTo,
+            to: email,
+            subject: subj,
+            htmlBody: html,
+            plainText: current.plainText || undefined,
+            customHeaders: headers,
+            campaignId: current._id || current.id,
+            userId,
           });
+
           sentCount += 1;
           existingCampaignEmails.add(email);
         } catch (_err) {
           failed += 1;
         }
+
         processed += 1;
       }
 
