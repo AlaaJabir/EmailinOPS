@@ -222,8 +222,9 @@ export class PersonalizationService {
     // 4. Handle {{email}}
     result = result.replace(/\{\{\s*email\s*\}\}/gi, email);
 
-    // 5. Handle {{unsubscribe_url}} and {{unsubscribe_link}}
+    // 5. Handle unsubscribe placeholders, including the legacy [UNSUBSCRIBE_URL] token.
     result = result.replace(/\{\{\s*(unsubscribe_url|unsubscribe_link|unsubscribeUrl|unsubscribeLink)\s*\}\}/gi, unsubscribeUrl);
+    result = result.replace(/\[UNSUBSCRIBE_URL\]/gi, unsubscribeUrl);
 
     // 6. Handle {{privacy_url}}
     result = result.replace(/\{\{\s*privacy_url\s*\}\}/gi, privacyUrl);
