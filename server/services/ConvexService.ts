@@ -617,8 +617,8 @@ export class ConvexService {
           sentCount: clean.sentCount,
           deliveredCount: clean.deliveredCount,
           bouncedCount: clean.bouncedCount,
-          openCount: clean.openCount,
-          clickCount: clean.clickCount,
+          openedCount: clean.openCount,
+          clickedCount: clean.clickCount,
           trackOpens: clean.trackOpens,
           trackClicks: clean.trackClicks,
           startedAt: clean.startedAt,
@@ -626,8 +626,9 @@ export class ConvexService {
           createdAt: clean.createdAt,
           updatedAt: clean.updatedAt,
         });
-      } catch (e) {
-        console.warn('[ConvexService] saveCampaign mutation warning:', e);
+      } catch (e: any) {
+        console.error('[ConvexService] saveCampaign mutation failed:', e);
+        throw new Error(`Failed to save campaign in Convex: ${e?.message || e}`);
       }
     }
     return clean;
