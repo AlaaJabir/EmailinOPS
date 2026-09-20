@@ -537,36 +537,43 @@ export class ConvexService {
     if (this.isConfigured && this.client) {
       try {
         const remote = await this.client.query('campaigns:list' as any, { userId });
-        if (Array.isArray(remote) && remote.length > 0) {
-          return remote.map((c: any) => ({
-            id: c._id || c.id,
-            name: c.name,
-            subject: c.subject,
-            senderId: c.senderId,
-            listId: c.listId,
-            status: c.status,
-            htmlBody: c.htmlBody || '',
-            headHtml: c.headHtml,
-            plainText: c.plainText,
-            totalRecipients: c.totalRecipients || 0,
-            sentCount: c.sentCount || 0,
-            deliveredCount: c.deliveredCount || 0,
-            bouncedCount: c.bouncedCount || 0,
-            complaintCount: c.complaintCount || 0,
-            openCount: c.openCount || c.openedCount || 0,
-            clickCount: c.clickCount || c.clickedCount || 0,
-            trackOpens: c.trackOpens !== false,
-            trackClicks: c.trackClicks !== false,
-            startedAt: c.startedAt,
-            completedAt: c.completedAt,
-            createdAt: c.createdAt,
-            updatedAt: c.updatedAt,
-          }));
+        if (!Array.isArray(remote)) {
+          throw new Error('Convex campaigns:list returned a non-array response');
         }
-      } catch (e) {
-        console.warn('[ConvexService] getCampaigns query warning:', e);
+        return remote.map((c: any) => ({
+          id: c._id || c.id,
+          name: c.name,
+          subject: c.subject,
+          senderId: c.senderId,
+          listId: c.listId,
+          status: c.status,
+          htmlBody: c.htmlBody || '',
+          headHtml: c.headHtml,
+          plainText: c.plainText,
+          totalRecipients: c.totalRecipients || 0,
+          sentCount: c.sentCount || 0,
+          deliveredCount: c.deliveredCount || 0,
+          bouncedCount: c.bouncedCount || 0,
+          complaintCount: c.complaintCount || 0,
+          openCount: c.openCount || c.openedCount || 0,
+          clickCount: c.clickCount || c.clickedCount || 0,
+          trackOpens: c.trackOpens !== false,
+          trackClicks: c.trackClicks !== false,
+          startedAt: c.startedAt,
+          completedAt: c.completedAt,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        }));
+      } catch (e: any) {
+        console.error('[ConvexService] getCampaigns query failed:', e);
+        throw new Error(`Failed to load campaigns from Convex: ${e?.message || e}`);
       }
     }
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Convex persistence is not configured in production');
+    }
+
     return db.campaigns;
   }
 
@@ -603,7 +610,7 @@ export class ConvexService {
 
     if (this.isConfigured && this.client) {
       try {
-        await this.client.mutation('campaigns:create' as any, {
+        const remoteId = await this.client.mutation('campaigns:create' as any, {
           userId,
           name: clean.name,
           subject: clean.subject,
@@ -626,6 +633,12 @@ export class ConvexService {
           createdAt: clean.createdAt,
           updatedAt: clean.updatedAt,
         });
+
+        const localIdx = db.campaigns.findIndex((c) => c.id === clean.id);
+        if (remoteId) {
+          clean.id = String(remoteId);
+          if (localIdx >= 0) db.campaigns[localIdx] = clean;
+        }
       } catch (e: any) {
         console.error('[ConvexService] saveCampaign mutation failed:', e);
         throw new Error(`Failed to save campaign in Convex: ${e?.message || e}`);
