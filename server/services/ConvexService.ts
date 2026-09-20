@@ -728,7 +728,7 @@ export class ConvexService {
     if (this.isConfigured && this.client) {
       try {
         const remote = await this.client.query('campaigns:list' as any, { userId });
-        if (Array.isArray(remote) && remote.length > 0) {
+        if (Array.isArray(remote)) {
           return remote.map((c: any) => ({
             id: c._id || c.id,
             name: c.name,
@@ -794,7 +794,7 @@ export class ConvexService {
 
     if (this.isConfigured && this.client) {
       try {
-        await this.client.mutation('campaigns:create' as any, {
+        const remoteId = await this.client.mutation('campaigns:create' as any, {
           userId,
           name: clean.name,
           subject: clean.subject,
@@ -808,8 +808,8 @@ export class ConvexService {
           sentCount: clean.sentCount,
           deliveredCount: clean.deliveredCount,
           bouncedCount: clean.bouncedCount,
-          openCount: clean.openCount,
-          clickCount: clean.clickCount,
+          openedCount: clean.openCount,
+          clickedCount: clean.clickCount,
           trackOpens: clean.trackOpens,
           trackClicks: clean.trackClicks,
           startedAt: clean.startedAt,
@@ -817,8 +817,14 @@ export class ConvexService {
           createdAt: clean.createdAt,
           updatedAt: clean.updatedAt,
         });
-      } catch (e) {
-        console.warn('[ConvexService] saveCampaign mutation warning:', e);
+        if (remoteId) {
+          clean.id = String(remoteId);
+          const localIdx = db.campaigns.findIndex((c) => c.id === campaign.id);
+          if (localIdx >= 0) db.campaigns[localIdx] = clean;
+        }
+      } catch (e: any) {
+        console.error('[ConvexService] saveCampaign mutation failed:', e);
+        throw new Error(`Failed to save campaign in Convex: ${e?.message || e}`);
       }
     }
     return clean;
